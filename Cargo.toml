@@ -16,8 +16,8 @@ license = "Apache-2.0"
 edition = "2021"
 rust-version = "1.81.0" # Attention - Change the MSRV in rust-toolchain and in .circleci/config.yml as well
 
-# [workspace]
-# members = ["cli", "node/helpers"]
+[workspace]
+members = ["cli", "node/helpers"]
 
 [[bin]]
 name = "amareleo-chain"
@@ -47,17 +47,17 @@ features = [ "derive" ]
 path = "./account"
 version = "=3.1.0"
 
-# [dependencies.snarkos-lite-cli]
-# path = "./cli"
-# version = "=3.1.0"
+[dependencies.snarkos-lite-cli]
+path = "./cli"
+version = "=3.1.0"
 
-# [dependencies.snarkos-lite-node]
-# path = "./node"
-# version = "=3.1.0"
+[dependencies.snarkos-lite-node]
+path = "./node"
+version = "=3.1.0"
 
-# [dependencies.snarkos-lite-node-helpers]
-# path = "./node/helpers"
-# version = "=3.1.0"
+[dependencies.snarkos-lite-node-helpers]
+path = "./node/helpers"
+version = "=3.1.0"
 
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 tikv-jemallocator = "0.5"
