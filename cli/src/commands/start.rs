@@ -351,6 +351,10 @@ fn compute_genesis<N: Network>(
     bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, Address<N>, u64)>,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
+    // AlexZ: Adding logs to highlight how slow this operation is,
+    // for future optimization.
+    println!(" Start Computing Genesis...");
+
     // Initialize a new VM.
     let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(Some(0))?)?;
     // Initialize the genesis block.
@@ -361,6 +365,7 @@ fn compute_genesis<N: Network>(
         bonded_balances,
         rng,
     )?;
+    println!(" Genesis Block computation ready.");
 
     // Return the genesis block.
     Ok(block)
