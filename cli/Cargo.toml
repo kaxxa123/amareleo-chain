@@ -75,13 +75,14 @@ version = "0.9"
 
 [dependencies.time]
 version = "0.3"
+features = ["formatting"]
 
 [dependencies.thiserror]
 version = "1.0"
 
 [dependencies.tokio]
 version = "1.28"
-features = ["rt"]
+features = ["rt", "rt-multi-thread"]
 
 [dependencies.tracing]
 version = "0.1"
