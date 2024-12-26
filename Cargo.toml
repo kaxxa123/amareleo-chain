@@ -59,5 +59,9 @@ version = "=3.1.0"
 path = "./node/helpers"
 version = "=3.1.0"
 
+[dependencies.snarkos-lite-node-bft-events]
+path = "./node/bft/events"
+version = "=3.1.0"
+
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 tikv-jemallocator = "0.5"
