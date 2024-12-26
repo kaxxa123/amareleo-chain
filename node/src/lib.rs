@@ -17,8 +17,16 @@
 #![allow(clippy::too_many_arguments)]
 #![recursion_limit = "256"]
 
+#[macro_use]
+extern crate async_trait;
+#[macro_use]
+extern crate tracing;
+
 mod validator;
 pub use validator::*;
 
 mod node;
 pub use node::*;
+
+mod traits;
+pub use traits::*;

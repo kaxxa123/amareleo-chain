@@ -2501,8 +2501,13 @@ version = "3.1.0"
 dependencies = [
  "aleo-std",
  "anyhow",
+ "async-trait",
+ "once_cell",
  "snarkos-lite-account",
  "snarkvm",
+ "tokio",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]
@@ -3721,8 +3726,21 @@ dependencies = [
  "libc",
  "mio 1.0.3",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
+ "tokio-macros",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "693d596312e88961bc67d7f1f97af8a70227d9f90c31bba5806eec004978d752"
+dependencies = [
+ "proc-macro2",
+ "quote 1.0.37",
+ "syn 2.0.91",
 ]
 
 [[package]]

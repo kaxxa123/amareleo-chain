@@ -16,3 +16,19 @@ workspace = true
 
 [dependencies.anyhow]
 version = "1.0.79"
+
+[dependencies.async-trait]
+version = "0.1"
+
+[dependencies.once_cell]
+version = "1"
+
+[dependencies.tokio]
+version = "1.28"
+features = ["rt", "signal", "macros"]
+
+[dependencies.tokio-util]
+version = "0.7"
+
+[dependencies.tracing]
+version = "0.1"

@@ -16,22 +16,14 @@
 use crate::Validator;
 use snarkos_lite_account::Account;
 
-use snarkvm::prelude::{
-    block::Block,
-    store::helpers::rocksdb::ConsensusDB,
-    // Address,
-    Network,
-    // PrivateKey,
-    // ViewKey,
-};
 use anyhow::Result;
+use snarkvm::prelude::{block::Block, store::helpers::rocksdb::ConsensusDB, Network};
 
 use aleo_std::StorageMode;
 use std::{
     net::SocketAddr,
     sync::{atomic::AtomicBool, Arc},
 };
-
 
 pub struct Node<N: Network> {
     /// The account private key.
@@ -49,36 +41,22 @@ impl<N: Network> Node<N> {
         storage_mode: StorageMode,
         dev_txs: bool,
         shutdown: Arc<AtomicBool>,
-    ) -> Result<Self> { 
+    ) -> Result<Self> {
         Ok(Self {
             validator: Arc::new(
-            Validator::new(
-                node_ip,
-                bft_ip,
-                rest_ip,
-                rest_rps,
-                account,
-                genesis,
-                storage_mode,
-                dev_txs,
-                shutdown,
-            ).await?,)
+                Validator::new(
+                    node_ip,
+                    bft_ip,
+                    rest_ip,
+                    rest_rps,
+                    account,
+                    genesis,
+                    storage_mode,
+                    dev_txs,
+                    shutdown,
+                )
+                .await?,
+            ),
         })
     }
-
-    // /// Returns the account private key of the node.
-    // pub fn private_key(&self) -> &PrivateKey<N> {
-    //     self.validator.private_key()
-    // }
-
-    // /// Returns the account view key of the node.
-    // pub fn view_key(&self) -> &ViewKey<N> {
-    //     self.validator.view_key()
-    // }
-
-    // /// Returns the account address of the node.
-    // pub fn address(&self) -> Address<N> {
-    //     self.validator.address()
-    // }
-
 }

@@ -93,11 +93,7 @@ impl Start {
         let shutdown: Arc<AtomicBool> = Default::default();
 
         // Initialize the logger.
-        let log_receiver = crate::helpers::initialize_logger(
-            self.verbosity,
-            self.logfile.clone(),
-            shutdown.clone(),
-        );
+        crate::helpers::initialize_logger(self.verbosity, self.logfile.clone(), shutdown.clone());
         // Initialize the runtime.
         Self::runtime().block_on(async move {
             // Clone the configurations.
