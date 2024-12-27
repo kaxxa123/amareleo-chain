@@ -13,23 +13,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![forbid(unsafe_code)]
-#![allow(clippy::too_many_arguments)]
-#![recursion_limit = "256"]
-
-#[macro_use]
-extern crate async_trait;
-#[macro_use]
-extern crate tracing;
-
-pub use snarkos_lite_node_bft as bft;
-pub use snarkvm;
-
-mod validator;
-pub use validator::*;
-
-mod node;
-pub use node::*;
-
-mod traits;
-pub use traits::*;
+pub mod channels;
+pub use channels::*;

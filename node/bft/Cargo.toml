@@ -1,0 +1,196 @@
+[package]
+name = "snarkos-lite-node-bft"
+version = "3.1.0"
+authors = ["The Aleo Team <hello@aleo.org>"]
+description = "A memory pool for a decentralized operating system"
+homepage = "https://amareleo.com"
+repository = "https://github.com/kaxxa123/amareleo-chain"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge",
+]
+categories = ["cryptography", "cryptography::cryptocurrencies", "os"]
+license = "Apache-2.0"
+edition = "2021"
+
+[features]
+default = []
+metrics = [
+  # "dep:metrics",
+  "snarkos-lite-node-bft-events/metrics",
+  # "snarkos-lite-node-bft-ledger-service/metrics",
+]
+test_targets = ["snarkvm/test_targets"]
+
+[dependencies.aleo-std]
+workspace = true
+
+[dependencies.anyhow]
+version = "1.0.79"
+
+[dependencies.async-recursion]
+version = "1.0"
+
+[dependencies.async-trait]
+version = "0.1"
+
+[dependencies.bytes]
+version = "1"
+
+[dependencies.colored]
+version = "2"
+
+[dependencies.futures]
+version = "0.3.30"
+features = ["thread-pool"]
+
+[dependencies.indexmap]
+version = "2.1"
+features = ["serde", "rayon"]
+
+# [dependencies.metrics]
+# package = "snarkos-node-metrics"
+# path = "../metrics"
+# version = "=3.1.0"
+# optional = true
+
+[dependencies.parking_lot]
+version = "0.12"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.rayon]
+version = "1"
+
+[dependencies.serde]
+version = "1"
+
+[dependencies.sha2]
+version = "0.10"
+default-features = false
+
+[dependencies.snarkos-lite-account]
+path = "../../account"
+version = "=3.1.0"
+
+[dependencies.snarkos-lite-node-bft-events]
+path = "./events"
+version = "=3.1.0"
+
+[dependencies.snarkos-lite-node-sync-locators]
+path = "../sync/locators"
+version = "=3.1.0"
+
+# [dependencies.snarkos-node-bft-ledger-service]
+# path = "./ledger-service"
+# version = "=3.1.0"
+# features = ["ledger", "prover"]
+
+# [dependencies.snarkos-node-bft-storage-service]
+# path = "./storage-service"
+# version = "=3.1.0"
+# features = ["memory"]
+
+# [dependencies.snarkos-node-sync]
+# path = "../sync"
+# version = "=3.1.0"
+
+# [dependencies.snarkos-node-tcp]
+# path = "../tcp"
+# version = "=3.1.0"
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.time]
+version = "0.3"
+
+[dependencies.tokio]
+version = "1.28"
+features = ["macros", "rt-multi-thread", "signal"]
+
+[dependencies.tokio-stream]
+version = "=0.1"
+
+[dependencies.tokio-util]
+version = "0.7"
+features = ["codec"]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dependencies.rand_chacha]
+version = "0.3.0"
+default-features = false
+
+[dev-dependencies.axum]
+version = "0.7"
+
+[dev-dependencies.axum-extra]
+version = "0.9"
+default-features = false
+features = ["erased-json"]
+
+[dev-dependencies.clap]
+version = "4.4"
+
+[dev-dependencies.deadline]
+version = "0.2"
+
+[dev-dependencies.itertools]
+version = "0.12"
+
+[dev-dependencies.open]
+version = "5"
+
+[dev-dependencies.paste]
+version = "1"
+
+[dev-dependencies.pea2pea]
+version = "0.49"
+
+[dev-dependencies.proptest]
+version = "1.4.0"
+
+[dev-dependencies.rand_chacha]
+version = "0.3"
+
+[dev-dependencies.rand_distr]
+version = "0.4"
+
+[dev-dependencies.rayon]
+version = "1"
+
+# [dev-dependencies.snarkos-node-bft-ledger-service]
+# path = "./ledger-service"
+# default-features = false
+# features = ["test"]
+
+# [dev-dependencies.snarkos-node-bft-storage-service]
+# path = "./storage-service"
+# features = ["test"]
+
+[dev-dependencies.snarkvm]
+workspace = true
+features = ["test-helpers"]
+
+[dev-dependencies.test-strategy]
+version = "0.3.1"
+
+[dev-dependencies.tower-http]
+version = "0.5"
+features = ["fs", "trace"]
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+features = ["env-filter"]
+
+[dev-dependencies.tracing-test]
+version = "0.1"
+
+[dev-dependencies.mockall]
+version = "0.12.1"
