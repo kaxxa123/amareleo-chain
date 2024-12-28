@@ -16,6 +16,18 @@ categories = ["cryptography", "cryptography::cryptocurrencies", "os"]
 license = "Apache-2.0"
 edition = "2021"
 
+[features]
+default = ["parallel"]
+parallel = ["rayon"]
+timer = ["aleo-std/timer"]
+metrics = [
+    "dep:metrics",
+    "snarkos-lite-node-bft/metrics",
+    # "snarkos-lite-node-consensus/metrics",
+    # "snarkos-lite-node-router/metrics",
+    # "snarkos-lite-node-tcp/metrics",
+]
+
 [dependencies.snarkvm]
 workspace = true
 features = ["console"]
@@ -39,6 +51,10 @@ version = "0.1"
 [dependencies.once_cell]
 version = "1"
 
+[dependencies.rayon]
+version = "1"
+optional = true
+
 [dependencies.tokio]
 version = "1.28"
 features = ["rt", "signal", "macros"]
@@ -48,3 +64,9 @@ version = "0.7"
 
 [dependencies.tracing]
 version = "0.1"
+
+[dependencies.metrics]
+package = "snarkos-lite-node-metrics"
+path = "./metrics"
+version = "=3.1.0"
+optional = true

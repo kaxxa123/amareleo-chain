@@ -77,6 +77,13 @@ pub struct Start {
     #[clap(default_value_os_t = std::env::temp_dir().join("amareleo-chain.log"), long = "logfile")]
     pub logfile: PathBuf,
 
+    /// Enables the metrics exporter
+    #[clap(default_value = "false", long = "metrics")]
+    pub metrics: bool,
+    /// Specify the IP address and port for the metrics exporter
+    #[clap(long = "metrics-ip")]
+    pub metrics_ip: Option<SocketAddr>,
+
     /// Specify the path to a directory containing the storage database for the ledger
     #[clap(long = "storage")]
     pub storage: Option<PathBuf>,
@@ -295,6 +302,11 @@ impl Start {
             // if let Ok(jwt_token) = snarkos_lite_node_rest::Claims::new(account.address()).to_jwt_string() {
             //     println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
             // }
+        }
+
+        // Initialize the metrics.
+        if self.metrics {
+            metrics::initialize_metrics(self.metrics_ip);
         }
 
         // Initialize the storage mode.

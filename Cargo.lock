@@ -100,6 +100,9 @@ name = "aleo-std-timer"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e4f181fc1a372e8ceff89612e5c9b13f72bff5b066da9f8d6827ae65af492c4"
+dependencies = [
+ "colored",
+]
 
 [[package]]
 name = "allocator-api2"
@@ -117,6 +120,7 @@ dependencies = [
  "snarkos-lite-node",
  "snarkos-lite-node-bft-events",
  "snarkos-lite-node-helpers",
+ "snarkos-lite-node-metrics",
  "tikv-jemallocator",
 ]
 
@@ -3000,6 +3004,7 @@ dependencies = [
  "snarkos-lite-account",
  "snarkos-lite-node",
  "snarkos-lite-node-helpers",
+ "snarkos-lite-node-metrics",
  "snarkvm",
  "sys-info",
  "thiserror 1.0.69",
@@ -3017,8 +3022,10 @@ dependencies = [
  "anyhow",
  "async-trait",
  "once_cell",
+ "rayon",
  "snarkos-lite-account",
  "snarkos-lite-node-bft",
+ "snarkos-lite-node-metrics",
  "snarkvm",
  "tokio",
  "tokio-util",
@@ -3056,6 +3063,7 @@ dependencies = [
  "sha2",
  "snarkos-lite-account",
  "snarkos-lite-node-bft-events",
+ "snarkos-lite-node-metrics",
  "snarkos-lite-node-sync-locators",
  "snarkvm",
  "test-strategy",
@@ -3079,6 +3087,7 @@ dependencies = [
  "proptest",
  "rayon",
  "serde",
+ "snarkos-lite-node-metrics",
  "snarkos-lite-node-sync-locators",
  "snarkvm",
  "test-strategy",
@@ -3092,6 +3101,18 @@ name = "snarkos-lite-node-helpers"
 version = "3.1.0"
 dependencies = [
  "aleo-std",
+]
+
+[[package]]
+name = "snarkos-lite-node-metrics"
+version = "3.1.0"
+dependencies = [
+ "metrics-exporter-prometheus",
+ "parking_lot",
+ "rayon",
+ "snarkvm",
+ "time",
+ "tokio",
 ]
 
 [[package]]
