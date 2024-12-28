@@ -3063,6 +3063,7 @@ dependencies = [
  "sha2",
  "snarkos-lite-account",
  "snarkos-lite-node-bft-events",
+ "snarkos-lite-node-bft-ledger-service",
  "snarkos-lite-node-metrics",
  "snarkos-lite-node-sync-locators",
  "snarkvm",
@@ -3093,6 +3094,21 @@ dependencies = [
  "test-strategy",
  "time",
  "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-lite-node-bft-ledger-service"
+version = "3.1.0"
+dependencies = [
+ "async-trait",
+ "indexmap",
+ "lru",
+ "parking_lot",
+ "rand",
+ "snarkos-lite-node-metrics",
+ "snarkvm",
+ "tokio",
  "tracing",
 ]
 

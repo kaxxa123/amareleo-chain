@@ -21,7 +21,7 @@ default = []
 metrics = [
   "dep:metrics",
   "snarkos-lite-node-bft-events/metrics",
-  # "snarkos-lite-node-bft-ledger-service/metrics",
+  "snarkos-lite-node-bft-ledger-service/metrics",
 ]
 test_targets = ["snarkvm/test_targets"]
 
@@ -85,10 +85,10 @@ version = "=3.1.0"
 path = "../sync/locators"
 version = "=3.1.0"
 
-# [dependencies.snarkos-node-bft-ledger-service]
-# path = "./ledger-service"
-# version = "=3.1.0"
-# features = ["ledger", "prover"]
+[dependencies.snarkos-lite-node-bft-ledger-service]
+path = "./ledger-service"
+version = "=3.1.0"
+features = ["ledger", "prover"]
 
 # [dependencies.snarkos-node-bft-storage-service]
 # path = "./storage-service"
@@ -165,10 +165,10 @@ version = "0.4"
 [dev-dependencies.rayon]
 version = "1"
 
-# [dev-dependencies.snarkos-node-bft-ledger-service]
-# path = "./ledger-service"
-# default-features = false
-# features = ["test"]
+[dev-dependencies.snarkos-lite-node-bft-ledger-service]
+path = "./ledger-service"
+default-features = false
+features = ["test"]
 
 # [dev-dependencies.snarkos-node-bft-storage-service]
 # path = "./storage-service"
