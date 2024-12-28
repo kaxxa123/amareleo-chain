@@ -13,17 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{fmt_id, spawn_blocking, LedgerService};
+use crate::{LedgerService, fmt_id, spawn_blocking};
 use snarkvm::{
     ledger::{
+        Ledger,
         block::{Block, Transaction},
         committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
         store::ConsensusStorage,
-        Ledger,
     },
-    prelude::{bail, Address, Field, FromBytes, Network, Result},
+    prelude::{Address, Field, FromBytes, Network, Result, bail},
 };
 
 use indexmap::IndexMap;
@@ -34,8 +34,8 @@ use std::{
     io::Read,
     ops::Range,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
@@ -54,24 +54,15 @@ pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
 impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     /// Initializes a new core ledger service.
     pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
-        let committee_cache = Arc::new(Mutex::new(LruCache::new(
-            COMMITTEE_CACHE_SIZE.try_into().unwrap(),
-        )));
-        Self {
-            ledger,
-            committee_cache,
-            latest_leader: Default::default(),
-            shutdown,
-        }
+        let committee_cache = Arc::new(Mutex::new(LruCache::new(COMMITTEE_CACHE_SIZE.try_into().unwrap())));
+        Self { ledger, committee_cache, latest_leader: Default::default(), shutdown }
     }
 }
 
 impl<N: Network, C: ConsensusStorage<N>> fmt::Debug for CoreLedgerService<N, C> {
     /// Implements a custom `fmt::Debug` for `CoreLedgerService`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CoreLedgerService")
-            .field("current_committee", &self.current_committee())
-            .finish()
+        f.debug_struct("CoreLedgerService").field("current_committee", &self.current_committee()).finish()
     }
 }
 
@@ -144,10 +135,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     }
 
     /// Returns the unconfirmed transaction for the given transaction ID.
-    fn get_unconfirmed_transaction(
-        &self,
-        transaction_id: N::TransactionID,
-    ) -> Result<Transaction<N>> {
+    fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
         self.ledger.get_unconfirmed_transaction(&transaction_id)
     }
 
@@ -155,9 +143,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>> {
         match self.ledger.get_batch_certificate(certificate_id) {
             Ok(Some(certificate)) => Ok(certificate),
-            Ok(None) => bail!(
-                "No batch certificate found for certificate ID {certificate_id} in the ledger"
-            ),
+            Ok(None) => bail!("No batch certificate found for certificate ID {certificate_id} in the ledger"),
             Err(error) => Err(error),
         }
     }
@@ -205,8 +191,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         };
 
         // Get the committee lookback round.
-        let committee_lookback_round =
-            previous_round.saturating_sub(Committee::<N>::COMMITTEE_LOOKBACK_RANGE);
+        let committee_lookback_round = previous_round.saturating_sub(Committee::<N>::COMMITTEE_LOOKBACK_RANGE);
 
         // Retrieve the committee for the committee lookback round.
         self.get_committee_for_round(committee_lookback_round)
@@ -221,12 +206,8 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
         match transmission_id {
             TransmissionID::Ratification => Ok(false),
-            TransmissionID::Solution(solution_id, _) => {
-                self.ledger.contains_solution_id(solution_id)
-            }
-            TransmissionID::Transaction(transaction_id, _) => {
-                self.ledger.contains_transaction_id(transaction_id)
-            }
+            TransmissionID::Solution(solution_id, _) => self.ledger.contains_solution_id(solution_id),
+            TransmissionID::Transaction(transaction_id, _) => self.ledger.contains_transaction_id(transaction_id),
         }
     }
 
@@ -245,9 +226,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
                 // Deserialize the transaction. If the transaction exceeds the maximum size, then return an error.
                 let transaction = match transaction_data.clone() {
                     Data::Object(transaction) => transaction,
-                    Data::Buffer(bytes) => {
-                        Transaction::<N>::read_le(&mut bytes.take(N::MAX_TRANSACTION_SIZE as u64))?
-                    }
+                    Data::Buffer(bytes) => Transaction::<N>::read_le(&mut bytes.take(N::MAX_TRANSACTION_SIZE as u64))?,
                 };
                 // Ensure the transaction ID matches the expected transaction ID.
                 if transaction.id() != expected_transaction_id {
@@ -315,19 +294,12 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     }
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        solution_id: SolutionID<N>,
-        solution: Data<Solution<N>>,
-    ) -> Result<()> {
+    async fn check_solution_basic(&self, solution_id: SolutionID<N>, solution: Data<Solution<N>>) -> Result<()> {
         // Deserialize the solution.
         let solution = spawn_blocking!(solution.deserialize_blocking())?;
         // Ensure the solution ID matches in the solution.
         if solution_id != solution.id() {
-            bail!(
-                "Invalid solution - expected {solution_id}, found {}",
-                solution.id()
-            );
+            bail!("Invalid solution - expected {solution_id}, found {}", solution.id());
         }
 
         // Compute the current epoch hash.
@@ -339,10 +311,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         let puzzle = self.ledger.puzzle().clone();
         match spawn_blocking!(puzzle.check_solution(&solution, epoch_hash, proof_target)) {
             Ok(()) => Ok(()),
-            Err(e) => bail!(
-                "Invalid solution '{}' for the current epoch - {e}",
-                fmt_id(solution_id)
-            ),
+            Err(e) => bail!("Invalid solution '{}' for the current epoch - {e}", fmt_id(solution_id)),
         }
     }
 
@@ -356,24 +325,16 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         let transaction = spawn_blocking!({
             match transaction {
                 Data::Object(transaction) => Ok(transaction),
-                Data::Buffer(bytes) => Ok(Transaction::<N>::read_le(
-                    &mut bytes.take(N::MAX_TRANSACTION_SIZE as u64),
-                )?),
+                Data::Buffer(bytes) => Ok(Transaction::<N>::read_le(&mut bytes.take(N::MAX_TRANSACTION_SIZE as u64))?),
             }
         })?;
         // Ensure the transaction ID matches in the transaction.
         if transaction_id != transaction.id() {
-            bail!(
-                "Invalid transaction - expected {transaction_id}, found {}",
-                transaction.id()
-            );
+            bail!("Invalid transaction - expected {transaction_id}, found {}", transaction.id());
         }
         // Check if the transmission is a fee transaction.
         if transaction.is_fee() {
-            bail!(
-                "Invalid transaction - 'Transaction::fee' type is not valid at this stage ({})",
-                transaction.id()
-            );
+            bail!("Invalid transaction - 'Transaction::fee' type is not valid at this stage ({})", transaction.id());
         }
         // Check the transaction is well-formed.
         let ledger = self.ledger.clone();
@@ -392,11 +353,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<Block<N>> {
-        self.ledger.prepare_advance_to_next_quorum_block(
-            subdag,
-            transmissions,
-            &mut rand::thread_rng(),
-        )
+        self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions, &mut rand::thread_rng())
     }
 
     /// Adds the given block as the next block in the ledger.
@@ -404,10 +361,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
         // If the Ctrl-C handler registered the signal, then skip advancing to the next block.
         if self.shutdown.load(Ordering::Acquire) {
-            bail!(
-                "Skipping advancing to block {} - The node is shutting down",
-                block.height()
-            );
+            bail!("Skipping advancing to block {} - The node is shutting down", block.height());
         }
         // Advance to the next block.
         self.ledger.advance_to_next_block(block)?;
@@ -424,12 +378,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             metrics::update_block_metrics(block);
         }
 
-        tracing::info!(
-            "\n\nAdvanced to block {} at round {} - {}\n",
-            block.height(),
-            block.round(),
-            block.hash()
-        );
+        tracing::info!("\n\nAdvanced to block {} at round {} - {}\n", block.height(), block.round(), block.hash());
         Ok(())
     }
 }

@@ -21,7 +21,7 @@ use snarkvm::{
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
     },
-    prelude::{bail, Address, Field, Network, Result, Zero},
+    prelude::{Address, Field, Network, Result, Zero, bail},
 };
 
 use indexmap::IndexMap;
@@ -36,9 +36,7 @@ pub struct ProverLedgerService<N: Network> {
 impl<N: Network> ProverLedgerService<N> {
     /// Initializes a new prover ledger service.
     pub fn new() -> Self {
-        Self {
-            _network: Default::default(),
-        }
+        Self { _network: Default::default() }
     }
 }
 
@@ -111,10 +109,7 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     }
 
     /// Returns the unconfirmed transaction for the given transaction ID.
-    fn get_unconfirmed_transaction(
-        &self,
-        transaction_id: N::TransactionID,
-    ) -> Result<Transaction<N>> {
+    fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
         bail!("Transaction '{transaction_id}' does not exist in prover")
     }
 
@@ -158,11 +153,7 @@ impl<N: Network> LedgerService<N> for ProverLedgerService<N> {
     }
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        _solution_id: SolutionID<N>,
-        _solution: Data<Solution<N>>,
-    ) -> Result<()> {
+    async fn check_solution_basic(&self, _solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
         Ok(())
     }
 

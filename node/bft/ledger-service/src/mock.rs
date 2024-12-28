@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{fmt_id, LedgerService};
+use crate::{LedgerService, fmt_id};
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
@@ -21,7 +21,7 @@ use snarkvm::{
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
     },
-    prelude::{bail, ensure, Address, Field, Network, Result, Zero},
+    prelude::{Address, Field, Network, Result, Zero, bail, ensure},
 };
 
 use indexmap::IndexMap;
@@ -39,10 +39,7 @@ pub struct MockLedgerService<N: Network> {
 impl<N: Network> MockLedgerService<N> {
     /// Initializes a new mock ledger service.
     pub fn new(committee: Committee<N>) -> Self {
-        Self {
-            committee,
-            height_to_round_and_hash: Default::default(),
-        }
+        Self { committee, height_to_round_and_hash: Default::default() }
     }
 
     /// Initializes a new mock ledger service at the specified height.
@@ -51,10 +48,7 @@ impl<N: Network> MockLedgerService<N> {
         for i in 0..=height {
             height_to_hash.insert(i, (i as u64 * 2, Field::<N>::from_u32(i).into()));
         }
-        Self {
-            committee,
-            height_to_round_and_hash: Mutex::new(height_to_hash),
-        }
+        Self { committee, height_to_round_and_hash: Mutex::new(height_to_hash) }
     }
 }
 
@@ -62,21 +56,12 @@ impl<N: Network> MockLedgerService<N> {
 impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     /// Returns the latest round in the ledger.
     fn latest_round(&self) -> u64 {
-        *self
-            .height_to_round_and_hash
-            .lock()
-            .keys()
-            .last()
-            .unwrap_or(&0) as u64
+        *self.height_to_round_and_hash.lock().keys().last().unwrap_or(&0) as u64
     }
 
     /// Returns the latest block height in the canonical ledger.
     fn latest_block_height(&self) -> u32 {
-        self.height_to_round_and_hash
-            .lock()
-            .last_key_value()
-            .map(|(height, _)| *height)
-            .unwrap_or(0)
+        self.height_to_round_and_hash.lock().last_key_value().map(|(height, _)| *height).unwrap_or(0)
     }
 
     /// Returns the latest block in the ledger.
@@ -153,10 +138,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     }
 
     /// Returns the unconfirmed transaction for the given transaction ID.
-    fn get_unconfirmed_transaction(
-        &self,
-        _transaction_id: N::TransactionID,
-    ) -> Result<Transaction<N>> {
+    fn get_unconfirmed_transaction(&self, _transaction_id: N::TransactionID) -> Result<Transaction<N>> {
         unreachable!("MockLedgerService does not support get_unconfirmed_transaction")
     }
 
@@ -182,10 +164,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
 
     /// Returns `false` for all queries.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
-        trace!(
-            "[MockLedgerService] Contains certificate ID {} - false",
-            fmt_id(certificate_id)
-        );
+        trace!("[MockLedgerService] Contains certificate ID {} - false", fmt_id(certificate_id));
         Ok(false)
     }
 
@@ -214,15 +193,8 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     }
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        solution_id: SolutionID<N>,
-        _solution: Data<Solution<N>>,
-    ) -> Result<()> {
-        trace!(
-            "[MockLedgerService] Check solution basic {:?} - Ok",
-            fmt_id(solution_id)
-        );
+    async fn check_solution_basic(&self, solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
+        trace!("[MockLedgerService] Check solution basic {:?} - Ok", fmt_id(solution_id));
         Ok(())
     }
 
@@ -232,10 +204,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         transaction_id: N::TransactionID,
         _transaction: Data<Transaction<N>>,
     ) -> Result<()> {
-        trace!(
-            "[MockLedgerService] Check transaction basic {:?} - Ok",
-            fmt_id(transaction_id)
-        );
+        trace!("[MockLedgerService] Check transaction basic {:?} - Ok", fmt_id(transaction_id));
         Ok(())
     }
 
@@ -263,9 +232,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
             block.height(),
             self.latest_block_height()
         );
-        self.height_to_round_and_hash
-            .lock()
-            .insert(block.height(), (block.round(), block.hash()));
+        self.height_to_round_and_hash.lock().insert(block.height(), (block.round(), block.hash()));
         Ok(())
     }
 }

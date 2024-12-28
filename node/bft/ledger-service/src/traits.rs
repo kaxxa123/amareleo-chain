@@ -11,7 +11,7 @@
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
-// limitations under the License
+// limitations under the License.
 
 use snarkvm::{
     ledger::{
@@ -69,10 +69,7 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     fn get_solution(&self, solution_id: &SolutionID<N>) -> Result<Solution<N>>;
 
     /// Returns the unconfirmed transaction for the given transaction ID.
-    fn get_unconfirmed_transaction(
-        &self,
-        transaction_id: N::TransactionID,
-    ) -> Result<Transaction<N>>;
+    fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>>;
 
     /// Returns the batch certificate for the given batch certificate ID.
     fn get_batch_certificate(&self, certificate_id: &Field<N>) -> Result<BatchCertificate<N>>;
@@ -100,11 +97,7 @@ pub trait LedgerService<N: Network>: Debug + Send + Sync {
     ) -> Result<()>;
 
     /// Checks the given solution is well-formed.
-    async fn check_solution_basic(
-        &self,
-        solution_id: SolutionID<N>,
-        solution: Data<Solution<N>>,
-    ) -> Result<()>;
+    async fn check_solution_basic(&self, solution_id: SolutionID<N>, solution: Data<Solution<N>>) -> Result<()>;
 
     /// Checks the given transaction is well-formed and unique.
     async fn check_transaction_basic(
