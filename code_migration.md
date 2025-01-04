@@ -61,7 +61,7 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
     where each maps `address => (round, batch_id, signature)`  <BR />
     __No cross-dependencies__
 
-*  `/node/bft/ledger-service` - Implements a number of structs exposing the `LedgerService`
+*  `/node/bft/ledger-service` - Implements structs exposing the `LedgerService`
     trait. The most useful is the `CoreLedgerService` which encapsulates the
     `LedgerService` implementation for validator nodes. 
 
@@ -71,4 +71,9 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
     3. Latest committee leader
     4. Shutdown flag.
     
+    __No cross-dependencies__
+
+* `/node/bft/storage-service` - Implements memory pool storage structs exposing the 
+    `StorageService` trait. `BFTMemoryService` provides in-memory storage. 
+    `BFTPersistentStorage` persists to a rocksdb within the ledger folder. <BR />
     __No cross-dependencies__

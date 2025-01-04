@@ -14,16 +14,17 @@
 // limitations under the License.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::blocks_in_conditions)]
 #![allow(clippy::type_complexity)]
 
-#[macro_use]
-extern crate async_trait;
-#[macro_use]
-extern crate tracing;
+#[cfg(feature = "memory")]
+pub mod memory;
+#[cfg(feature = "memory")]
+pub use memory::*;
 
-pub use snarkos_lite_node_bft_events as events;
-pub use snarkos_lite_node_bft_ledger_service as ledger_service;
-pub use snarkos_lite_node_bft_storage_service as storage_service;
+#[cfg(feature = "persistent")]
+pub mod persistent;
+#[cfg(feature = "persistent")]
+pub use persistent::*;
 
-pub mod helpers;
+pub mod traits;
+pub use traits::*;

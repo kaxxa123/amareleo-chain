@@ -90,10 +90,10 @@ path = "./ledger-service"
 version = "=3.1.0"
 features = ["ledger", "prover"]
 
-# [dependencies.snarkos-node-bft-storage-service]
-# path = "./storage-service"
-# version = "=3.1.0"
-# features = ["memory"]
+[dependencies.snarkos-lite-node-bft-storage-service]
+path = "./storage-service"
+version = "=3.1.0"
+features = ["memory"]
 
 # [dependencies.snarkos-node-sync]
 # path = "../sync"

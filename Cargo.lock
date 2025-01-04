@@ -3064,6 +3064,7 @@ dependencies = [
  "snarkos-lite-account",
  "snarkos-lite-node-bft-events",
  "snarkos-lite-node-bft-ledger-service",
+ "snarkos-lite-node-bft-storage-service",
  "snarkos-lite-node-metrics",
  "snarkos-lite-node-sync-locators",
  "snarkvm",
@@ -3109,6 +3110,19 @@ dependencies = [
  "snarkos-lite-node-metrics",
  "snarkvm",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-lite-node-bft-storage-service"
+version = "3.1.0"
+dependencies = [
+ "aleo-std",
+ "anyhow",
+ "indexmap",
+ "lru",
+ "parking_lot",
+ "snarkvm",
  "tracing",
 ]
 
