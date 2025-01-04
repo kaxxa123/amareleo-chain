@@ -77,3 +77,17 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
     `StorageService` trait. `BFTMemoryService` provides in-memory storage. 
     `BFTPersistentStorage` persists to a rocksdb within the ledger folder. <BR />
     __No cross-dependencies__
+
+
+* `/node/bft/src/helpers/storage.rs` <BR /> - Implements complete memory pool storage in 
+    `Storage` and `StorageInner`. This includes:
+    1. `LedgerService`
+    2. Block Hieght, Round Number
+    3. Last garabage collected round.
+    4. Maxium number of rounds stored.
+    5. Map (round_num => List of (certificate_id, batch_id, signer_addr))
+    6. Map (certificate_id => certificate)
+    7. Map (batch_id => round_num)
+    8. `StorageService`
+
+    __Dependent__ on `LedgerService`, `StorageService`

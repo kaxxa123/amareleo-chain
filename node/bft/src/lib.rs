@@ -27,3 +27,6 @@ pub use snarkos_lite_node_bft_ledger_service as ledger_service;
 pub use snarkos_lite_node_bft_storage_service as storage_service;
 
 pub mod helpers;
+
+/// The maximum number of seconds before the timestamp is considered expired.
+pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds

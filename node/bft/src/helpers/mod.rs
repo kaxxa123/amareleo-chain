@@ -21,3 +21,19 @@ pub use proposal::*;
 
 pub mod signed_proposals;
 pub use signed_proposals::*;
+
+pub mod storage;
+pub use storage::*;
+
+pub mod timestamp;
+pub use timestamp::*;
+
+/// Formats an ID into a truncated identifier (for logging purposes).
+pub fn fmt_id(id: impl ToString) -> String {
+    let id = id.to_string();
+    let mut formatted_id = id.chars().take(16).collect::<String>();
+    if id.chars().count() > 16 {
+        formatted_id.push_str("..");
+    }
+    formatted_id
+}
