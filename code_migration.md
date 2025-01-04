@@ -21,6 +21,22 @@ As we migrate snarkos code into amareleo-chain, we keep notes on key changes. We
 
 <BR />
 
+## Code Encapsulation Issues
+
+There are some code encapsulation issues within `snarkos` and `snarkvm`. Specifically:
+
+* The minimum committee size requirements are hardcoded in both `snarkos` and `snarkvm`. 
+For this reason, at this stage we mock having 4 committee members in a single node. 
+An alternative approach would be to remove/replace the consensus altogether.
+
+* The ledger directory path is returned by [aleo-std](https://github.com/ProvableHQ/aleo-std) | `aleo_ledger_dir()`.
+This is invoked directly both from `snarkos` and `snarkvm`. <BR />
+`amareleo-chain` aims to rename the ledger folder. We achive this by setting `StorageMode::Custom` with our custom 
+ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custom path.
+
+
+<BR />
+
 ## Notes
 
 * `/node/metrics` - Prometheus/Grafana Metrics. <BR />

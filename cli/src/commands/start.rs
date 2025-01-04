@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use aleo_std::StorageMode;
 use anyhow::{bail, ensure, Result};
 use clap::Parser;
 use colored::Colorize;
@@ -21,8 +20,11 @@ use core::str::FromStr;
 use indexmap::IndexMap;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
+
 use snarkos_lite_account::Account;
 use snarkos_lite_node::Node;
+use snarkos_lite_node_helpers::helpers::amareleo_storage_mode;
+
 use snarkvm::{
     console::{
         account::{Address, PrivateKey},
@@ -310,10 +312,7 @@ impl Start {
         }
 
         // Initialize the storage mode.
-        let storage_mode = match &self.storage {
-            Some(path) => StorageMode::Custom(path.clone()),
-            None => StorageMode::from(Some(0u16)),
-        };
+        let storage_mode = amareleo_storage_mode(self.network);
 
         // Determine whether to generate background transactions in dev mode.
         let dev_txs = !self.no_dev_txs;

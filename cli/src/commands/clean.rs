@@ -15,7 +15,6 @@
 
 use snarkos_lite_node_helpers::helpers::{amareleo_ledger_dir, proposal_cache_path};
 
-use aleo_std::StorageMode;
 use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
@@ -45,20 +44,14 @@ impl Clean {
                 );
             }
         }
-        // Remove the specified ledger from storage.
-        Self::remove_ledger(
-            self.network,
-            match self.path {
-                Some(path) => StorageMode::Custom(path),
-                None => StorageMode::from(Some(0u16)),
-            },
-        )
+        // Remove the ledger from storage.
+        Self::remove_ledger(self.network)
     }
 
     /// Removes the specified ledger from storage.
-    pub(crate) fn remove_ledger(network: u16, mode: StorageMode) -> Result<String> {
+    pub(crate) fn remove_ledger(network: u16) -> Result<String> {
         // Construct the path to the ledger in storage.
-        let path = amareleo_ledger_dir(network, mode);
+        let path = amareleo_ledger_dir(network);
 
         // Prepare the path string.
         let path_string = format!("(in \"{}\")", path.display()).dimmed();
