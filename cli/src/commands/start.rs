@@ -28,6 +28,7 @@ use snarkos_lite_node_helpers::helpers::amareleo_storage_mode;
 use snarkvm::{
     console::{
         account::{Address, PrivateKey},
+        algorithms::Hash,
         network::{CanaryV0, MainnetV0, Network, TestnetV0},
     },
     ledger::{
@@ -35,7 +36,9 @@ use snarkvm::{
         committee::{Committee, MIN_VALIDATOR_STAKE},
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
     },
+    prelude::{FromBytes, ToBits, ToBytes},
     synthesizer::VM,
+    utilities::to_bytes_le,
 };
 use std::result::Result::Ok;
 
@@ -255,7 +258,7 @@ impl Start {
         }
 
         // Construct the genesis block.
-        compute_genesis(
+        load_or_compute_genesis(
             development_private_keys[0],
             committee,
             public_balances,
@@ -350,20 +353,153 @@ impl Start {
     }
 }
 
-/// Computes the genesis block.
-fn compute_genesis<N: Network>(
+/// Loads or computes the genesis block.
+fn load_or_compute_genesis<N: Network>(
     genesis_private_key: PrivateKey<N>,
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
     bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, Address<N>, u64)>,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
-    // AlexZ: Adding logs to highlight how slow this operation is,
-    // for future optimization.
-    println!(" Start Computing Genesis...");
+    // Construct the preimage.
+    let mut preimage = Vec::new();
+
+    // Input the network ID.
+    preimage.extend(&N::ID.to_le_bytes());
+    // Input the genesis coinbase target.
+    preimage.extend(&to_bytes_le![N::GENESIS_COINBASE_TARGET]?);
+    // Input the genesis proof target.
+    preimage.extend(&to_bytes_le![N::GENESIS_PROOF_TARGET]?);
+
+    // Input the genesis private key, committee, and public balances.
+    preimage.extend(genesis_private_key.to_bytes_le()?);
+    preimage.extend(committee.to_bytes_le()?);
+    preimage.extend(&to_bytes_le![public_balances
+        .iter()
+        .collect::<Vec<(_, _)>>()]?);
+    preimage.extend(&to_bytes_le![bonded_balances
+        .iter()
+        .flat_map(|(staker, (validator, withdrawal, amount))| to_bytes_le![
+            staker, validator, withdrawal, amount
+        ])
+        .collect::<Vec<_>>()]?);
+
+    // Input the parameters' metadata based on network
+    match N::ID {
+        snarkvm::console::network::MainnetV0::ID => {
+            preimage
+                .extend(snarkvm::parameters::mainnet::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
+            preimage
+                .extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(
+                snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes(),
+            );
+            preimage.extend(
+                snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes(),
+            );
+            preimage
+                .extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage
+                .extend(snarkvm::parameters::mainnet::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(
+                snarkvm::parameters::mainnet::TransferPrivateToPublicVerifier::METADATA.as_bytes(),
+            );
+            preimage.extend(
+                snarkvm::parameters::mainnet::TransferPublicToPrivateVerifier::METADATA.as_bytes(),
+            );
+            preimage.extend(snarkvm::parameters::mainnet::FeePrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::FeePublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::InclusionVerifier::METADATA.as_bytes());
+        }
+        snarkvm::console::network::TestnetV0::ID => {
+            preimage
+                .extend(snarkvm::parameters::testnet::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::BondPublicVerifier::METADATA.as_bytes());
+            preimage
+                .extend(snarkvm::parameters::testnet::UnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(
+                snarkvm::parameters::testnet::ClaimUnbondPublicVerifier::METADATA.as_bytes(),
+            );
+            preimage.extend(
+                snarkvm::parameters::testnet::SetValidatorStateVerifier::METADATA.as_bytes(),
+            );
+            preimage
+                .extend(snarkvm::parameters::testnet::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage
+                .extend(snarkvm::parameters::testnet::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(
+                snarkvm::parameters::testnet::TransferPrivateToPublicVerifier::METADATA.as_bytes(),
+            );
+            preimage.extend(
+                snarkvm::parameters::testnet::TransferPublicToPrivateVerifier::METADATA.as_bytes(),
+            );
+            preimage.extend(snarkvm::parameters::testnet::FeePrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::FeePublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::InclusionVerifier::METADATA.as_bytes());
+        }
+        snarkvm::console::network::CanaryV0::ID => {
+            preimage
+                .extend(snarkvm::parameters::canary::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::BondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::UnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(
+                snarkvm::parameters::canary::ClaimUnbondPublicVerifier::METADATA.as_bytes(),
+            );
+            preimage.extend(
+                snarkvm::parameters::canary::SetValidatorStateVerifier::METADATA.as_bytes(),
+            );
+            preimage
+                .extend(snarkvm::parameters::canary::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage
+                .extend(snarkvm::parameters::canary::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(
+                snarkvm::parameters::canary::TransferPrivateToPublicVerifier::METADATA.as_bytes(),
+            );
+            preimage.extend(
+                snarkvm::parameters::canary::TransferPublicToPrivateVerifier::METADATA.as_bytes(),
+            );
+            preimage.extend(snarkvm::parameters::canary::FeePrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::FeePublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::InclusionVerifier::METADATA.as_bytes());
+        }
+        _ => {
+            // Unrecognized Network ID
+            bail!("Unrecognized Network ID: {}", N::ID);
+        }
+    }
+
+    // Initialize the hasher.
+    let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
+    // Compute the hash.
+    // NOTE: this is a fast-to-compute but *IMPERFECT* identifier for the genesis block.
+    //       to know the actualy genesis block hash, you need to compute the block itself.
+    let hash = hasher.hash(&preimage.to_bits_le())?.to_string();
+
+    // A closure to load the block.
+    let load_block = |file_path| -> Result<Block<N>> {
+        // Attempts to load the genesis block file locally.
+        let buffer = std::fs::read(file_path)?;
+        // Return the genesis block.
+        Block::from_bytes_le(&buffer)
+    };
+
+    // Construct the file path.
+    let file_path = std::env::temp_dir().join(hash);
+    // println!("Genesis Block file path: {}", file_path.display());
+
+    // Check if the genesis block exists.
+    if file_path.exists() {
+        // If the block loads successfully, return it.
+        if let Ok(block) = load_block(&file_path) {
+            return Ok(block);
+        }
+    }
+
+    /* Otherwise, compute the genesis block and store it. */
 
     // Initialize a new VM.
-    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(Some(0))?)?;
+    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(0u16)?)?;
     // Initialize the genesis block.
     let block = vm.genesis_quorum(
         &genesis_private_key,
@@ -372,8 +508,8 @@ fn compute_genesis<N: Network>(
         bonded_balances,
         rng,
     )?;
-    println!(" Genesis Block computation ready.");
-
+    // Write the genesis block to the file.
+    std::fs::write(&file_path, block.to_bytes_le()?)?;
     // Return the genesis block.
     Ok(block)
 }
