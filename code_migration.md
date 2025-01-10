@@ -110,3 +110,8 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
     In snarkos this would send out requests/responses for transmissions to peers. In snarkos the receiving side would be the Sync object. The amareleo-chain Worker is stripped down from the network communcation (gateway) component.
 
     __Dependent__ on `LedgerService`, `StorageService`, `Ready`, `Proposal`
+
+
+* `/node/sync/src/block_sync.rs` - Implements `BlockSyncMode` and `BlockSync`. `BlockSync` is reponsible for syncing Blocks across peers. This is largely unecessary for amareleo-chain. At this stage we are keeping a minimal implementation with no network access. Later we might remove this altogether.
+
+    __Dependent__ on `LedgerService`, `BlockLocators`

@@ -81,10 +81,6 @@ version = "=3.1.0"
 path = "./events"
 version = "=3.1.0"
 
-[dependencies.snarkos-lite-node-sync-locators]
-path = "../sync/locators"
-version = "=3.1.0"
-
 [dependencies.snarkos-lite-node-bft-ledger-service]
 path = "./ledger-service"
 version = "=3.1.0"
@@ -95,9 +91,9 @@ path = "./storage-service"
 version = "=3.1.0"
 features = ["memory"]
 
-# [dependencies.snarkos-node-sync]
-# path = "../sync"
-# version = "=3.1.0"
+[dependencies.snarkos-lite-node-sync]
+path = "../sync"
+version = "=3.1.0"
 
 # [dependencies.snarkos-node-tcp]
 # path = "../tcp"

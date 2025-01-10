@@ -17,7 +17,7 @@ use crate::events::{
     BatchPropose, BatchSignature, CertificateRequest, CertificateResponse, TransmissionRequest,
     TransmissionResponse,
 };
-use snarkos_lite_node_sync_locators::BlockLocators;
+use snarkos_lite_node_sync::locators::BlockLocators;
 use snarkvm::{
     console::network::*,
     ledger::{
