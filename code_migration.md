@@ -17,7 +17,11 @@ As we migrate snarkos code into amareleo-chain, we keep notes on key changes. We
     |----------------------------|-----------------------------|
     | `.current-proposal-cache*` | `.amareleo-proposal-cache*` |
     | `.ledger-*`                | `.amareleo-ledger-*`        |
-    | `snakros.log`              | `amareleo-chain.log`        |
+    | `/tmp/snakros.log`         | `/tmp/amareleo-chain.log`   |
+
+* Just like snarkos, amareleo-chain relies on caching to disk the genesis block. Both use the same filename. The first time a node is run this will do extra work that will speed up launching other node instances. The name is deterministic and is currently: <BR />
+`/tmp/15983110333109949993277199043008208330432506493933185651419933655310578437field`
+
 
 <BR />
 
@@ -79,7 +83,7 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
     __No cross-dependencies__
 
 
-* `/node/bft/src/helpers/storage.rs` <BR /> - Implements complete memory pool storage in 
+* `/node/bft/src/helpers/storage.rs` - Implements complete memory pool storage in 
     `Storage` and `StorageInner`. This includes:
     1. `LedgerService`
     2. Block Hieght, Round Number
@@ -91,3 +95,11 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
     8. `StorageService`
 
     __Dependent__ on `LedgerService`, `StorageService`
+
+
+* `/node/bft/src/helpers/ready.rs` - Implements a map of transmissions that have completed processing `transmission_id => transmission`. Where a transmission can be one of: <BR />
+    * Ratification 
+    * Solution
+    * Transaction
+
+    __No cross-dependencies__

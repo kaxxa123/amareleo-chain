@@ -19,6 +19,9 @@ pub use channels::*;
 pub mod proposal;
 pub use proposal::*;
 
+pub mod ready;
+pub use ready::*;
+
 pub mod signed_proposals;
 pub use signed_proposals::*;
 
