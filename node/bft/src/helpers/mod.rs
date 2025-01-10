@@ -16,6 +16,12 @@
 pub mod channels;
 pub use channels::*;
 
+pub mod partition;
+pub use partition::*;
+
+pub mod proposal_cache;
+pub use proposal_cache::*;
+
 pub mod proposal;
 pub use proposal::*;
 

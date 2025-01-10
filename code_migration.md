@@ -116,7 +116,12 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
 
     __Dependent__ on `LedgerService`, `BlockLocators`
 
+
 * `/node/bft/src/sync/mod.rs` - Implements the `Sync` module which is resposnbile to sync the ledger from storage and keeping the ledger in a synced state. In snarkos, `Sync` receives messages from other peer `Worker` instances. However in amareleo-chain all that communication was removed. In snarkos, `Sync` employes `BlockSync` for exchanging blocks with peers. In amareleo-chain this `BlockSync` dependency was removed with some of its functianality merged into `Sync`.
 
     __Dependent__ on `Storage`, `LedgerService`, `BlockLocators`
 
+
+* `/node/bft/src/primary.rs` - Implements the `Primary` object, a DAG-based Narwhal mempool manager. This object has been greatly modified to allow a single object to create proposal certificates for itself and other fake validators.
+
+    __Dependent__ on `Proposal`, `Storage`, `Sync`,  `Worker`, `LedgerService`

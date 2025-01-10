@@ -39,6 +39,8 @@ pub use worker::*;
 
 /// The maximum number of milliseconds to wait before proposing a batch.
 pub const MAX_BATCH_DELAY_IN_MS: u64 = 2500; // ms
+/// The minimum number of seconds to wait before proposing a batch.
+pub const MIN_BATCH_DELAY_IN_SECS: u64 = 1; // seconds
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of workers that can be spawned.
@@ -47,3 +49,14 @@ pub const MAX_WORKERS: u8 = 1; // worker(s)
 /// The frequency at which each primary broadcasts a ping to every other node.
 /// Note: If this is updated, be sure to update `MAX_BLOCKS_BEHIND` to correspond properly.
 pub const PRIMARY_PING_IN_MS: u64 = 2 * MAX_BATCH_DELAY_IN_MS; // ms
+
+/// A helper macro to spawn a blocking task.
+#[macro_export]
+macro_rules! spawn_blocking {
+    ($expr:expr) => {
+        match tokio::task::spawn_blocking(move || $expr).await {
+            Ok(value) => value,
+            Err(error) => Err(anyhow::anyhow!("[tokio::spawn_blocking] {error}")),
+        }
+    };
+}

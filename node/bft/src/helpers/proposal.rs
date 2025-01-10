@@ -261,3 +261,94 @@ impl<N: Network> FromBytes for Proposal<N> {
         })
     }
 }
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::helpers::storage::tests::sample_transmissions;
+    use snarkvm::{console::network::MainnetV0, utilities::TestRng};
+
+    type CurrentNetwork = MainnetV0;
+
+    const ITERATIONS: usize = 100;
+
+    pub(crate) fn sample_proposal(rng: &mut TestRng) -> Proposal<CurrentNetwork> {
+        let certificate =
+            snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(
+                rng,
+            );
+        let (_, transmissions) = sample_transmissions(&certificate, rng);
+
+        let transmissions = transmissions
+            .into_iter()
+            .map(|(id, (t, _))| (id, t))
+            .collect::<IndexMap<_, _>>();
+        let batch_header = certificate.batch_header().clone();
+        let signatures = certificate.signatures().copied().collect();
+
+        Proposal {
+            batch_header,
+            transmissions,
+            signatures,
+        }
+    }
+
+    #[test]
+    fn test_bytes() {
+        let rng = &mut TestRng::default();
+
+        for _ in 0..ITERATIONS {
+            let expected = sample_proposal(rng);
+            // Check the byte representation.
+            let expected_bytes = expected.to_bytes_le().unwrap();
+            assert_eq!(expected, Proposal::read_le(&expected_bytes[..]).unwrap());
+        }
+    }
+}
+
+#[cfg(test)]
+mod prop_tests {
+    use crate::helpers::{
+        now,
+        storage::prop_tests::{AnyTransmission, AnyTransmissionID, CryptoTestRng},
+        Proposal,
+    };
+    use snarkvm::ledger::{
+        committee::prop_tests::{CommitteeContext, ValidatorSet},
+        narwhal::BatchHeader,
+    };
+
+    use indexmap::IndexMap;
+    use proptest::sample::{size_range, Selector};
+    use test_strategy::proptest;
+
+    #[proptest]
+    fn initialize_proposal(
+        context: CommitteeContext,
+        #[any(size_range(1..16).lift())] transmissions: Vec<(AnyTransmissionID, AnyTransmission)>,
+        selector: Selector,
+        mut rng: CryptoTestRng,
+    ) {
+        let CommitteeContext(committee, ValidatorSet(validators)) = context;
+
+        let signer = selector.select(&validators);
+        let mut transmission_map = IndexMap::new();
+
+        for (AnyTransmissionID(id), AnyTransmission(t)) in transmissions.iter() {
+            transmission_map.insert(*id, t.clone());
+        }
+
+        let header = BatchHeader::new(
+            &signer.private_key,
+            committee.starting_round(),
+            now(),
+            committee.id(),
+            transmission_map.keys().cloned().collect(),
+            Default::default(),
+            &mut rng,
+        )
+        .unwrap();
+        let proposal = Proposal::new(committee, header.clone(), transmission_map.clone()).unwrap();
+        assert_eq!(proposal.batch_id(), header.batch_id());
+    }
+}
