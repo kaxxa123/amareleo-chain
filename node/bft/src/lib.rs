@@ -28,5 +28,13 @@ pub use snarkos_lite_node_bft_storage_service as storage_service;
 
 pub mod helpers;
 
+mod primary;
+pub use primary::*;
+
+mod worker;
+pub use worker::*;
+
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
+/// The maximum number of workers that can be spawned.
+pub const MAX_WORKERS: u8 = 1; // worker(s)

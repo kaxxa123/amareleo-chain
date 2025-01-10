@@ -168,7 +168,7 @@ version = "1"
 [dev-dependencies.snarkos-lite-node-bft-ledger-service]
 path = "./ledger-service"
 default-features = false
-features = ["test"]
+features = ["test", "ledger-write"]
 
 [dev-dependencies.snarkos-lite-node-bft-storage-service]
 path = "./storage-service"

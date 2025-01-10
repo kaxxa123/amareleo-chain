@@ -103,3 +103,10 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
     * Transaction
 
     __No cross-dependencies__
+
+
+* `/node/bft/src/worker.rs` - Implements the Worker object responsible for processing transmissions. 
+
+    In snarkos this would send out requests/responses for transmissions to peers. In snarkos the receiving side would be the Sync object. The amareleo-chain Worker is stripped down from the network communcation (gateway) component.
+
+    __Dependent__ on `LedgerService`, `StorageService`, `Ready`, `Proposal`
