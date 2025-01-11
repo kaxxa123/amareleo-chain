@@ -150,3 +150,8 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
 * `/node/router` - Implements router components needed for the `REST` | `Router` | `Tcp` stack.
 
     __Dependent__ on `Tcp`, `Sync`, `BlockLocators`
+
+
+* `/node/rest` - Implements rest server.
+
+    __Dependent__ on `Consensus`, `Router`

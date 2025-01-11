@@ -13,28 +13,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![forbid(unsafe_code)]
-#![allow(clippy::too_many_arguments)]
-#![recursion_limit = "256"]
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 
-#[macro_use]
-extern crate async_trait;
-#[macro_use]
-extern crate tracing;
+/// An enum of error handlers for the REST API server.
+pub struct RestError(pub String);
 
-pub use snarkos_lite_node_bft as bft;
-pub use snarkos_lite_node_consensus as consensus;
-pub use snarkos_lite_node_rest as rest;
-pub use snarkos_lite_node_router as router;
-pub use snarkos_lite_node_sync as sync;
-pub use snarkos_lite_node_tcp as tcp;
-pub use snarkvm;
+impl IntoResponse for RestError {
+    fn into_response(self) -> Response {
+        (StatusCode::INTERNAL_SERVER_ERROR, format!("Something went wrong: {}", self.0)).into_response()
+    }
+}
 
-mod validator;
-pub use validator::*;
-
-mod node;
-pub use node::*;
-
-mod traits;
-pub use traits::*;
+impl From<anyhow::Error> for RestError {
+    fn from(err: anyhow::Error) -> Self {
+        Self(err.to_string())
+    }
+}

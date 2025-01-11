@@ -30,6 +30,8 @@ metrics = [
     "snarkos-lite-node-router/metrics",
     "snarkos-lite-node-tcp/metrics",
 ]
+history = ["snarkos-lite-node-rest/history"]
+test_targets = ["snarkvm/test_targets"]
 
 [dependencies.snarkvm]
 workspace = true
@@ -47,6 +49,10 @@ version = "=3.1.0"
 
 [dependencies.snarkos-lite-node-consensus]
 path = "./consensus"
+version = "=3.1.0"
+
+[dependencies.snarkos-lite-node-rest]
+path = "./rest"
 version = "=3.1.0"
 
 [dependencies.snarkos-lite-node-router]

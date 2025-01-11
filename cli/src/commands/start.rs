@@ -304,9 +304,9 @@ impl Start {
         if let Some(rest_ip) = rest_ip {
             println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
 
-            // if let Ok(jwt_token) = snarkos_lite_node_rest::Claims::new(account.address()).to_jwt_string() {
-            //     println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
-            // }
+            if let Ok(jwt_token) = snarkos_lite_node_rest::Claims::new(account.address()).to_jwt_string() {
+                println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
+            }
         }
 
         // Initialize the metrics.
