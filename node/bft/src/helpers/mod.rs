@@ -16,6 +16,9 @@
 pub mod channels;
 pub use channels::*;
 
+pub mod dag;
+pub use dag::*;
+
 pub mod partition;
 pub use partition::*;
 

@@ -125,3 +125,9 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
 * `/node/bft/src/primary.rs` - Implements the `Primary` object, a DAG-based Narwhal mempool manager. This object has been greatly modified to allow a single object to create proposal certificates for itself and other fake validators.
 
     __Dependent__ on `Proposal`, `Storage`, `Sync`,  `Worker`, `LedgerService`
+
+
+* `/node/bft/src/helpers/dag.rs` - Implements the `DAG` object an in-memory DAG for Narwhal to store its rounds.
+
+    __No cross-dependencies__
+
