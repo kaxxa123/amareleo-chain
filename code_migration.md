@@ -135,4 +135,6 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
 
     __Dependent__ on `Primary`, `DAG`
 
-    
+* `/node/consensus/src/lib.rs` -  Implements the `Consensus` object adding the Bullshark consensus to Narhwal.
+
+    __Dependent__ on `BFT`, `Ledger`, `Storage`

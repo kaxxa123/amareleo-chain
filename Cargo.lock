@@ -3025,6 +3025,7 @@ dependencies = [
  "rayon",
  "snarkos-lite-account",
  "snarkos-lite-node-bft",
+ "snarkos-lite-node-consensus",
  "snarkos-lite-node-metrics",
  "snarkos-lite-node-sync",
  "snarkvm",
@@ -3077,7 +3078,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber 0.3.19",
- "tracing-test",
+ "tracing-test 0.1.0",
 ]
 
 [[package]]
@@ -3125,6 +3126,30 @@ dependencies = [
  "parking_lot",
  "snarkvm",
  "tracing",
+]
+
+[[package]]
+name = "snarkos-lite-node-consensus"
+version = "3.1.0"
+dependencies = [
+ "aleo-std",
+ "anyhow",
+ "colored",
+ "indexmap",
+ "itertools 0.12.1",
+ "lru",
+ "once_cell",
+ "parking_lot",
+ "rand",
+ "snarkos-lite-account",
+ "snarkos-lite-node-bft",
+ "snarkos-lite-node-bft-ledger-service",
+ "snarkos-lite-node-bft-storage-service",
+ "snarkos-lite-node-metrics",
+ "snarkvm",
+ "tokio",
+ "tracing",
+ "tracing-test 0.2.5",
 ]
 
 [[package]]
@@ -4681,7 +4706,18 @@ dependencies = [
  "lazy_static",
  "tracing-core",
  "tracing-subscriber 0.2.25",
- "tracing-test-macro",
+ "tracing-test-macro 0.1.0",
+]
+
+[[package]]
+name = "tracing-test"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "557b891436fe0d5e0e363427fc7f217abf9ccd510d5136549847bdcbcd011d68"
+dependencies = [
+ "tracing-core",
+ "tracing-subscriber 0.3.19",
+ "tracing-test-macro 0.2.5",
 ]
 
 [[package]]
@@ -4693,6 +4729,16 @@ dependencies = [
  "lazy_static",
  "quote 1.0.37",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "tracing-test-macro"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04659ddb06c87d233c566112c1c9c5b9e98256d9af50ec3bc9c8327f873a7568"
+dependencies = [
+ "quote 1.0.37",
+ "syn 2.0.91",
 ]
 
 [[package]]

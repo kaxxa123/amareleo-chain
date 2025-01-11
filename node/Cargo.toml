@@ -26,7 +26,7 @@ timer = ["aleo-std/timer"]
 metrics = [
     "dep:metrics",
     "snarkos-lite-node-bft/metrics",
-    # "snarkos-lite-node-consensus/metrics",
+    "snarkos-lite-node-consensus/metrics",
     # "snarkos-lite-node-router/metrics",
     # "snarkos-lite-node-tcp/metrics",
 ]
@@ -43,6 +43,10 @@ workspace = true
 
 [dependencies.snarkos-lite-node-bft]
 path = "./bft"
+version = "=3.1.0"
+
+[dependencies.snarkos-lite-node-consensus]
+path = "./consensus"
 version = "=3.1.0"
 
 [dependencies.snarkos-lite-node-sync]
