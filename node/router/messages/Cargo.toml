@@ -1,0 +1,85 @@
+[package]
+name = "snarkos-lite-node-router-messages"
+version = "3.1.0"
+authors = [
+  "The Aleo Team <hello@aleo.org>",
+  "The Amareleo Team <support@windeveloper.com>",
+]
+description = "Node messages for a decentralized operating system"
+homepage = "https://amareleo.com"
+repository = "https://github.com/kaxxa123/amareleo-chain"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge",
+]
+categories = ["cryptography", "cryptography::cryptocurrencies", "os"]
+license = "Apache-2.0"
+edition = "2021"
+
+[features]
+default = []
+test = []
+test_targets = ["snarkvm/test_targets"]
+
+[dependencies.anyhow]
+version = "1.0"
+
+[dependencies.bytes]
+version = "1"
+
+[dependencies.indexmap]
+version = "2.1"
+features = ["serde", "rayon"]
+
+[dependencies.rayon]
+version = "1"
+
+[dependencies.serde]
+version = "1"
+
+[dependencies.snarkos-lite-node-bft-events]
+path = "../../bft/events"
+version = "=3.1.0"
+
+[dependencies.snarkos-lite-node-sync-locators]
+path = "../../sync/locators"
+version = "=3.1.0"
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.tokio]
+version = "1.28"
+features = [
+  "io-util",
+  "macros",
+  "net",
+  "rt-multi-thread",
+  "signal",
+  "sync",
+  "time",
+]
+
+[dependencies.tokio-util]
+version = "0.7"
+features = ["codec"]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dev-dependencies.snarkos-lite-node-sync-locators]
+path = "../../sync/locators"
+features = ["test"]
+
+[dev-dependencies.snarkvm]
+workspace = true
+features = ["algorithms", "test-helpers"]
+
+[dev-dependencies.proptest]
+version = "1.4.0"
+
+[dev-dependencies.test-strategy]
+version = "0.3.1"

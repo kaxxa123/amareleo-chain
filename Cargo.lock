@@ -1724,6 +1724,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "linked-hash-map"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2189,6 +2195,12 @@ dependencies = [
  "tokio-util",
  "tracing",
 ]
+
+[[package]]
+name = "peak_alloc"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29c4e8e2dd832fd76346468f822e4e600d30ba4e5aa545a128abf12cfae7ea3e"
 
 [[package]]
 name = "peeking_take_while"
@@ -3031,6 +3043,7 @@ dependencies = [
  "snarkos-lite-node-bft",
  "snarkos-lite-node-consensus",
  "snarkos-lite-node-metrics",
+ "snarkos-lite-node-router",
  "snarkos-lite-node-sync",
  "snarkos-lite-node-tcp",
  "snarkvm",
@@ -3177,6 +3190,61 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-lite-node-router"
+version = "3.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "bytes",
+ "colored",
+ "deadline",
+ "futures",
+ "futures-util",
+ "indexmap",
+ "linked-hash-map",
+ "parking_lot",
+ "peak_alloc",
+ "rand",
+ "rayon",
+ "reqwest 0.11.27",
+ "serde",
+ "snarkos-lite-account",
+ "snarkos-lite-node-metrics",
+ "snarkos-lite-node-router",
+ "snarkos-lite-node-router-messages",
+ "snarkos-lite-node-sync",
+ "snarkos-lite-node-sync-locators",
+ "snarkos-lite-node-tcp",
+ "snarkvm",
+ "time",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber 0.3.19",
+]
+
+[[package]]
+name = "snarkos-lite-node-router-messages"
+version = "3.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "indexmap",
+ "proptest",
+ "rayon",
+ "serde",
+ "snarkos-lite-node-bft-events",
+ "snarkos-lite-node-sync-locators",
+ "snarkvm",
+ "test-strategy",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "snarkos-lite-node-sync"
 version = "3.1.0"
 dependencies = [
@@ -3240,6 +3308,7 @@ dependencies = [
  "rayon",
  "self_update 0.38.0",
  "serde_json",
+ "snarkvm-algorithms",
  "snarkvm-circuit",
  "snarkvm-console",
  "snarkvm-ledger",
