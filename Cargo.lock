@@ -3022,6 +3022,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "once_cell",
+ "parking_lot",
  "rayon",
  "snarkos-lite-account",
  "snarkos-lite-node-bft",
