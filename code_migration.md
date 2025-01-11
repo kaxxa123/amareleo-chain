@@ -131,3 +131,8 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
 
     __No cross-dependencies__
 
+* `/node/bft/src/bft.rs` - Implements the `BFT` object bringing together `Primary` and `DAG` largely encapsulating Narwhal.
+
+    __Dependent__ on `Primary`, `DAG`
+
+    

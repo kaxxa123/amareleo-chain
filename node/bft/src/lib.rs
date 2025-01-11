@@ -28,6 +28,9 @@ pub use snarkos_lite_node_bft_storage_service as storage_service;
 
 pub mod helpers;
 
+mod bft;
+pub use bft::*;
+
 mod primary;
 pub use primary::*;
 
@@ -41,6 +44,8 @@ pub use worker::*;
 pub const MAX_BATCH_DELAY_IN_MS: u64 = 2500; // ms
 /// The minimum number of seconds to wait before proposing a batch.
 pub const MIN_BATCH_DELAY_IN_SECS: u64 = 1; // seconds
+/// The maximum number of seconds allowed for the leader to send their certificate.
+pub const MAX_LEADER_CERTIFICATE_DELAY_IN_SECS: i64 = 2 * MAX_BATCH_DELAY_IN_MS as i64 / 1000; // seconds
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of workers that can be spawned.
