@@ -131,10 +131,18 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
 
     __No cross-dependencies__
 
+
 * `/node/bft/src/bft.rs` - Implements the `BFT` object bringing together `Primary` and `DAG` largely encapsulating Narwhal.
 
     __Dependent__ on `Primary`, `DAG`
 
+
 * `/node/consensus/src/lib.rs` -  Implements the `Consensus` object adding the Bullshark consensus to Narhwal.
 
     __Dependent__ on `BFT`, `Ledger`, `Storage`
+
+
+* `/node/tcp` - Implements tcp components needed for the `REST` | `Router` | `Tcp` stack.
+
+    __No cross-dependencies__
+

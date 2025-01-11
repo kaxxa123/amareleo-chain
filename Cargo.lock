@@ -2076,6 +2076,9 @@ name = "once_cell"
 version = "1.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
+dependencies = [
+ "parking_lot_core",
+]
 
 [[package]]
 name = "open"
@@ -3029,6 +3032,7 @@ dependencies = [
  "snarkos-lite-node-consensus",
  "snarkos-lite-node-metrics",
  "snarkos-lite-node-sync",
+ "snarkos-lite-node-tcp",
  "snarkvm",
  "tokio",
  "tokio-util",
@@ -3199,6 +3203,21 @@ dependencies = [
  "indexmap",
  "serde",
  "snarkvm",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-lite-node-tcp"
+version = "3.1.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures-util",
+ "once_cell",
+ "parking_lot",
+ "snarkos-lite-node-metrics",
+ "tokio",
+ "tokio-util",
  "tracing",
 ]
 

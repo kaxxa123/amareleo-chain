@@ -23,7 +23,9 @@ extern crate async_trait;
 extern crate tracing;
 
 pub use snarkos_lite_node_bft as bft;
+pub use snarkos_lite_node_consensus as consensus;
 pub use snarkos_lite_node_sync as sync;
+pub use snarkos_lite_node_tcp as tcp;
 pub use snarkvm;
 
 mod validator;
