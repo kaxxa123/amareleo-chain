@@ -18,8 +18,6 @@
 #![allow(clippy::type_complexity)]
 
 #[macro_use]
-extern crate async_trait;
-#[macro_use]
 extern crate tracing;
 
 pub use snarkos_lite_node_bft_events as events;
