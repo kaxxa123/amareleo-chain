@@ -18,28 +18,41 @@ use crate::helpers::{Proposal, SignedProposals};
 use snarkvm::{
     console::{account::Address, network::Network, program::SUBDAG_CERTIFICATES_DEPTH},
     ledger::narwhal::BatchCertificate,
-    prelude::{FromBytes, IoResult, Read, Result, ToBytes, Write, anyhow, bail, error},
+    prelude::{anyhow, bail, error, FromBytes, IoResult, Read, Result, ToBytes, Write},
 };
 
-use aleo_std::{StorageMode, aleo_ledger_dir};
+use aleo_std::StorageMode;
 use indexmap::IndexSet;
 use std::{fs, path::PathBuf};
 
 /// Returns the path where a proposal cache file may be stored.
 pub fn proposal_cache_path(network: u16, dev: Option<u16>) -> PathBuf {
-    const PROPOSAL_CACHE_FILE_NAME: &str = "current-proposal-cache";
+    const PROPOSAL_CACHE_FILE_NAME: &str = "amareleo-proposal-cache";
 
     // Obtain the path to the ledger.
-    let mut path = aleo_ledger_dir(network, StorageMode::from(dev));
+    let mut path = amareleo_ledger_dir(network);
     // Go to the folder right above the ledger.
     path.pop();
     // Append the proposal store's file name.
     match dev {
-        Some(id) => path.push(format!(".{PROPOSAL_CACHE_FILE_NAME}-{}-{}", network, id)),
-        None => path.push(format!("{PROPOSAL_CACHE_FILE_NAME}-{}", network)),
+        Some(id) => path.push(format!(".{PROPOSAL_CACHE_FILE_NAME}-{network}-{id}")),
+        None => path.push(format!("{PROPOSAL_CACHE_FILE_NAME}-{network}")),
     }
 
     path
+}
+
+pub fn amareleo_ledger_dir(network: u16) -> PathBuf {
+    let mut path = match std::env::current_dir() {
+        Ok(current_dir) => current_dir,
+        _ => PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+    };
+    path.push(format!(".amareleo-ledger-{}-0", network));
+    path
+}
+
+pub fn amareleo_storage_mode(network: u16) -> StorageMode {
+    StorageMode::Custom(amareleo_ledger_dir(network))
 }
 
 /// A helper type for the cache of proposal and signed proposals.
@@ -63,7 +76,12 @@ impl<N: Network> ProposalCache<N> {
         signed_proposals: SignedProposals<N>,
         pending_certificates: IndexSet<BatchCertificate<N>>,
     ) -> Self {
-        Self { latest_round, proposal, signed_proposals, pending_certificates }
+        Self {
+            latest_round,
+            proposal,
+            signed_proposals,
+            pending_certificates,
+        }
     }
 
     /// Ensure that the proposal and every signed proposal is associated with the `expected_signer`.
@@ -71,7 +89,8 @@ impl<N: Network> ProposalCache<N> {
         self.proposal
             .as_ref()
             .map(|proposal| {
-                proposal.batch_header().author() == expected_signer && self.latest_round == proposal.round()
+                proposal.batch_header().author() == expected_signer
+                    && self.latest_round == proposal.round()
             })
             .unwrap_or(true)
             && self.signed_proposals.is_valid(expected_signer)
@@ -91,7 +110,10 @@ impl<N: Network> ProposalCache<N> {
         let proposal_cache = match fs::read(&path) {
             Ok(bytes) => match Self::from_bytes_le(&bytes) {
                 Ok(proposal_cache) => proposal_cache,
-                Err(_) => bail!("Couldn't deserialize the proposal stored at {}", path.display()),
+                Err(_) => bail!(
+                    "Couldn't deserialize the proposal stored at {}",
+                    path.display()
+                ),
             },
             Err(_) => bail!("Couldn't read the proposal stored at {}", path.display()),
         };
@@ -101,7 +123,11 @@ impl<N: Network> ProposalCache<N> {
             bail!("The proposal cache is invalid for the given address {expected_signer}");
         }
 
-        info!("Loaded the proposal cache from {} at round {}", path.display(), proposal_cache.latest_round);
+        info!(
+            "Loaded the proposal cache from {} at round {}",
+            path.display(),
+            proposal_cache.latest_round
+        );
 
         Ok(proposal_cache)
     }
@@ -114,15 +140,31 @@ impl<N: Network> ProposalCache<N> {
         // Serialize the proposal cache.
         let bytes = self.to_bytes_le()?;
         // Store the proposal cache to the file system.
-        fs::write(&path, bytes)
-            .map_err(|err| anyhow!("Couldn't write the proposal cache to {} - {err}", path.display()))?;
+        fs::write(&path, bytes).map_err(|err| {
+            anyhow!(
+                "Couldn't write the proposal cache to {} - {err}",
+                path.display()
+            )
+        })?;
 
         Ok(())
     }
 
     /// Returns the latest round, proposal, signed proposals, and pending certificates.
-    pub fn into(self) -> (u64, Option<Proposal<N>>, SignedProposals<N>, IndexSet<BatchCertificate<N>>) {
-        (self.latest_round, self.proposal, self.signed_proposals, self.pending_certificates)
+    pub fn into(
+        self,
+    ) -> (
+        u64,
+        Option<Proposal<N>>,
+        SignedProposals<N>,
+        IndexSet<BatchCertificate<N>>,
+    ) {
+        (
+            self.latest_round,
+            self.proposal,
+            self.signed_proposals,
+            self.pending_certificates,
+        )
     }
 }
 
@@ -138,7 +180,9 @@ impl<N: Network> ToBytes for ProposalCache<N> {
         // Serialize the `signed_proposals`.
         self.signed_proposals.write_le(&mut writer)?;
         // Write the number of pending certificates.
-        u32::try_from(self.pending_certificates.len()).map_err(error)?.write_le(&mut writer)?;
+        u32::try_from(self.pending_certificates.len())
+            .map_err(error)?
+            .write_le(&mut writer)?;
         // Serialize the pending certificates.
         for certificate in &self.pending_certificates {
             certificate.write_le(&mut writer)?;
@@ -170,10 +214,16 @@ impl<N: Network> FromBytes for ProposalCache<N> {
             )));
         };
         // Deserialize the pending certificates.
-        let pending_certificates =
-            (0..num_certificates).map(|_| BatchCertificate::read_le(&mut reader)).collect::<IoResult<IndexSet<_>>>()?;
+        let pending_certificates = (0..num_certificates)
+            .map(|_| BatchCertificate::read_le(&mut reader))
+            .collect::<IoResult<IndexSet<_>>>()?;
 
-        Ok(Self::new(latest_round, proposal, signed_proposals, pending_certificates))
+        Ok(Self::new(
+            latest_round,
+            proposal,
+            signed_proposals,
+            pending_certificates,
+        ))
     }
 }
 
@@ -187,7 +237,9 @@ impl<N: Network> Default for ProposalCache<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::helpers::{proposal::tests::sample_proposal, signed_proposals::tests::sample_signed_proposals};
+    use crate::helpers::{
+        proposal::tests::sample_proposal, signed_proposals::tests::sample_signed_proposals,
+    };
     use snarkvm::{
         console::{account::PrivateKey, network::MainnetV0},
         ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificates,
@@ -207,7 +259,12 @@ mod tests {
         let round = proposal.round();
         let pending_certificates = sample_batch_certificates(rng);
 
-        ProposalCache::new(round, Some(proposal), signed_proposals, pending_certificates)
+        ProposalCache::new(
+            round,
+            Some(proposal),
+            signed_proposals,
+            pending_certificates,
+        )
     }
 
     #[test]
@@ -219,7 +276,10 @@ mod tests {
             let expected = sample_proposal_cache(&singer_private_key, rng);
             // Check the byte representation.
             let expected_bytes = expected.to_bytes_le().unwrap();
-            assert_eq!(expected, ProposalCache::read_le(&expected_bytes[..]).unwrap());
+            assert_eq!(
+                expected,
+                ProposalCache::read_le(&expected_bytes[..]).unwrap()
+            );
         }
     }
 }

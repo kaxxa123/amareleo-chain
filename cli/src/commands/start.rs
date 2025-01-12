@@ -22,8 +22,8 @@ use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
 use snarkos_lite_account::Account;
+use snarkos_lite_node::bft::helpers::amareleo_storage_mode;
 use snarkos_lite_node::Node;
-use snarkos_lite_node_helpers::helpers::amareleo_storage_mode;
 
 use snarkvm::{
     console::{
