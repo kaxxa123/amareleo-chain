@@ -93,7 +93,7 @@ pub trait NodeInterface<N: Network>: Routing<N> {
                 Ok(()) => {
                     warn!("==========================================================================================");
                     warn!("⚠️  Attention - Starting the graceful shutdown procedure (ETA: 30 seconds)...");
-                    warn!("⚠️  Attention - To avoid DATA CORRUPTION, do NOT interrupt snarkOS (or press Ctrl+C again)");
+                    warn!("⚠️  Attention - To avoid DATA CORRUPTION, do NOT interrupt amareleo (or press Ctrl+C again)");
                     warn!("⚠️  Attention - Please wait until the shutdown gracefully completes (ETA: 30 seconds)");
                     warn!("==========================================================================================");
 

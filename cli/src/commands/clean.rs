@@ -24,7 +24,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 pub struct Clean {
     /// Specify the network to remove from storage.
-    #[clap(default_value = "0", long = "network")]
+    #[clap(default_value = "1", long = "network")]
     pub network: u16,
     /// Specify the path to a directory containing the ledger
     #[clap(long = "path")]
@@ -60,17 +60,19 @@ impl Clean {
         if path.exists() {
             // Remove the ledger files from storage.
             match std::fs::remove_dir_all(&path) {
-                Ok(_) => Ok(format!("✅ Cleaned the snarkOS node storage {path_string}")),
+                Ok(_) => Ok(format!(
+                    "✅ Cleaned the amareleo node storage {path_string}"
+                )),
                 Err(error) => {
                     bail!(
-                        "Failed to remove the snarkOS node storage {path_string}\n{}",
+                        "Failed to remove the amareleo node storage {path_string}\n{}",
                         error.to_string().dimmed()
                     )
                 }
             }
         } else {
             Ok(format!(
-                "✅ No snarkOS node storage was found {path_string}"
+                "✅ No amareleo node storage was found {path_string}"
             ))
         }
     }
