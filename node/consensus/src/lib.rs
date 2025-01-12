@@ -112,10 +112,7 @@ impl<N: Network> Consensus<N> {
         storage_mode: StorageMode,
     ) -> Result<Self> {
         // Recover the development ID, if it is present.
-        let dev = match storage_mode {
-            StorageMode::Development(id) => Some(id),
-            StorageMode::Production | StorageMode::Custom(..) => None,
-        };
+        let dev = Some(0u16);
         // Initialize the Narwhal transmissions.
         let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode)?);
         // Initialize the Narwhal storage.

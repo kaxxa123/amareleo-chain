@@ -33,12 +33,34 @@ metrics = [
 history = ["snarkos-lite-node-rest/history"]
 test_targets = ["snarkvm/test_targets"]
 
-[dependencies.snarkvm]
-workspace = true
-features = ["console"]
-
 [dependencies.aleo-std]
 workspace = true
+
+[dependencies.anyhow]
+version = "1.0.79"
+
+[dependencies.async-trait]
+version = "0.1"
+
+[dependencies.metrics]
+package = "snarkos-lite-node-metrics"
+path = "./metrics"
+version = "=3.1.0"
+optional = true
+
+[dependencies.once_cell]
+version = "1"
+
+[dependencies.parking_lot]
+version = "0.12"
+
+[dependencies.rand]
+version = "0.8"
+default-features = false
+
+[dependencies.rayon]
+version = "1"
+optional = true
 
 [dependencies.snarkos-lite-account]
 workspace = true
@@ -67,25 +89,9 @@ version = "=3.1.0"
 path = "./tcp"
 version = "=3.1.0"
 
-[dependencies.anyhow]
-version = "1.0.79"
-
-[dependencies.async-trait]
-version = "0.1"
-
-[dependencies.once_cell]
-version = "1"
-
-[dependencies.parking_lot]
-version = "0.12"
-
-[dependencies.rand]
-version = "0.8"
-default-features = false
-
-[dependencies.rayon]
-version = "1"
-optional = true
+[dependencies.snarkvm]
+workspace = true
+features = ["console"]
 
 [dependencies.tokio]
 version = "1.28"
@@ -97,8 +103,5 @@ version = "0.7"
 [dependencies.tracing]
 version = "0.1"
 
-[dependencies.metrics]
-package = "snarkos-lite-node-metrics"
-path = "./metrics"
-version = "=3.1.0"
-optional = true
+[dev-dependencies.rand_chacha]
+version = "0.3.0"

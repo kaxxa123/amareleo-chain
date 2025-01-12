@@ -38,7 +38,7 @@ use anyhow::Result;
 use core::future::Future;
 use parking_lot::Mutex;
 use std::{
-    net::SocketAddr,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
@@ -80,13 +80,16 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let signal_node = Self::handle_signals(shutdown.clone());
 
         // Initialize the ledger.
-        let ledger: Ledger<N, C> = Ledger::load(genesis, storage_mode.clone())?;
+        let ledger = Ledger::load(genesis, storage_mode.clone())?;
 
         // Initialize the ledger service.
         let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone(), shutdown.clone()));
 
         // Initialize the consensus.
-        let trusted_validators: [SocketAddr; 0] = [];
+        let trusted_validators: [SocketAddr; 1] = [SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            5001,
+        )];
         let mut consensus = Consensus::new(
             account.clone(),
             ledger_service.clone(),
@@ -106,10 +109,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             NodeType::Validator,
             account,
             &trusted_peers,
-            4u16,
+            Self::MAXIMUM_NUMBER_OF_PEERS as u16,
             false,
             false,
-            matches!(storage_mode, StorageMode::Development(_)),
+            true,
         )
         .await?;
 
@@ -126,9 +129,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             handles: Default::default(),
             shutdown,
         };
-
         // Initialize the transaction pool.
-        node.initialize_transaction_pool(storage_mode, dev_txs)?;
+        node.initialize_transaction_pool(dev_txs)?;
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
@@ -170,7 +172,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Initialize the transaction pool.
-    fn initialize_transaction_pool(&self, storage_mode: StorageMode, dev_txs: bool) -> Result<()> {
+    fn initialize_transaction_pool(&self, dev_txs: bool) -> Result<()> {
         use snarkvm::console::{
             program::{Identifier, Literal, ProgramID, Value},
             types::U64,
@@ -184,16 +186,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         );
 
         // Determine whether to start the loop.
-        match storage_mode {
-            // If the node is running in development mode, only generate if you are allowed.
-            StorageMode::Development(id) => {
-                // If the node is not the first node, or if we should not create dev traffic, do not start the loop.
-                if id != 0 || !dev_txs {
-                    return Ok(());
-                }
-            }
-            // If the node is not running in development mode, do not generate dev traffic.
-            _ => return Ok(()),
+        if !dev_txs {
+            return Ok(());
         }
 
         let self_ = self.clone();
@@ -272,5 +266,67 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
         self.consensus.shut_down().await;
 
         info!("Node has shut down.");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snarkvm::prelude::{
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        MainnetV0, VM,
+    };
+
+    use anyhow::bail;
+    use rand::SeedableRng;
+    use rand_chacha::ChaChaRng;
+    use std::str::FromStr;
+
+    type CurrentNetwork = MainnetV0;
+
+    /// Use `RUST_MIN_STACK=67108864 cargo test --release profiler --features timer` to run this test.
+    #[ignore]
+    #[tokio::test]
+    async fn test_profiler() -> Result<()> {
+        // Specify the node attributes.
+        let node = SocketAddr::from_str("0.0.0.0:4130").unwrap();
+        let rest = SocketAddr::from_str("0.0.0.0:3030").unwrap();
+        let storage_mode = StorageMode::Development(0);
+        let dev_txs = true;
+
+        // Initialize an (insecure) fixed RNG.
+        let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
+        // Initialize the account.
+        let account = Account::<CurrentNetwork>::new(&mut rng).unwrap();
+        // Initialize a new VM.
+        let vm = VM::from(ConsensusStore::<
+            CurrentNetwork,
+            ConsensusMemory<CurrentNetwork>,
+        >::open(None)?)?;
+        // Initialize the genesis block.
+        let genesis = vm.genesis_beacon(account.private_key(), &mut rng)?;
+
+        println!("Initializing validator node...");
+
+        let validator = Validator::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
+            node,
+            None,
+            Some(rest),
+            10,
+            account,
+            genesis,
+            storage_mode,
+            dev_txs,
+            Default::default(),
+        )
+        .await
+        .unwrap();
+
+        println!(
+            "Loaded validator node with {} blocks",
+            validator.ledger.latest_height(),
+        );
+
+        bail!("\n\nRemember to #[ignore] this test!\n\n")
     }
 }

@@ -3219,6 +3219,7 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "rand",
+ "rand_chacha",
  "rayon",
  "snarkos-lite-account",
  "snarkos-lite-node-bft",
