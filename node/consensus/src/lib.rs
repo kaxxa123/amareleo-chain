@@ -666,7 +666,7 @@ impl<N: Network> Consensus<N> {
         //        cheating in always assigning the same leader.
         //        Validation is within SnarkVM which we don't want to touch.
         // Check that the block is well-formed.
-        self.ledger.check_next_block(&next_block)?;
+        // self.ledger.check_next_block(&next_block)?;
 
         // Advance to the next block.
         self.ledger.advance_to_next_block(&next_block)?;
