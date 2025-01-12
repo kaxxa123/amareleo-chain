@@ -119,7 +119,6 @@ dependencies = [
  "snarkos-lite-cli",
  "snarkos-lite-node",
  "snarkos-lite-node-bft-events",
- "snarkos-lite-node-helpers",
  "snarkos-lite-node-metrics",
  "tikv-jemallocator",
 ]
@@ -3199,7 +3198,6 @@ dependencies = [
  "self_update 0.41.0",
  "snarkos-lite-account",
  "snarkos-lite-node",
- "snarkos-lite-node-helpers",
  "snarkos-lite-node-metrics",
  "snarkos-lite-node-rest",
  "snarkvm",
@@ -3220,6 +3218,7 @@ dependencies = [
  "async-trait",
  "once_cell",
  "parking_lot",
+ "rand",
  "rayon",
  "snarkos-lite-account",
  "snarkos-lite-node-bft",
@@ -3351,13 +3350,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-test 0.2.5",
-]
-
-[[package]]
-name = "snarkos-lite-node-helpers"
-version = "3.1.0"
-dependencies = [
- "aleo-std",
 ]
 
 [[package]]

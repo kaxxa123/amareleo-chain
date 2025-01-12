@@ -13,11 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Validator;
+use crate::{NodeInterface, Validator};
 use snarkos_lite_account::Account;
+use snarkos_lite_node_router::messages::NodeType;
 
 use anyhow::Result;
-use snarkvm::prelude::{block::Block, store::helpers::rocksdb::ConsensusDB, Network};
+use snarkvm::prelude::{
+    block::Block, store::helpers::rocksdb::ConsensusDB, Address, Network, PrivateKey, ViewKey,
+};
 
 use aleo_std::StorageMode;
 use std::{
@@ -58,5 +61,30 @@ impl<N: Network> Node<N> {
                 .await?,
             ),
         })
+    }
+
+    /// Returns the node type.
+    pub fn node_type(&self) -> NodeType {
+        self.validator.node_type()
+    }
+
+    /// Returns the account private key of the node.
+    pub fn private_key(&self) -> &PrivateKey<N> {
+        self.validator.private_key()
+    }
+
+    /// Returns the account view key of the node.
+    pub fn view_key(&self) -> &ViewKey<N> {
+        self.validator.view_key()
+    }
+
+    /// Returns the account address of the node.
+    pub fn address(&self) -> Address<N> {
+        self.validator.address()
+    }
+
+    /// Returns `true` if the node is in development mode.
+    pub fn is_dev(&self) -> bool {
+        self.validator.is_dev()
     }
 }

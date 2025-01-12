@@ -79,6 +79,10 @@ version = "1"
 [dependencies.parking_lot]
 version = "0.12"
 
+[dependencies.rand]
+version = "0.8"
+default-features = false
+
 [dependencies.rayon]
 version = "1"
 optional = true
