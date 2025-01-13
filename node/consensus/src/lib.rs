@@ -114,7 +114,7 @@ impl<N: Network> Consensus<N> {
         // Recover the development ID, if it is present.
         let dev = Some(0u16);
         // Initialize the Narwhal transmissions.
-        let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode)?);
+        let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode.clone())?);
         // Initialize the Narwhal storage.
         let storage = NarwhalStorage::new(
             ledger.clone(),
@@ -125,6 +125,7 @@ impl<N: Network> Consensus<N> {
         let bft = BFT::new(
             account,
             storage,
+            storage_mode,
             ledger.clone(),
             ip,
             trusted_validators,

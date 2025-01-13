@@ -13,7 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_lite_node::bft::helpers::{amareleo_ledger_dir, proposal_cache_path};
+use snarkos_lite_node::bft::helpers::{
+    amareleo_ledger_dir, amareleo_storage_mode, proposal_cache_path,
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -34,8 +36,16 @@ pub struct Clean {
 impl Clean {
     /// Cleans the snarkOS node storage.
     pub fn parse(self) -> Result<String> {
+        // Determine the ledger path
+        let ledger_path = match &self.path {
+            Some(path) => path.clone(),
+            None => amareleo_ledger_dir(self.network),
+        };
+
+        let storage_mode = amareleo_storage_mode(self.network, self.path);
+
         // Remove the current proposal cache file, if it exists.
-        let proposal_cache_path = proposal_cache_path(self.network, Some(0u16));
+        let proposal_cache_path = proposal_cache_path(self.network, Some(0u16), &storage_mode);
         if proposal_cache_path.exists() {
             if let Err(err) = std::fs::remove_file(&proposal_cache_path) {
                 bail!(
@@ -46,11 +56,6 @@ impl Clean {
         }
 
         // Remove the specified ledger from storage.
-        let ledger_path = match self.path {
-            Some(path) => path,
-            None => amareleo_ledger_dir(self.network),
-        };
-
         Self::remove_ledger(ledger_path)
     }
 

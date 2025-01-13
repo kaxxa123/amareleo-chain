@@ -33,6 +33,7 @@ use snarkvm::{
     prelude::{committee::Committee, Signature},
 };
 
+use aleo_std::StorageMode;
 use colored::Colorize;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
@@ -66,6 +67,8 @@ pub struct Primary<N: Network> {
     account: Account<N>,
     /// The storage.
     storage: Storage<N>,
+    /// The storage mode.
+    storage_mode: StorageMode,
     /// The ledger service.
     ledger: Arc<dyn LedgerService<N>>,
     /// The workers.
@@ -93,6 +96,7 @@ impl<N: Network> Primary<N> {
     pub fn new(
         account: Account<N>,
         storage: Storage<N>,
+        storage_mode: StorageMode,
         ledger: Arc<dyn LedgerService<N>>,
         _ip: Option<SocketAddr>,
         _trusted_validators: &[SocketAddr],
@@ -106,6 +110,7 @@ impl<N: Network> Primary<N> {
             sync,
             account,
             storage,
+            storage_mode,
             ledger,
             workers: Arc::from(vec![]),
             bft_sender: Default::default(),
@@ -120,10 +125,14 @@ impl<N: Network> Primary<N> {
     /// Load the proposal cache file and update the Primary state with the stored data.
     async fn load_proposal_cache(&self) -> Result<()> {
         // Fetch the signed proposals from the file system if it exists.
-        match ProposalCache::<N>::exists(Some(0u16)) {
+        match ProposalCache::<N>::exists(Some(0u16), &self.storage_mode) {
             // If the proposal cache exists, then process the proposal cache.
             true => {
-                match ProposalCache::<N>::load(self.account.address(), Some(0u16)) {
+                match ProposalCache::<N>::load(
+                    self.account.address(),
+                    Some(0u16),
+                    &self.storage_mode,
+                ) {
                     Ok(proposal_cache) => {
                         // Extract the proposal and signed proposals.
                         let (
@@ -1354,7 +1363,7 @@ impl<N: Network> Primary<N> {
                 pending_certificates,
             )
         };
-        if let Err(err) = proposal_cache.store(Some(0u16)) {
+        if let Err(err) = proposal_cache.store(Some(0u16), &self.storage_mode) {
             error!("Failed to store the current proposal cache: {err}");
         }
     }
