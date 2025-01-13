@@ -1,6 +1,10 @@
 [package]
 name = "snarkos-lite-cli"
 version = "3.1.0"
+authors = [
+    "The Aleo Team <hello@aleo.org>",
+    "The Amareleo Team <support@windeveloper.com>",
+]
 description = "A CLI for a decentralized operating system"
 homepage = "https://amareleo.com"
 repository = "https://github.com/kaxxa123/amareleo-chain"
@@ -17,6 +21,7 @@ edition = "2021"
 
 [features]
 default = ["snarkos-lite-node/metrics"]
+test_targets = ["snarkvm/test_targets"]
 
 [dependencies.aleo-std]
 workspace = true
@@ -65,7 +70,8 @@ version = "0.41"
 features = ["archive-zip", "compression-zip-deflate"]
 
 [dependencies.snarkos-lite-account]
-workspace = true
+path = "../account"
+version = "=3.1.0"
 
 [dependencies.snarkos-lite-node]
 path = "../node"

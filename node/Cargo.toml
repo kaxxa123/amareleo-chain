@@ -63,7 +63,8 @@ version = "1"
 optional = true
 
 [dependencies.snarkos-lite-account]
-workspace = true
+path = "../account"
+version = "=3.1.0"
 
 [dependencies.snarkos-lite-node-bft]
 path = "./bft"
@@ -102,6 +103,10 @@ version = "0.7"
 
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+features = ["env-filter", "fmt"]
 
 [dev-dependencies.rand_chacha]
 version = "0.3.0"
