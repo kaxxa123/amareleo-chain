@@ -44,15 +44,18 @@ impl Clean {
                 );
             }
         }
-        // Remove the ledger from storage.
-        Self::remove_ledger(self.network)
+
+        // Remove the specified ledger from storage.
+        let ledger_path = match self.path {
+            Some(path) => path,
+            None => amareleo_ledger_dir(self.network),
+        };
+
+        Self::remove_ledger(ledger_path)
     }
 
     /// Removes the specified ledger from storage.
-    pub(crate) fn remove_ledger(network: u16) -> Result<String> {
-        // Construct the path to the ledger in storage.
-        let path = amareleo_ledger_dir(network);
-
+    pub(crate) fn remove_ledger(path: PathBuf) -> Result<String> {
         // Prepare the path string.
         let path_string = format!("(in \"{}\")", path.display()).dimmed();
 

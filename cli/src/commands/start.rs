@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use aleo_std::StorageMode;
 use anyhow::{bail, ensure, Result};
 use clap::Parser;
 use colored::Colorize;
@@ -315,7 +316,10 @@ impl Start {
         }
 
         // Initialize the storage mode.
-        let storage_mode = amareleo_storage_mode(self.network);
+        let storage_mode = match &self.storage {
+            Some(path) => StorageMode::Custom(path.clone()),
+            None => amareleo_storage_mode(self.network),
+        };
 
         // Determine whether to generate background transactions in dev mode.
         let dev_txs = !self.no_dev_txs;
