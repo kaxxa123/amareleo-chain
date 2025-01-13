@@ -24,6 +24,10 @@ use rand_chacha::ChaChaRng;
 use snarkos_lite_account::Account;
 use snarkos_lite_node::bft::helpers::amareleo_storage_mode;
 use snarkos_lite_node::Node;
+use snarkos_lite_resources::{
+    BLOCK0_CANARY, BLOCK0_CANARY_ID, BLOCK0_MAINNET, BLOCK0_MAINNET_ID, BLOCK0_TESTNET,
+    BLOCK0_TESTNET_ID,
+};
 
 use snarkvm::{
     console::{
@@ -363,6 +367,8 @@ fn load_or_compute_genesis<N: Network>(
 ) -> Result<Block<N>> {
     // Construct the preimage.
     let mut preimage = Vec::new();
+    let raw_block0: &[u8];
+    let raw_blockid: &str;
 
     // Input the network ID.
     preimage.extend(&N::ID.to_le_bytes());
@@ -411,6 +417,8 @@ fn load_or_compute_genesis<N: Network>(
             preimage.extend(snarkvm::parameters::mainnet::FeePrivateVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::mainnet::FeePublicVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::mainnet::InclusionVerifier::METADATA.as_bytes());
+            raw_block0 = BLOCK0_MAINNET;
+            raw_blockid = BLOCK0_MAINNET_ID;
         }
         snarkvm::console::network::TestnetV0::ID => {
             preimage
@@ -437,6 +445,8 @@ fn load_or_compute_genesis<N: Network>(
             preimage.extend(snarkvm::parameters::testnet::FeePrivateVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::testnet::FeePublicVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::testnet::InclusionVerifier::METADATA.as_bytes());
+            raw_block0 = BLOCK0_TESTNET;
+            raw_blockid = BLOCK0_TESTNET_ID;
         }
         snarkvm::console::network::CanaryV0::ID => {
             preimage
@@ -462,6 +472,8 @@ fn load_or_compute_genesis<N: Network>(
             preimage.extend(snarkvm::parameters::canary::FeePrivateVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::canary::FeePublicVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::canary::InclusionVerifier::METADATA.as_bytes());
+            raw_block0 = BLOCK0_CANARY;
+            raw_blockid = BLOCK0_CANARY_ID;
         }
         _ => {
             // Unrecognized Network ID
@@ -475,6 +487,11 @@ fn load_or_compute_genesis<N: Network>(
     // NOTE: this is a fast-to-compute but *IMPERFECT* identifier for the genesis block.
     //       to know the actualy genesis block hash, you need to compute the block itself.
     let hash = hasher.hash(&preimage.to_bits_le())?.to_string();
+    if hash == raw_blockid {
+        println!("Loading Genesis Block from internal resource.");
+        let block = Block::from_bytes_le(raw_block0)?;
+        return Ok(block);
+    }
 
     // A closure to load the block.
     let load_block = |file_path| -> Result<Block<N>> {

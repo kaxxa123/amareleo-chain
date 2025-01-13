@@ -1,0 +1,10 @@
+pub const BLOCK0_TESTNET: &[u8] = include_bytes!("../data/block0_testnet.raw");
+pub const BLOCK0_MAINNET: &[u8] = include_bytes!("../data/block0_mainnet.raw");
+pub const BLOCK0_CANARY: &[u8] = include_bytes!("../data/block0_canary.raw");
+
+pub const BLOCK0_TESTNET_ID: &str =
+    "15983110333109949993277199043008208330432506493933185651419933655310578437field";
+pub const BLOCK0_MAINNET_ID: &str =
+    "1183017358971043385584313705852146661629153587991855518340588342044161724549field";
+pub const BLOCK0_CANARY_ID: &str =
+    "4973822415700687499344496803476383842645579465251629774701462962794734491572field";

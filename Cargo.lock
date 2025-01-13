@@ -3276,6 +3276,7 @@ dependencies = [
  "snarkos-lite-node",
  "snarkos-lite-node-metrics",
  "snarkos-lite-node-rest",
+ "snarkos-lite-resources",
  "snarkvm",
  "sys-info",
  "thiserror 1.0.69",
@@ -3569,6 +3570,10 @@ dependencies = [
  "tokio-util",
  "tracing",
 ]
+
+[[package]]
+name = "snarkos-lite-resources"
+version = "2.0.0"
 
 [[package]]
 name = "snarkvm"
