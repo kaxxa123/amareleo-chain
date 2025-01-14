@@ -94,9 +94,9 @@ pub struct Start {
     #[clap(long = "storage")]
     pub storage: Option<PathBuf>,
 
-    /// If developtment mode is enabled, specify whether it should generate traffic to drive the network
-    #[clap(default_value = "false", long = "no-dev-txs")]
-    pub no_dev_txs: bool,
+    /// Specify whether node should generate traffic to drive the network
+    #[clap(default_value = "false", long = "dev-txs")]
+    pub dev_txs: bool,
 }
 
 impl Start {
@@ -314,11 +314,8 @@ impl Start {
         // Initialize the storage mode.
         let storage_mode = amareleo_storage_mode(self.network, self.storage.clone());
 
-        // Determine whether to generate background transactions in dev mode.
-        let dev_txs = !self.no_dev_txs;
-
-        // // Initialize the node.
-        Node::new_validator(node_ip, rest_ip, self.rest_rps, account, genesis, storage_mode, dev_txs, shutdown.clone()).await
+        // Initialize the node.
+        Node::new_validator(node_ip, rest_ip, self.rest_rps, account, genesis, storage_mode, self.dev_txs, shutdown.clone()).await
     }
 
     /// Returns a runtime for the node.
