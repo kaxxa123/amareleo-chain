@@ -36,7 +36,6 @@ pub struct Node<N: Network> {
 impl<N: Network> Node<N> {
     pub async fn new_validator(
         node_ip: SocketAddr,
-        bft_ip: Option<SocketAddr>,
         rest_ip: Option<SocketAddr>,
         rest_rps: u32,
         account: Account<N>,
@@ -49,7 +48,6 @@ impl<N: Network> Node<N> {
             validator: Arc::new(
                 Validator::new(
                     node_ip,
-                    bft_ip,
                     rest_ip,
                     rest_rps,
                     account,

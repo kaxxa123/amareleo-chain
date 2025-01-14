@@ -68,9 +68,6 @@ pub struct Start {
     /// Specify the IP address and port for the node server
     #[clap(long = "node")]
     pub node: Option<SocketAddr>,
-    /// Specify the IP address and port for the BFT
-    #[clap(long = "bft")]
-    pub bft: Option<SocketAddr>,
 
     /// Specify the IP address and port for the REST server
     #[clap(long = "rest")]
@@ -325,7 +322,7 @@ impl Start {
         let dev_txs = !self.no_dev_txs;
 
         // // Initialize the node.
-        Node::new_validator(node_ip, self.bft, rest_ip, self.rest_rps, account, genesis, storage_mode, dev_txs, shutdown.clone()).await
+        Node::new_validator(node_ip, rest_ip, self.rest_rps, account, genesis, storage_mode, dev_txs, shutdown.clone()).await
     }
 
     /// Returns a runtime for the node.

@@ -98,7 +98,6 @@ impl<N: Network> Primary<N> {
         storage: Storage<N>,
         storage_mode: StorageMode,
         ledger: Arc<dyn LedgerService<N>>,
-        _ip: Option<SocketAddr>,
         _trusted_validators: &[SocketAddr],
         _dev: Option<u16>,
     ) -> Result<Self> {

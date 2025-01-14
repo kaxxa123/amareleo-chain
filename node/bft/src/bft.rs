@@ -76,7 +76,6 @@ impl<N: Network> BFT<N> {
         storage: Storage<N>,
         storage_mode: StorageMode,
         ledger: Arc<dyn LedgerService<N>>,
-        ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
@@ -86,7 +85,6 @@ impl<N: Network> BFT<N> {
                 storage,
                 storage_mode,
                 ledger,
-                ip,
                 trusted_validators,
                 dev,
             )?,
@@ -1092,7 +1090,6 @@ mod tests {
             storage.clone(),
             StorageMode::Development(0),
             ledger.clone(),
-            None,
             &[],
             None,
         )?;
@@ -1135,7 +1132,6 @@ mod tests {
             storage,
             StorageMode::Development(0),
             ledger,
-            None,
             &[],
             None,
         )?;
@@ -1165,7 +1161,6 @@ mod tests {
             storage,
             StorageMode::Development(0),
             ledger,
-            None,
             &[],
             None,
         )?;
@@ -1214,7 +1209,6 @@ mod tests {
             storage.clone(),
             StorageMode::Development(0),
             ledger.clone(),
-            None,
             &[],
             None,
         )?;
@@ -1235,7 +1229,6 @@ mod tests {
             storage.clone(),
             StorageMode::Development(0),
             ledger.clone(),
-            None,
             &[],
             None,
         )?;
@@ -1282,7 +1275,6 @@ mod tests {
             storage,
             StorageMode::Development(0),
             ledger,
-            None,
             &[],
             None,
         )?;
@@ -1308,7 +1300,6 @@ mod tests {
             storage,
             StorageMode::Development(0),
             ledger,
-            None,
             &[],
             None,
         )?;
@@ -1371,7 +1362,6 @@ mod tests {
             storage.clone(),
             StorageMode::Development(0),
             ledger,
-            None,
             &[],
             None,
         )?;
@@ -1417,7 +1407,6 @@ mod tests {
                 storage,
                 StorageMode::Development(0),
                 ledger.clone(),
-                None,
                 &[],
                 None,
             )?;
@@ -1463,7 +1452,6 @@ mod tests {
                 storage,
                 StorageMode::Development(0),
                 ledger,
-                None,
                 &[],
                 None,
             )?;
@@ -1538,7 +1526,6 @@ mod tests {
             storage,
             StorageMode::Development(0),
             ledger,
-            None,
             &[],
             None,
         )?;
@@ -1610,7 +1597,6 @@ mod tests {
             storage.clone(),
             StorageMode::Development(0),
             ledger,
-            None,
             &[],
             None,
         )?;
@@ -1699,7 +1685,6 @@ mod tests {
             storage,
             StorageMode::Development(0),
             ledger.clone(),
-            None,
             &[],
             None,
         )?;
@@ -1734,7 +1719,6 @@ mod tests {
             storage_2,
             StorageMode::Development(0),
             ledger,
-            None,
             &[],
             None,
         )?;
@@ -1931,7 +1915,6 @@ mod tests {
             storage,
             StorageMode::Development(0),
             ledger.clone(),
-            None,
             &[],
             None,
         )?;
@@ -1976,7 +1959,6 @@ mod tests {
             bootup_storage.clone(),
             StorageMode::Development(0),
             ledger.clone(),
-            None,
             &[],
             None,
         )?;
@@ -2226,7 +2208,6 @@ mod tests {
             storage.clone(),
             StorageMode::Development(0),
             ledger.clone(),
-            None,
             &[],
             None,
         )?;

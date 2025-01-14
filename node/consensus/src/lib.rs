@@ -107,7 +107,6 @@ impl<N: Network> Consensus<N> {
     pub fn new(
         account: Account<N>,
         ledger: Arc<dyn LedgerService<N>>,
-        ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
         storage_mode: StorageMode,
     ) -> Result<Self> {
@@ -127,7 +126,6 @@ impl<N: Network> Consensus<N> {
             storage,
             storage_mode,
             ledger.clone(),
-            ip,
             trusted_validators,
             dev,
         )?;
