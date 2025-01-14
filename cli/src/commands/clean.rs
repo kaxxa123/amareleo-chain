@@ -42,10 +42,19 @@ impl Clean {
             None => amareleo_ledger_dir(self.network),
         };
 
-        let storage_mode = amareleo_storage_mode(self.network, self.path);
+        // Remove the current proposal cache file, if it exists.
+        Self::remove_proposal_cache(self.network, ledger_path.clone())?;
+
+        // Remove the specified ledger from storage.
+        Self::remove_ledger(ledger_path)
+    }
+
+    /// Removes the specified ledger from storage.
+    pub(crate) fn remove_proposal_cache(network: u16, path: PathBuf) -> Result<()> {
+        let storage_mode = amareleo_storage_mode(network, Some(path));
 
         // Remove the current proposal cache file, if it exists.
-        let proposal_cache_path = proposal_cache_path(self.network, Some(0u16), &storage_mode);
+        let proposal_cache_path = proposal_cache_path(network, Some(0u16), &storage_mode);
         if proposal_cache_path.exists() {
             if let Err(err) = std::fs::remove_file(&proposal_cache_path) {
                 bail!(
@@ -55,8 +64,7 @@ impl Clean {
             }
         }
 
-        // Remove the specified ledger from storage.
-        Self::remove_ledger(ledger_path)
+        Ok(())
     }
 
     /// Removes the specified ledger from storage.

@@ -42,7 +42,7 @@ members = [
 
 [[bin]]
 name = "amareleo-chain"
-path = "main.rs"
+path = "src/main.rs"
 
 [features]
 metrics = [ 

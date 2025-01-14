@@ -21,8 +21,9 @@ use indexmap::IndexMap;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
+use crate::commands::Clean;
 use snarkos_lite_account::Account;
-use snarkos_lite_node::bft::helpers::amareleo_storage_mode;
+use snarkos_lite_node::bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode};
 use snarkos_lite_node::Node;
 use snarkos_lite_resources::{
     BLOCK0_CANARY, BLOCK0_CANARY_ID, BLOCK0_MAINNET, BLOCK0_MAINNET_ID, BLOCK0_TESTNET,
@@ -97,6 +98,10 @@ pub struct Start {
     /// Specify whether node should generate traffic to drive the network
     #[clap(default_value = "false", long = "dev-txs")]
     pub dev_txs: bool,
+
+    /// Specify whether the chain state of the last run should be retained, or restart from genesis.
+    #[clap(default_value = "false", long = "keep-state")]
+    pub keep_state: bool,
 }
 
 impl Start {
@@ -311,8 +316,21 @@ impl Start {
             metrics::initialize_metrics(self.metrics_ip);
         }
 
+        // Determine the ledger path
+        let ledger_path = match &self.storage {
+            Some(path) => path.clone(),
+            None => amareleo_ledger_dir(self.network),
+        };
+
+        if !self.keep_state {
+            // Remove old ledger state
+            Clean::remove_proposal_cache(self.network, ledger_path.clone())?;
+            let res_text = Clean::remove_ledger(ledger_path.clone())?;
+            println!("{res_text}\n");
+        }
+
         // Initialize the storage mode.
-        let storage_mode = amareleo_storage_mode(self.network, self.storage.clone());
+        let storage_mode = amareleo_storage_mode(self.network, Some(ledger_path));
 
         // Initialize the node.
         Node::new_validator(node_ip, rest_ip, self.rest_rps, account, genesis, storage_mode, self.dev_txs, shutdown.clone()).await
