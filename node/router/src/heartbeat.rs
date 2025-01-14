@@ -20,7 +20,7 @@ use crate::{
 use snarkvm::prelude::Network;
 
 use colored::Colorize;
-use rand::{prelude::IteratorRandom, rngs::OsRng, Rng};
+use rand::{prelude::IteratorRandom, rngs::OsRng};
 
 /// A helper function to compute the maximum of two numbers.
 /// See Rust issue 92391: https://github.com/rust-lang/rust/issues/92391.
@@ -127,17 +127,11 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         // Obtain the number of connected provers.
         let num_connected_provers = self.router().number_of_connected_provers();
 
-        // Consider rotating more external peers every ~10 heartbeats.
-        let reduce_peers = self.router().rotate_external_peers() && rng.gen_range(0..10) == 0;
         // Determine the maximum number of peers and provers to keep.
-        let (max_peers, max_provers) = if reduce_peers {
-            (Self::MEDIAN_NUMBER_OF_PEERS, 0)
-        } else {
-            (
-                Self::MAXIMUM_NUMBER_OF_PEERS,
-                Self::MAXIMUM_NUMBER_OF_PROVERS,
-            )
-        };
+        let (max_peers, max_provers) = (
+            Self::MAXIMUM_NUMBER_OF_PEERS,
+            Self::MAXIMUM_NUMBER_OF_PROVERS,
+        );
 
         // Compute the number of surplus peers.
         let num_surplus_peers = num_connected.saturating_sub(max_peers);

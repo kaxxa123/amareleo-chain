@@ -108,7 +108,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             account,
             &trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
-            false,
             true,
         )
         .await?;
