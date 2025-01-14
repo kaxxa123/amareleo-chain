@@ -114,29 +114,3 @@ version = "=0.1"
 
 [dependencies.tracing]
 version = "0.1"
-
-[dev-dependencies.deadline]
-version = "0.2"
-
-[dev-dependencies.futures-util]
-version = "0.3"
-features = ["sink"]
-
-[dev-dependencies.peak_alloc]
-version = "0.2"
-
-[dev-dependencies.snarkos-lite-node-sync]
-path = "../sync"
-features = ["test"]
-
-[dev-dependencies.snarkos-lite-node-router]
-path = "."
-features = ["test"]
-
-[dev-dependencies.snarkos-lite-node-router-messages]
-path = "messages"
-features = ["test"]
-
-[dev-dependencies.tracing-subscriber]
-version = "0.3"
-features = ["env-filter", "fmt"]

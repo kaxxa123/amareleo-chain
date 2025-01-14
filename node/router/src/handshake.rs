@@ -14,20 +14,20 @@
 // limitations under the License.
 
 use crate::{
-    NodeType,
-    Peer,
-    Router,
-    messages::{ChallengeRequest, ChallengeResponse, DisconnectReason, Message, MessageCodec, MessageTrait},
+    messages::{
+        ChallengeRequest, ChallengeResponse, DisconnectReason, Message, MessageCodec, MessageTrait,
+    },
+    NodeType, Peer, Router,
 };
-use snarkos_lite_node_tcp::{ConnectionSide, P2P, Tcp};
+use snarkos_lite_node_tcp::{ConnectionSide, Tcp, P2P};
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{Address, Field, Network, block::Header, error},
+    prelude::{block::Header, error, Address, Field, Network},
 };
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use futures::SinkExt;
-use rand::{Rng, rngs::OsRng};
+use rand::{rngs::OsRng, Rng};
 use std::{collections::hash_map::Entry, io, net::SocketAddr};
 use tokio::net::TcpStream;
 use tokio_stream::StreamExt;
@@ -65,7 +65,11 @@ macro_rules! expect_message {
             }
             // Received nothing.
             None => {
-                return Err(error(format!("'{}' disconnected before sending {:?}", $peer_addr, stringify!($msg_ty),)))
+                return Err(error(format!(
+                    "'{}' disconnected before sending {:?}",
+                    $peer_addr,
+                    stringify!($msg_ty),
+                )))
             }
         }
     };
@@ -106,26 +110,58 @@ impl<N: Network> Router<N> {
         if !self.is_dev() && peer_side == ConnectionSide::Initiator {
             // If the IP is already banned reject the connection.
             if self.is_ip_banned(peer_addr.ip()) {
-                trace!("Rejected a connection request from banned IP '{}'", peer_addr.ip());
-                return Err(error(format!("'{}' is a banned IP address", peer_addr.ip())));
+                trace!(
+                    "Rejected a connection request from banned IP '{}'",
+                    peer_addr.ip()
+                );
+                return Err(error(format!(
+                    "'{}' is a banned IP address",
+                    peer_addr.ip()
+                )));
             }
 
-            let num_attempts =
-                self.cache.insert_inbound_connection(peer_addr.ip(), Router::<N>::CONNECTION_ATTEMPTS_SINCE_SECS);
+            let num_attempts = self.cache.insert_inbound_connection(
+                peer_addr.ip(),
+                Router::<N>::CONNECTION_ATTEMPTS_SINCE_SECS,
+            );
 
-            debug!("Number of connection attempts from '{}': {}", peer_addr.ip(), num_attempts);
+            debug!(
+                "Number of connection attempts from '{}': {}",
+                peer_addr.ip(),
+                num_attempts
+            );
             if num_attempts > Router::<N>::MAX_CONNECTION_ATTEMPTS {
                 self.update_ip_ban(peer_addr.ip());
-                trace!("Rejected a consecutive connection request from IP '{}'", peer_addr.ip());
-                return Err(error(format!("'{}' appears to be spamming connections", peer_addr.ip())));
+                trace!(
+                    "Rejected a consecutive connection request from IP '{}'",
+                    peer_addr.ip()
+                );
+                return Err(error(format!(
+                    "'{}' appears to be spamming connections",
+                    peer_addr.ip()
+                )));
             }
         }
 
         // Perform the handshake; we pass on a mutable reference to peer_ip in case the process is broken at any point in time.
         let handshake_result = if peer_side == ConnectionSide::Responder {
-            self.handshake_inner_initiator(peer_addr, &mut peer_ip, stream, genesis_header, restrictions_id).await
+            self.handshake_inner_initiator(
+                peer_addr,
+                &mut peer_ip,
+                stream,
+                genesis_header,
+                restrictions_id,
+            )
+            .await
         } else {
-            self.handshake_inner_responder(peer_addr, &mut peer_ip, stream, genesis_header, restrictions_id).await
+            self.handshake_inner_responder(
+                peer_addr,
+                &mut peer_ip,
+                stream,
+                genesis_header,
+                restrictions_id,
+            )
+            .await
         };
 
         if let Some(ip) = peer_ip {
@@ -160,8 +196,18 @@ impl<N: Network> Router<N> {
         // Sample a random nonce.
         let our_nonce = rng.gen();
         // Send a challenge request to the peer.
-        let our_request = ChallengeRequest::new(self.local_ip().port(), self.node_type, self.address(), our_nonce);
-        send(&mut framed, peer_addr, Message::ChallengeRequest(our_request)).await?;
+        let our_request = ChallengeRequest::new(
+            self.local_ip().port(),
+            self.node_type,
+            self.address(),
+            our_nonce,
+        );
+        send(
+            &mut framed,
+            peer_addr,
+            Message::ChallengeRequest(our_request),
+        )
+        .await?;
 
         /* Step 2: Receive the peer's challenge response followed by the challenge request. */
 
@@ -184,20 +230,30 @@ impl<N: Network> Router<N> {
             .await
         {
             send(&mut framed, peer_addr, reason.into()).await?;
-            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+            return Err(error(format!(
+                "Dropped '{peer_addr}' for reason: {reason:?}"
+            )));
         }
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
         if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
             send(&mut framed, peer_addr, reason.into()).await?;
-            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+            return Err(error(format!(
+                "Dropped '{peer_addr}' for reason: {reason:?}"
+            )));
         }
         /* Step 3: Send the challenge response. */
 
         let response_nonce: u64 = rng.gen();
-        let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
+        let data = [
+            peer_request.nonce.to_le_bytes(),
+            response_nonce.to_le_bytes(),
+        ]
+        .concat();
         // Sign the counterparty nonce.
         let Ok(our_signature) = self.account.sign_bytes(&data, rng) else {
-            return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")));
+            return Err(error(format!(
+                "Failed to sign the challenge request nonce from '{peer_addr}'"
+            )));
         };
         // Send the challenge response.
         let our_response = ChallengeResponse {
@@ -206,10 +262,17 @@ impl<N: Network> Router<N> {
             signature: Data::Object(our_signature),
             nonce: response_nonce,
         };
-        send(&mut framed, peer_addr, Message::ChallengeResponse(our_response)).await?;
+        send(
+            &mut framed,
+            peer_addr,
+            Message::ChallengeResponse(our_response),
+        )
+        .await?;
 
         // Finalize the connecting peer information.
-        self.connecting_peers.lock().insert(peer_ip, Some(Peer::new(peer_ip, peer_addr, &peer_request)));
+        self.connecting_peers
+            .lock()
+            .insert(peer_ip, Some(Peer::new(peer_ip, peer_addr, &peer_request)));
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer_ip, peer_addr);
 
@@ -244,7 +307,9 @@ impl<N: Network> Router<N> {
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
         if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
             send(&mut framed, peer_addr, reason.into()).await?;
-            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+            return Err(error(format!(
+                "Dropped '{peer_addr}' for reason: {reason:?}"
+            )));
         }
         /* Step 2: Send the challenge response followed by own challenge request. */
 
@@ -253,9 +318,15 @@ impl<N: Network> Router<N> {
 
         // Sign the counterparty nonce.
         let response_nonce: u64 = rng.gen();
-        let data = [peer_request.nonce.to_le_bytes(), response_nonce.to_le_bytes()].concat();
+        let data = [
+            peer_request.nonce.to_le_bytes(),
+            response_nonce.to_le_bytes(),
+        ]
+        .concat();
         let Ok(our_signature) = self.account.sign_bytes(&data, rng) else {
-            return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")));
+            return Err(error(format!(
+                "Failed to sign the challenge request nonce from '{peer_addr}'"
+            )));
         };
         // Send the challenge response.
         let our_response = ChallengeResponse {
@@ -264,13 +335,28 @@ impl<N: Network> Router<N> {
             signature: Data::Object(our_signature),
             nonce: response_nonce,
         };
-        send(&mut framed, peer_addr, Message::ChallengeResponse(our_response)).await?;
+        send(
+            &mut framed,
+            peer_addr,
+            Message::ChallengeResponse(our_response),
+        )
+        .await?;
 
         // Sample a random nonce.
         let our_nonce = rng.gen();
         // Send the challenge request.
-        let our_request = ChallengeRequest::new(self.local_ip().port(), self.node_type, self.address(), our_nonce);
-        send(&mut framed, peer_addr, Message::ChallengeRequest(our_request)).await?;
+        let our_request = ChallengeRequest::new(
+            self.local_ip().port(),
+            self.node_type,
+            self.address(),
+            our_nonce,
+        );
+        send(
+            &mut framed,
+            peer_addr,
+            Message::ChallengeRequest(our_request),
+        )
+        .await?;
 
         /* Step 3: Receive the challenge response. */
 
@@ -290,11 +376,15 @@ impl<N: Network> Router<N> {
             .await
         {
             send(&mut framed, peer_addr, reason.into()).await?;
-            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+            return Err(error(format!(
+                "Dropped '{peer_addr}' for reason: {reason:?}"
+            )));
         }
 
         // Finalize the connecting peer information.
-        self.connecting_peers.lock().insert(peer_ip, Some(Peer::new(peer_ip, peer_addr, &peer_request)));
+        self.connecting_peers
+            .lock()
+            .insert(peer_ip, Some(Peer::new(peer_ip, peer_addr, &peer_request)));
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer_ip, peer_addr);
 
@@ -319,7 +409,7 @@ impl<N: Network> Router<N> {
             bail!("Dropping connection request from '{peer_ip}' (already connected)")
         }
         // Only allow trusted peers to connect if allow_external_peers is set
-        if !self.allow_external_peers() && !self.is_trusted(&peer_ip) {
+        if !self.is_trusted(&peer_ip) {
             bail!("Dropping connection request from '{peer_ip}' (untrusted)")
         }
         // Ensure the peer is not restricted.
@@ -329,7 +419,9 @@ impl<N: Network> Router<N> {
         // Ensure the peer is not spamming connection attempts.
         if !peer_ip.ip().is_loopback() {
             // Add this connection attempt and retrieve the number of attempts.
-            let num_attempts = self.cache.insert_inbound_connection(peer_ip.ip(), Self::RADIO_SILENCE_IN_SECS as i64);
+            let num_attempts = self
+                .cache
+                .insert_inbound_connection(peer_ip.ip(), Self::RADIO_SILENCE_IN_SECS as i64);
             // Ensure the connecting peer has not surpassed the connection attempt limit.
             if num_attempts > Self::MAXIMUM_CONNECTION_FAILURES {
                 // Restrict the peer.
@@ -347,7 +439,13 @@ impl<N: Network> Router<N> {
         message: &ChallengeRequest<N>,
     ) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge request.
-        let &ChallengeRequest { version, listener_port: _, node_type: _, address: _, nonce: _ } = message;
+        let &ChallengeRequest {
+            version,
+            listener_port: _,
+            node_type: _,
+            address: _,
+            nonce: _,
+        } = message;
 
         // Ensure the message protocol version is not outdated.
         if version < Message::<N>::VERSION {
@@ -370,7 +468,12 @@ impl<N: Network> Router<N> {
         expected_nonce: u64,
     ) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge response.
-        let ChallengeResponse { genesis_header, restrictions_id, signature, nonce } = response;
+        let ChallengeResponse {
+            genesis_header,
+            restrictions_id,
+            signature,
+            nonce,
+        } = response;
 
         // Verify the challenge response, by checking that the block header matches.
         if genesis_header != expected_genesis_header {
@@ -378,7 +481,10 @@ impl<N: Network> Router<N> {
             return Some(DisconnectReason::InvalidChallengeResponse);
         }
         // Verify the restrictions ID.
-        if !peer_node_type.is_prover() && !self.node_type.is_prover() && restrictions_id != expected_restrictions_id {
+        if !peer_node_type.is_prover()
+            && !self.node_type.is_prover()
+            && restrictions_id != expected_restrictions_id
+        {
             warn!("Handshake with '{peer_addr}' failed (incorrect restrictions ID)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         }
@@ -388,7 +494,10 @@ impl<N: Network> Router<N> {
             return Some(DisconnectReason::InvalidChallengeResponse);
         };
         // Verify the signature.
-        if !signature.verify_bytes(&peer_address, &[expected_nonce.to_le_bytes(), nonce.to_le_bytes()].concat()) {
+        if !signature.verify_bytes(
+            &peer_address,
+            &[expected_nonce.to_le_bytes(), nonce.to_le_bytes()].concat(),
+        ) {
             warn!("Handshake with '{peer_addr}' failed (invalid signature)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         }

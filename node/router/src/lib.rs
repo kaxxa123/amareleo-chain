@@ -99,8 +99,6 @@ pub struct InnerRouter<N: Network> {
     handles: Mutex<Vec<JoinHandle<()>>>,
     /// If the flag is set, the node will periodically evict more external peers.
     rotate_external_peers: bool,
-    /// If the flag is set, the node will engage in P2P gossip to request more peers.
-    allow_external_peers: bool,
     /// The boolean flag for the development mode.
     is_dev: bool,
 }
@@ -131,7 +129,6 @@ impl<N: Network> Router<N> {
         trusted_peers: &[SocketAddr],
         max_peers: u16,
         rotate_external_peers: bool,
-        allow_external_peers: bool,
         is_dev: bool,
     ) -> Result<Self> {
         // Initialize the TCP stack.
@@ -150,7 +147,6 @@ impl<N: Network> Router<N> {
             restricted_peers: Default::default(),
             handles: Default::default(),
             rotate_external_peers,
-            allow_external_peers,
             is_dev,
         })))
     }
@@ -279,11 +275,6 @@ impl<N: Network> Router<N> {
     /// Returns `true` if the node is periodically evicting more external peers.
     pub fn rotate_external_peers(&self) -> bool {
         self.rotate_external_peers
-    }
-
-    /// Returns `true` if the node is engaging in P2P gossip to request more peers.
-    pub fn allow_external_peers(&self) -> bool {
-        self.allow_external_peers
     }
 
     /// Returns the listener IP address from the (ambiguous) peer address.

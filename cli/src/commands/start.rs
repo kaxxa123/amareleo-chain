@@ -94,7 +94,7 @@ pub struct Start {
     #[clap(long = "storage")]
     pub storage: Option<PathBuf>,
 
-    /// If developtment mode is enabled, specify whether node 0 should generate traffic to drive the network
+    /// If developtment mode is enabled, specify whether it should generate traffic to drive the network
     #[clap(default_value = "false", long = "no-dev-txs")]
     pub no_dev_txs: bool,
 }
@@ -161,11 +161,6 @@ impl Start {
 
     /// Updates the configurations if the node is in development mode.
     fn parse_development(&mut self) -> Result<()> {
-        // Note: the `node` flag is an option to detect remote devnet testing.
-        if self.node.is_none() {
-            self.node = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 4130))?);
-        }
-
         // If the REST IP is not already specified set the REST IP to `3030`.
         if self.rest.is_none() {
             self.rest = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 3030)).unwrap());
@@ -284,6 +279,7 @@ impl Start {
         let account = self.parse_private_key::<N>()?;
 
         // Parse the node IP.
+        // Note: the `node` flag is an option to detect remote devnet testing.
         let node_ip = match self.node {
             Some(node_ip) => node_ip,
             None => SocketAddr::from_str("0.0.0.0:4130").unwrap(),

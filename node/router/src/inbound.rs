@@ -14,28 +14,20 @@
 // limitations under the License.
 
 use crate::{
-    Outbound,
-    Peer,
     messages::{
-        BlockRequest,
-        BlockResponse,
-        DataBlocks,
-        Message,
-        PeerResponse,
-        Ping,
-        Pong,
-        UnconfirmedSolution,
-        UnconfirmedTransaction,
+        BlockRequest, BlockResponse, DataBlocks, Message, PeerResponse, Ping, Pong,
+        UnconfirmedSolution, UnconfirmedTransaction,
     },
+    Outbound, Peer,
 };
 use snarkos_lite_node_tcp::protocols::Reading;
 use snarkvm::prelude::{
-    Network,
     block::{Block, Header, Transaction},
     puzzle::Solution,
+    Network,
 };
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{anyhow, bail, Result};
 use snarkos_lite_node_tcp::is_bogon_ip;
 use std::net::SocketAddr;
 use tokio::task::spawn_blocking;
@@ -70,7 +62,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
         // Drop the peer, if they have sent more than `MESSAGE_LIMIT` messages
         // in the last `MESSAGE_LIMIT_TIME_FRAME_IN_SECS` seconds.
-        let num_messages = self.router().cache.insert_inbound_message(peer_ip, Self::MESSAGE_LIMIT_TIME_FRAME_IN_SECS);
+        let num_messages = self
+            .router()
+            .cache
+            .insert_inbound_message(peer_ip, Self::MESSAGE_LIMIT_TIME_FRAME_IN_SECS);
         if num_messages > Self::MESSAGE_LIMIT {
             bail!("Dropping '{peer_ip}' for spamming messages (num_messages = {num_messages})")
         }
@@ -84,12 +79,17 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // checking that the message is valid, and then calling the appropriate (trait) handler.
         match message {
             Message::BlockRequest(message) => {
-                let BlockRequest { start_height, end_height } = &message;
+                let BlockRequest {
+                    start_height,
+                    end_height,
+                } = &message;
                 // Insert the block request for the peer, and fetch the recent frequency.
                 let frequency = self.router().cache.insert_inbound_block_request(peer_ip);
                 // Check if the number of block requests is within the limit.
                 if frequency > Self::MAXIMUM_BLOCK_REQUESTS_PER_INTERVAL {
-                    bail!("Peer '{peer_ip}' is not following the protocol (excessive block requests)")
+                    bail!(
+                        "Peer '{peer_ip}' is not following the protocol (excessive block requests)"
+                    )
                 }
                 // Ensure the block request is well-formed.
                 if start_height >= end_height {
@@ -110,7 +110,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 let BlockResponse { request, blocks } = message;
 
                 // Remove the block request, checking if this node previously sent a block request to this peer.
-                if !self.router().cache.remove_outbound_block_request(peer_ip, &request) {
+                if !self
+                    .router()
+                    .cache
+                    .remove_outbound_block_request(peer_ip, &request)
+                {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected block response)")
                 }
                 // Perform the deferred non-blocking deserialization of the blocks.
@@ -118,17 +122,27 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // this on a blocking task, but on a rayon thread pool.
                 let (send, recv) = tokio::sync::oneshot::channel();
                 rayon::spawn_fifo(move || {
-                    let blocks = blocks.deserialize_blocking().map_err(|error| anyhow!("[BlockResponse] {error}"));
+                    let blocks = blocks
+                        .deserialize_blocking()
+                        .map_err(|error| anyhow!("[BlockResponse] {error}"));
                     let _ = send.send(blocks);
                 });
                 let blocks = match recv.await {
                     Ok(Ok(blocks)) => blocks,
-                    Ok(Err(error)) => bail!("Peer '{peer_ip}' sent an invalid block response - {error}"),
-                    Err(error) => bail!("Peer '{peer_ip}' sent an invalid block response - {error}"),
+                    Ok(Err(error)) => {
+                        bail!("Peer '{peer_ip}' sent an invalid block response - {error}")
+                    }
+                    Err(error) => {
+                        bail!("Peer '{peer_ip}' sent an invalid block response - {error}")
+                    }
                 };
 
                 // Ensure the block response is well-formed.
-                blocks.ensure_response_is_well_formed(peer_ip, request.start_height, request.end_height)?;
+                blocks.ensure_response_is_well_formed(
+                    peer_ip,
+                    request.start_height,
+                    request.end_height,
+                )?;
 
                 // Process the block response.
                 let node = self.clone();
@@ -148,45 +162,55 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 true => Ok(()),
                 false => bail!("Peer '{peer_ip}' sent an invalid peer request"),
             },
-            Message::PeerResponse(message) => {
+            Message::PeerResponse(_message) => {
                 if !self.router().cache.contains_outbound_peer_request(peer_ip) {
-                    bail!("Peer '{peer_ip}' is not following the protocol (unexpected peer response)")
+                    bail!(
+                        "Peer '{peer_ip}' is not following the protocol (unexpected peer response)"
+                    )
                 }
-                self.router().cache.decrement_outbound_peer_requests(peer_ip);
-                if !self.router().allow_external_peers() {
-                    bail!("Not accepting peer response from '{peer_ip}' (validator gossip is disabled)");
-                }
-
-                match self.peer_response(peer_ip, &message.peers) {
-                    true => Ok(()),
-                    false => bail!("Peer '{peer_ip}' sent an invalid peer response"),
-                }
+                self.router()
+                    .cache
+                    .decrement_outbound_peer_requests(peer_ip);
+                bail!(
+                    "Not accepting peer response from '{peer_ip}' (validator gossip is disabled)"
+                );
             }
             Message::Ping(message) => {
                 // Ensure the message protocol version is not outdated.
                 if message.version < Message::<N>::VERSION {
-                    bail!("Dropping '{peer_ip}' on message version {} (outdated)", message.version);
+                    bail!(
+                        "Dropping '{peer_ip}' on message version {} (outdated)",
+                        message.version
+                    );
                 }
 
                 // If the peer is a client or validator, ensure there are block locators.
-                let is_client_or_validator = message.node_type.is_client() || message.node_type.is_validator();
+                let is_client_or_validator =
+                    message.node_type.is_client() || message.node_type.is_validator();
                 if is_client_or_validator && message.block_locators.is_none() {
-                    bail!("Peer '{peer_ip}' is a {}, but no block locators were provided", message.node_type);
+                    bail!(
+                        "Peer '{peer_ip}' is a {}, but no block locators were provided",
+                        message.node_type
+                    );
                 }
                 // If the peer is a prover, ensure there are no block locators.
                 else if message.node_type.is_prover() && message.block_locators.is_some() {
-                    bail!("Peer '{peer_ip}' is a prover or client, but block locators were provided");
+                    bail!(
+                        "Peer '{peer_ip}' is a prover or client, but block locators were provided"
+                    );
                 }
 
                 // Update the connected peer.
-                if let Err(error) =
-                    self.router().update_connected_peer(peer_ip, message.node_type, |peer: &mut Peer<N>| {
+                if let Err(error) = self.router().update_connected_peer(
+                    peer_ip,
+                    message.node_type,
+                    |peer: &mut Peer<N>| {
                         // Update the version of the peer.
                         peer.set_version(message.version);
                         // Update the node type of the peer.
                         peer.set_node_type(message.node_type);
-                    })
-                {
+                    },
+                ) {
                     bail!("[Ping] {error}");
                 }
 
@@ -215,11 +239,17 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             }
             Message::PuzzleResponse(message) => {
                 // Check that this node previously sent a puzzle request to this peer.
-                if !self.router().cache.contains_outbound_puzzle_request(&peer_ip) {
+                if !self
+                    .router()
+                    .cache
+                    .contains_outbound_puzzle_request(&peer_ip)
+                {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected puzzle response)")
                 }
                 // Decrement the number of puzzle requests.
-                self.router().cache.decrement_outbound_puzzle_requests(peer_ip);
+                self.router()
+                    .cache
+                    .decrement_outbound_puzzle_requests(peer_ip);
 
                 // Perform the deferred non-blocking deserialization of the block header.
                 let header = match message.block_header.deserialize().await {
@@ -235,11 +265,18 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             Message::UnconfirmedSolution(message) => {
                 // Do not process unconfirmed solutions if the node is too far behind.
                 if self.num_blocks_behind() > SYNC_LENIENCY {
-                    trace!("Skipped processing unconfirmed solution '{}' (node is syncing)", message.solution_id);
+                    trace!(
+                        "Skipped processing unconfirmed solution '{}' (node is syncing)",
+                        message.solution_id
+                    );
                     return Ok(());
                 }
                 // Update the timestamp for the unconfirmed solution.
-                let seen_before = self.router().cache.insert_inbound_solution(peer_ip, message.solution_id).is_some();
+                let seen_before = self
+                    .router()
+                    .cache
+                    .insert_inbound_solution(peer_ip, message.solution_id)
+                    .is_some();
                 // Determine whether to propagate the solution.
                 if seen_before {
                     trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
@@ -257,7 +294,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     bail!("Peer '{peer_ip}' is not following the 'UnconfirmedSolution' protocol")
                 }
                 // Handle the unconfirmed solution.
-                match self.unconfirmed_solution(peer_ip, serialized, solution).await {
+                match self
+                    .unconfirmed_solution(peer_ip, serialized, solution)
+                    .await
+                {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid unconfirmed solution"),
                 }
@@ -265,12 +305,18 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             Message::UnconfirmedTransaction(message) => {
                 // Do not process unconfirmed transactions if the node is too far behind.
                 if self.num_blocks_behind() > SYNC_LENIENCY {
-                    trace!("Skipped processing unconfirmed transaction '{}' (node is syncing)", message.transaction_id);
+                    trace!(
+                        "Skipped processing unconfirmed transaction '{}' (node is syncing)",
+                        message.transaction_id
+                    );
                     return Ok(());
                 }
                 // Update the timestamp for the unconfirmed transaction.
-                let seen_before =
-                    self.router().cache.insert_inbound_transaction(peer_ip, message.transaction_id).is_some();
+                let seen_before = self
+                    .router()
+                    .cache
+                    .insert_inbound_transaction(peer_ip, message.transaction_id)
+                    .is_some();
                 // Determine whether to propagate the transaction.
                 if seen_before {
                     trace!("Skipping 'UnconfirmedTransaction' from '{peer_ip}'");
@@ -288,7 +334,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     bail!("Peer '{peer_ip}' is not following the 'UnconfirmedTransaction' protocol")
                 }
                 // Handle the unconfirmed transaction.
-                match self.unconfirmed_transaction(peer_ip, serialized, transaction).await {
+                match self
+                    .unconfirmed_transaction(peer_ip, serialized, transaction)
+                    .await
+                {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid unconfirmed transaction"),
                 }
@@ -309,9 +358,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Filter out invalid addresses.
         let peers = match self.router().is_dev() {
             // In development mode, relax the validity requirements to make operating devnets more flexible.
-            true => {
-                peers.into_iter().filter(|ip| *ip != peer_ip && !is_bogon_ip(ip.ip())).take(MAX_PEERS_TO_SEND).collect()
-            }
+            true => peers
+                .into_iter()
+                .filter(|ip| *ip != peer_ip && !is_bogon_ip(ip.ip()))
+                .take(MAX_PEERS_TO_SEND)
+                .collect(),
             // In production mode, ensure the peer IPs are valid.
             false => peers
                 .into_iter()
@@ -333,9 +384,17 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Filter out invalid addresses.
         let peers = match self.router().is_dev() {
             // In development mode, relax the validity requirements to make operating devnets more flexible.
-            true => peers.iter().copied().filter(|ip| !is_bogon_ip(ip.ip())).collect::<Vec<_>>(),
+            true => peers
+                .iter()
+                .copied()
+                .filter(|ip| !is_bogon_ip(ip.ip()))
+                .collect::<Vec<_>>(),
             // In production mode, ensure the peer IPs are valid.
-            false => peers.iter().copied().filter(|ip| self.router().is_valid_peer_ip(ip)).collect(),
+            false => peers
+                .iter()
+                .copied()
+                .filter(|ip| self.router().is_valid_peer_ip(ip))
+                .collect(),
         };
         // Adds the given peer IPs to the list of candidate peers.
         self.router().insert_candidate_peers(&peers);
@@ -352,7 +411,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool;
 
     /// Handles a `PuzzleResponse` message.
-    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_hash: N::BlockHash, _header: Header<N>) -> bool;
+    fn puzzle_response(
+        &self,
+        peer_ip: SocketAddr,
+        _epoch_hash: N::BlockHash,
+        _header: Header<N>,
+    ) -> bool;
 
     /// Handles an `UnconfirmedSolution` message.
     async fn unconfirmed_solution(
