@@ -356,20 +356,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Retrieve the connected peers.
         let peers = self.router().connected_peers();
         // Filter out invalid addresses.
-        let peers = match self.router().is_dev() {
-            // In development mode, relax the validity requirements to make operating devnets more flexible.
-            true => peers
-                .into_iter()
-                .filter(|ip| *ip != peer_ip && !is_bogon_ip(ip.ip()))
-                .take(MAX_PEERS_TO_SEND)
-                .collect(),
-            // In production mode, ensure the peer IPs are valid.
-            false => peers
-                .into_iter()
-                .filter(|ip| *ip != peer_ip && self.router().is_valid_peer_ip(ip))
-                .take(MAX_PEERS_TO_SEND)
-                .collect(),
-        };
+        let peers = peers
+            .into_iter()
+            .filter(|ip| *ip != peer_ip && !is_bogon_ip(ip.ip()))
+            .take(MAX_PEERS_TO_SEND)
+            .collect();
+
         // Send a `PeerResponse` message to the peer.
         self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
         true
@@ -382,20 +374,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             return false;
         }
         // Filter out invalid addresses.
-        let peers = match self.router().is_dev() {
-            // In development mode, relax the validity requirements to make operating devnets more flexible.
-            true => peers
-                .iter()
-                .copied()
-                .filter(|ip| !is_bogon_ip(ip.ip()))
-                .collect::<Vec<_>>(),
-            // In production mode, ensure the peer IPs are valid.
-            false => peers
-                .iter()
-                .copied()
-                .filter(|ip| self.router().is_valid_peer_ip(ip))
-                .collect(),
-        };
+        let peers = peers
+            .iter()
+            .copied()
+            .filter(|ip| !is_bogon_ip(ip.ip()))
+            .collect::<Vec<_>>();
+
         // Adds the given peer IPs to the list of candidate peers.
         self.router().insert_candidate_peers(&peers);
         true

@@ -101,14 +101,11 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         consensus.run(primary_sender, primary_receiver).await?;
 
         // Initialize the node router.
-        let trusted_peers: [SocketAddr; 0] = [];
         let router = Router::new(
             node_ip,
             NodeType::Validator,
             account,
-            &trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
-            true,
         )
         .await?;
 

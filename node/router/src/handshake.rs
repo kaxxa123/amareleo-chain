@@ -105,44 +105,6 @@ impl<N: Network> Router<N> {
             Some(peer_addr)
         };
 
-        // Check (or impose) IP-level bans.
-        #[cfg(not(any(test)))]
-        if !self.is_dev() && peer_side == ConnectionSide::Initiator {
-            // If the IP is already banned reject the connection.
-            if self.is_ip_banned(peer_addr.ip()) {
-                trace!(
-                    "Rejected a connection request from banned IP '{}'",
-                    peer_addr.ip()
-                );
-                return Err(error(format!(
-                    "'{}' is a banned IP address",
-                    peer_addr.ip()
-                )));
-            }
-
-            let num_attempts = self.cache.insert_inbound_connection(
-                peer_addr.ip(),
-                Router::<N>::CONNECTION_ATTEMPTS_SINCE_SECS,
-            );
-
-            debug!(
-                "Number of connection attempts from '{}': {}",
-                peer_addr.ip(),
-                num_attempts
-            );
-            if num_attempts > Router::<N>::MAX_CONNECTION_ATTEMPTS {
-                self.update_ip_ban(peer_addr.ip());
-                trace!(
-                    "Rejected a consecutive connection request from IP '{}'",
-                    peer_addr.ip()
-                );
-                return Err(error(format!(
-                    "'{}' appears to be spamming connections",
-                    peer_addr.ip()
-                )));
-            }
-        }
-
         // Perform the handshake; we pass on a mutable reference to peer_ip in case the process is broken at any point in time.
         let handshake_result = if peer_side == ConnectionSide::Responder {
             self.handshake_inner_initiator(
@@ -409,27 +371,7 @@ impl<N: Network> Router<N> {
             bail!("Dropping connection request from '{peer_ip}' (already connected)")
         }
         // Only allow trusted peers to connect if allow_external_peers is set
-        if !self.is_trusted(&peer_ip) {
-            bail!("Dropping connection request from '{peer_ip}' (untrusted)")
-        }
-        // Ensure the peer is not restricted.
-        if self.is_restricted(&peer_ip) {
-            bail!("Dropping connection request from '{peer_ip}' (restricted)")
-        }
-        // Ensure the peer is not spamming connection attempts.
-        if !peer_ip.ip().is_loopback() {
-            // Add this connection attempt and retrieve the number of attempts.
-            let num_attempts = self
-                .cache
-                .insert_inbound_connection(peer_ip.ip(), Self::RADIO_SILENCE_IN_SECS as i64);
-            // Ensure the connecting peer has not surpassed the connection attempt limit.
-            if num_attempts > Self::MAXIMUM_CONNECTION_FAILURES {
-                // Restrict the peer.
-                self.insert_restricted_peer(peer_ip);
-                bail!("Dropping connection request from '{peer_ip}' (tried {num_attempts} times)")
-            }
-        }
-        Ok(())
+        bail!("Dropping connection request from '{peer_ip}' (untrusted)")
     }
 
     /// Verifies the given challenge request. Returns a disconnect reason if the request is invalid.

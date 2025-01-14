@@ -80,9 +80,4 @@ impl<N: Network> Node<N> {
     pub fn address(&self) -> Address<N> {
         self.validator.address()
     }
-
-    /// Returns `true` if the node is in development mode.
-    pub fn is_dev(&self) -> bool {
-        self.validator.is_dev()
-    }
 }

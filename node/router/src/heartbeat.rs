@@ -59,10 +59,6 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         self.remove_oldest_connected_peer();
         // Keep the number of connected peers within the allowed range.
         self.handle_connected_peers();
-        // Keep the bootstrap peers within the allowed range.
-        self.handle_bootstrap_peers();
-        // Keep the trusted peers connected.
-        self.handle_trusted_peers();
         // Keep the puzzle request up to date.
         self.handle_puzzle_request();
         // Unban any addresses whose ban time has expired.
@@ -148,17 +144,11 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 "Exceeded maximum number of connected peers, disconnecting from ({num_surplus_provers} + {num_surplus_clients_validators}) peers"
             );
 
-            // Retrieve the trusted peers.
-            let trusted = self.router().trusted_peers();
-            // Retrieve the bootstrap peers.
-            let bootstrap = self.router().bootstrap_peers();
-
             // Determine the provers to disconnect from.
             let prover_ips_to_disconnect = self
                 .router()
                 .connected_provers()
                 .into_iter()
-                .filter(|peer_ip| !trusted.contains(peer_ip) && !bootstrap.contains(peer_ip))
                 .choose_multiple(rng, num_surplus_provers);
 
             // TODO (howardwu): As a validator, prioritize disconnecting from clients.
@@ -171,8 +161,6 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 .filter_map(|peer| {
                     let peer_ip = peer.ip();
                     if !peer.is_prover() && // Skip if the peer is a prover.
-                       !trusted.contains(&peer_ip) && // Skip if the peer is trusted.
-                       !bootstrap.contains(&peer_ip) && // Skip if the peer is a bootstrap peer.
                        // Skip if you are syncing from this peer.
                        (self.is_block_synced() || (!self.is_block_synced() && self.router().cache.num_outbound_block_requests(&peer.ip()) == 0))
                     {
@@ -224,59 +212,6 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 .choose_multiple(rng, num_deficient)
             {
                 self.router().connect(peer_ip);
-            }
-        }
-    }
-
-    /// This function keeps the number of bootstrap peers within the allowed range.
-    fn handle_bootstrap_peers(&self) {
-        // Split the bootstrap peers into connected and candidate lists.
-        let mut connected_bootstrap = Vec::new();
-        let mut candidate_bootstrap = Vec::new();
-        for bootstrap_ip in self.router().bootstrap_peers() {
-            match self.router().is_connected(&bootstrap_ip) {
-                true => connected_bootstrap.push(bootstrap_ip),
-                false => candidate_bootstrap.push(bootstrap_ip),
-            }
-        }
-        // If there are not enough connected bootstrap peers, connect to more.
-        if connected_bootstrap.is_empty() {
-            // Initialize an RNG.
-            let rng = &mut OsRng;
-            // Attempt to connect to a bootstrap peer.
-            if let Some(peer_ip) = candidate_bootstrap.into_iter().choose(rng) {
-                self.router().connect(peer_ip);
-            }
-        }
-        // Determine if the node is connected to more bootstrap peers than allowed.
-        let num_surplus = connected_bootstrap.len().saturating_sub(1);
-        if num_surplus > 0 {
-            // Initialize an RNG.
-            let rng = &mut OsRng;
-            // Proceed to send disconnect requests to these bootstrap peers.
-            for peer_ip in connected_bootstrap
-                .into_iter()
-                .choose_multiple(rng, num_surplus)
-            {
-                info!("Disconnecting from '{peer_ip}' (exceeded maximum bootstrap)");
-                self.send(
-                    peer_ip,
-                    Message::Disconnect(DisconnectReason::TooManyPeers.into()),
-                );
-                // Disconnect from this peer.
-                self.router().disconnect(peer_ip);
-            }
-        }
-    }
-
-    /// This function attempts to connect to any disconnected trusted peers.
-    fn handle_trusted_peers(&self) {
-        // Ensure that the trusted nodes are connected.
-        for peer_ip in self.router().trusted_peers() {
-            // If the peer is not connected, attempt to connect to it.
-            if !self.router().is_connected(peer_ip) {
-                // Attempt to connect to the trusted peer.
-                self.router().connect(*peer_ip);
             }
         }
     }

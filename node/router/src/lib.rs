@@ -47,14 +47,11 @@ use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
 use parking_lot::{Mutex, RwLock};
-#[cfg(not(any(test)))]
-use std::net::IpAddr;
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     future::Future,
     net::SocketAddr,
     ops::Deref,
-    str::FromStr,
     sync::Arc,
     time::Instant,
 };
@@ -82,8 +79,6 @@ pub struct InnerRouter<N: Network> {
     cache: Cache<N>,
     /// The resolver.
     resolver: Resolver,
-    /// The set of trusted peers.
-    trusted_peers: HashSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
     connected_peers: RwLock<HashMap<SocketAddr, Peer<N>>>,
     /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
@@ -97,21 +92,11 @@ pub struct InnerRouter<N: Network> {
     restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
     /// The spawned handles.
     handles: Mutex<Vec<JoinHandle<()>>>,
-    /// The boolean flag for the development mode.
-    is_dev: bool,
 }
 
 impl<N: Network> Router<N> {
-    /// The minimum permitted interval between connection attempts for an IP; anything shorter is considered malicious.
-    #[cfg(not(any(test)))]
-    const CONNECTION_ATTEMPTS_SINCE_SECS: i64 = 10;
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
-    /// The maximum number of connection failures permitted by an inbound connecting peer.
-    const MAXIMUM_CONNECTION_FAILURES: usize = 5;
-    /// The maximum amount of connection attempts withing a 10 second threshold
-    #[cfg(not(any(test)))]
-    const MAX_CONNECTION_ATTEMPTS: usize = 10;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
@@ -124,9 +109,7 @@ impl<N: Network> Router<N> {
         node_ip: SocketAddr,
         node_type: NodeType,
         account: Account<N>,
-        trusted_peers: &[SocketAddr],
         max_peers: u16,
-        is_dev: bool,
     ) -> Result<Self> {
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(node_ip, max_peers));
@@ -137,13 +120,11 @@ impl<N: Network> Router<N> {
             account,
             cache: Default::default(),
             resolver: Default::default(),
-            trusted_peers: trusted_peers.iter().copied().collect(),
             connected_peers: Default::default(),
             connecting_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             handles: Default::default(),
-            is_dev,
         })))
     }
 }
@@ -263,11 +244,6 @@ impl<N: Network> Router<N> {
         self.account.address()
     }
 
-    /// Returns `true` if the node is in development mode.
-    pub fn is_dev(&self) -> bool {
-        self.is_dev
-    }
-
     /// Returns the listener IP address from the (ambiguous) peer address.
     pub fn resolve_to_listener(&self, peer_addr: &SocketAddr) -> Option<SocketAddr> {
         self.resolver.get_listener(peer_addr)
@@ -319,11 +295,6 @@ impl<N: Network> Router<N> {
             .get(ip)
             .map(|time| time.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS)
             .unwrap_or(false)
-    }
-
-    /// Returns `true` if the given IP is trusted.
-    pub fn is_trusted(&self, ip: &SocketAddr) -> bool {
-        self.trusted_peers.contains(ip)
     }
 
     /// Returns the maximum number of connected peers.
@@ -432,59 +403,6 @@ impl<N: Network> Router<N> {
     /// Returns the list of restricted peers.
     pub fn restricted_peers(&self) -> Vec<SocketAddr> {
         self.restricted_peers.read().keys().copied().collect()
-    }
-
-    /// Returns the list of trusted peers.
-    pub fn trusted_peers(&self) -> &HashSet<SocketAddr> {
-        &self.trusted_peers
-    }
-
-    /// Returns the list of bootstrap peers.
-    #[allow(clippy::if_same_then_else)]
-    pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
-        if cfg!(feature = "test") || self.is_dev {
-            // Development testing contains no bootstrap peers.
-            vec![]
-        } else if N::ID == snarkvm::console::network::MainnetV0::ID {
-            // Mainnet contains the following bootstrap peers.
-            vec![
-                SocketAddr::from_str("34.105.20.52:4130").unwrap(),
-                SocketAddr::from_str("35.231.118.193:4130").unwrap(),
-                SocketAddr::from_str("35.204.253.77:4130").unwrap(),
-                SocketAddr::from_str("34.87.188.140:4130").unwrap(),
-            ]
-        } else if N::ID == snarkvm::console::network::TestnetV0::ID {
-            // TestnetV0 contains the following bootstrap peers.
-            vec![
-                SocketAddr::from_str("34.168.118.156:4130").unwrap(),
-                SocketAddr::from_str("35.231.152.213:4130").unwrap(),
-                SocketAddr::from_str("34.17.53.129:4130").unwrap(),
-                SocketAddr::from_str("35.200.149.162:4130").unwrap(),
-            ]
-        } else if N::ID == snarkvm::console::network::CanaryV0::ID {
-            // CanaryV0 contains the following bootstrap peers.
-            vec![
-                SocketAddr::from_str("34.74.24.41:4130").unwrap(),
-                SocketAddr::from_str("35.228.3.69:4130").unwrap(),
-                SocketAddr::from_str("34.124.178.133:4130").unwrap(),
-                SocketAddr::from_str("34.125.137.231:4130").unwrap(),
-            ]
-        } else {
-            // Unrecognized networks contain no bootstrap peers.
-            vec![]
-        }
-    }
-
-    /// Check whether the given IP address is currently banned.
-    #[cfg(not(any(test)))]
-    fn is_ip_banned(&self, ip: IpAddr) -> bool {
-        self.tcp.banned_peers().is_ip_banned(&ip)
-    }
-
-    /// Insert or update a banned IP.
-    #[cfg(not(any(test)))]
-    fn update_ip_ban(&self, ip: IpAddr) {
-        self.tcp.banned_peers().update_ip_ban(ip);
     }
 
     /// Returns the list of metrics for the connected peers.

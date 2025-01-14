@@ -49,11 +49,6 @@ pub trait NodeInterface<N: Network>: Routing<N> {
         self.router().address()
     }
 
-    /// Returns `true` if the node is in development mode.
-    fn is_dev(&self) -> bool {
-        self.router().is_dev()
-    }
-
     /// Handles OS signals for the node to intercept and perform a clean shutdown.
     /// The optional `shutdown_flag` flag can be used to cleanly terminate the syncing process.
     fn handle_signals(shutdown_flag: Arc<AtomicBool>) -> Arc<OnceCell<Self>> {
