@@ -64,10 +64,6 @@ features = ["preserve_order"]
 path = "../consensus"
 version = "=3.1.0"
 
-[dependencies.snarkos-lite-node-router]
-path = "../router"
-version = "=3.1.0"
-
 [dependencies.snarkvm-synthesizer]
 #path = "../../../snarkVM/synthesizer"
 #git = "https://github.com/AleoNet/snarkVM.git"

@@ -27,8 +27,6 @@ metrics = [
     "dep:metrics",
     "snarkos-lite-node-bft/metrics",
     "snarkos-lite-node-consensus/metrics",
-    "snarkos-lite-node-router/metrics",
-    "snarkos-lite-node-tcp/metrics",
 ]
 history = ["snarkos-lite-node-rest/history"]
 test_targets = ["snarkvm/test_targets"]
@@ -78,16 +76,8 @@ version = "=3.1.0"
 path = "./rest"
 version = "=3.1.0"
 
-[dependencies.snarkos-lite-node-router]
-path = "./router"
-version = "=3.1.0"
-
 [dependencies.snarkos-lite-node-sync]
 path = "./sync"
-version = "=3.1.0"
-
-[dependencies.snarkos-lite-node-tcp]
-path = "./tcp"
 version = "=3.1.0"
 
 [dependencies.snarkvm]

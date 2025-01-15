@@ -13,20 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::traits::NodeInterface;
 use snarkos_lite_account::Account;
 use snarkos_lite_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use snarkos_lite_node_consensus::Consensus;
 use snarkos_lite_node_rest::Rest;
-use snarkos_lite_node_router::{
-    messages::{NodeType, PuzzleResponse, UnconfirmedSolution},
-    Heartbeat, Inbound, Outbound, Router, Routing,
-};
 use snarkos_lite_node_sync::{BlockSync, BlockSyncMode};
-use snarkos_lite_node_tcp::{
-    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
-    Config, Tcp, P2P,
-};
 use snarkvm::prelude::{block::Block, store::ConsensusStorage, Ledger, Network};
 
 use aleo_std::StorageMode;

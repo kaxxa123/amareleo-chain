@@ -24,13 +24,8 @@ pub use helpers::*;
 mod routes;
 
 use snarkos_lite_node_consensus::Consensus;
-use snarkos_lite_node_router::{
-    messages::{Message, UnconfirmedTransaction},
-    Routing,
-};
 use snarkvm::{
     console::{program::ProgramID, types::Field},
-    ledger::narwhal::Data,
     prelude::{cfg_into_iter, store::ConsensusStorage, Ledger, Network},
 };
 

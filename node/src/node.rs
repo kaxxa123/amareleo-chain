@@ -13,14 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{NodeInterface, Validator};
+use crate::Validator;
 use snarkos_lite_account::Account;
-use snarkos_lite_node_router::messages::NodeType;
 
 use anyhow::Result;
-use snarkvm::prelude::{
-    block::Block, store::helpers::rocksdb::ConsensusDB, Address, Network, PrivateKey, ViewKey,
-};
+use snarkvm::prelude::{block::Block, store::helpers::rocksdb::ConsensusDB, Network};
 
 use aleo_std::StorageMode;
 use std::{

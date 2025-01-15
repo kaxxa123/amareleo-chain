@@ -124,9 +124,7 @@ dependencies = [
  "snarkos-lite-node-consensus",
  "snarkos-lite-node-metrics",
  "snarkos-lite-node-rest",
- "snarkos-lite-node-router",
  "snarkos-lite-node-sync",
- "snarkos-lite-node-tcp",
  "tikv-jemallocator",
  "walkdir",
 ]
@@ -1874,12 +1872,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "linked-hash-map"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2273,9 +2265,6 @@ name = "once_cell"
 version = "1.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
-dependencies = [
- "parking_lot_core",
-]
 
 [[package]]
 name = "open"
@@ -3297,9 +3286,7 @@ dependencies = [
  "snarkos-lite-node-consensus",
  "snarkos-lite-node-metrics",
  "snarkos-lite-node-rest",
- "snarkos-lite-node-router",
  "snarkos-lite-node-sync",
- "snarkos-lite-node-tcp",
  "snarkvm",
  "tokio",
  "tokio-util",
@@ -3454,7 +3441,6 @@ dependencies = [
  "serde",
  "serde_json",
  "snarkos-lite-node-consensus",
- "snarkos-lite-node-router",
  "snarkvm",
  "snarkvm-synthesizer",
  "time",
@@ -3462,55 +3448,6 @@ dependencies = [
  "tower 0.4.13",
  "tower-http",
  "tower_governor",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-lite-node-router"
-version = "3.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bincode",
- "bytes",
- "colored",
- "futures",
- "indexmap 2.7.0",
- "linked-hash-map",
- "parking_lot",
- "rand",
- "rayon",
- "reqwest 0.11.27",
- "serde",
- "snarkos-lite-account",
- "snarkos-lite-node-metrics",
- "snarkos-lite-node-router-messages",
- "snarkos-lite-node-sync-locators",
- "snarkos-lite-node-tcp",
- "snarkvm",
- "time",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-lite-node-router-messages"
-version = "3.1.0"
-dependencies = [
- "anyhow",
- "bytes",
- "indexmap 2.7.0",
- "proptest",
- "rayon",
- "serde",
- "snarkos-lite-node-bft-events",
- "snarkos-lite-node-sync-locators",
- "snarkvm",
- "test-strategy",
- "tokio",
- "tokio-util",
  "tracing",
 ]
 
@@ -3545,21 +3482,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snarkos-lite-node-tcp"
-version = "3.1.0"
-dependencies = [
- "async-trait",
- "bytes",
- "futures-util",
- "once_cell",
- "parking_lot",
- "snarkos-lite-node-metrics",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
 name = "snarkos-lite-resources"
 version = "2.0.0"
 
@@ -3582,7 +3504,6 @@ dependencies = [
  "rayon",
  "self_update 0.38.0",
  "serde_json",
- "snarkvm-algorithms",
  "snarkvm-circuit",
  "snarkvm-console",
  "snarkvm-ledger",

@@ -14,7 +14,6 @@
 // limitations under the License.
 
 use super::*;
-use snarkos_lite_node_router::{messages::UnconfirmedSolution, SYNC_LENIENCY};
 use snarkvm::{
     ledger::puzzle::Solution,
     prelude::{block::Transaction, Address, Identifier, LimitedWriter, Plaintext, ToBytes},
@@ -348,22 +347,22 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     }
 
     // GET /<network>/peers/count
-    pub(crate) async fn get_peers_count(State(rest): State<Self>) -> ErasedJson {
+    pub(crate) async fn get_peers_count(State(_rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(0)
     }
 
     // GET /<network>/peers/all
-    pub(crate) async fn get_peers_all(State(rest): State<Self>) -> ErasedJson {
+    pub(crate) async fn get_peers_all(State(_rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty::<[u16; 0]>([])
     }
 
     // GET /<network>/peers/all/metrics
-    pub(crate) async fn get_peers_all_metrics(State(rest): State<Self>) -> ErasedJson {
+    pub(crate) async fn get_peers_all_metrics(State(_rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty::<[u16; 0]>([])
     }
 
     // GET /<network>/node/address
-    pub(crate) async fn get_node_address(State(rest): State<Self>) -> ErasedJson {
+    pub(crate) async fn get_node_address(State(_rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty("")
     }
 
