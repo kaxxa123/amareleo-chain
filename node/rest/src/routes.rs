@@ -41,7 +41,7 @@ pub(crate) struct Metadata {
     all: Option<bool>,
 }
 
-impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
+impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     // GET /<network>/block/height/latest
     pub(crate) async fn get_block_height_latest(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_height())
@@ -335,13 +335,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Path(validator): Path<Address<N>>,
     ) -> Result<ErasedJson, RestError> {
-        // Do not process the request if the node is too far behind to avoid sending outdated data.
-        if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
-            return Err(RestError(
-                "Unable to  request delegators (node is syncing)".to_string(),
-            ));
-        }
-
         // Return the delegators for the given validator.
         match tokio::task::spawn_blocking(move || {
             rest.ledger.get_delegators_for_validator(&validator)
@@ -356,22 +349,22 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
     // GET /<network>/peers/count
     pub(crate) async fn get_peers_count(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.routing.router().number_of_connected_peers())
+        ErasedJson::pretty(0)
     }
 
     // GET /<network>/peers/all
     pub(crate) async fn get_peers_all(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.routing.router().connected_peers())
+        ErasedJson::pretty::<[u16; 0]>([])
     }
 
     // GET /<network>/peers/all/metrics
     pub(crate) async fn get_peers_all_metrics(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.routing.router().connected_metrics())
+        ErasedJson::pretty::<[u16; 0]>([])
     }
 
     // GET /<network>/node/address
     pub(crate) async fn get_node_address(State(rest): State<Self>) -> ErasedJson {
-        ErasedJson::pretty(rest.routing.router().address())
+        ErasedJson::pretty("")
     }
 
     // GET /<network>/find/blockHash/{transactionID}
@@ -429,14 +422,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(tx): Json<Transaction<N>>,
     ) -> Result<ErasedJson, RestError> {
-        // Do not process the transaction if the node is too far behind.
-        if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
-            return Err(RestError(format!(
-                "Unable to broadcast transaction '{}' (node is syncing)",
-                fmt_id(tx.id())
-            )));
-        }
-
         // If the transaction exceeds the transaction size limit, return an error.
         // The buffer is initially roughly sized to hold a `transfer_public`,
         // most transactions will be smaller and this reduces unnecessary allocations.
@@ -457,17 +442,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             consensus.add_unconfirmed_transaction(tx.clone()).await?;
         }
 
-        // Prepare the unconfirmed transaction message.
-        let tx_id = tx.id();
-        let message = Message::UnconfirmedTransaction(UnconfirmedTransaction {
-            transaction_id: tx_id,
-            transaction: Data::Object(tx),
-        });
-
-        // Broadcast the transaction.
-        rest.routing.propagate(message, &[]);
-
-        Ok(ErasedJson::pretty(tx_id))
+        Ok(ErasedJson::pretty(tx.id()))
     }
 
     // POST /<network>/solution/broadcast
@@ -475,14 +450,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(solution): Json<Solution<N>>,
     ) -> Result<ErasedJson, RestError> {
-        // Do not process the solution if the node is too far behind.
-        if rest.routing.num_blocks_behind() > SYNC_LENIENCY {
-            return Err(RestError(format!(
-                "Unable to broadcast solution '{}' (node is syncing)",
-                fmt_id(solution.id())
-            )));
-        }
-
         // If the consensus module is enabled, add the unconfirmed solution to the memory pool.
         // Otherwise, verify it prior to broadcasting.
         match rest.consensus {
@@ -519,17 +486,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             }
         }
 
-        let solution_id = solution.id();
-        // Prepare the unconfirmed solution message.
-        let message = Message::UnconfirmedSolution(UnconfirmedSolution {
-            solution_id,
-            solution: Data::Object(solution),
-        });
-
-        // Broadcast the unconfirmed solution message.
-        rest.routing.propagate(message, &[]);
-
-        Ok(ErasedJson::pretty(solution_id))
+        Ok(ErasedJson::pretty(solution.id()))
     }
 
     // GET /{network}/block/{blockHeight}/history/{mapping}

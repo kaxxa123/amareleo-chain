@@ -57,31 +57,27 @@ use tower_http::{
 
 /// A REST API server for the ledger.
 #[derive(Clone)]
-pub struct Rest<N: Network, C: ConsensusStorage<N>, R: Routing<N>> {
+pub struct Rest<N: Network, C: ConsensusStorage<N>> {
     /// The consensus module.
     consensus: Option<Consensus<N>>,
     /// The ledger.
     ledger: Ledger<N, C>,
-    /// The node (routing).
-    routing: Arc<R>,
     /// The server handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
-impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
+impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
     /// Initializes a new instance of the server.
     pub async fn start(
         rest_ip: SocketAddr,
         rest_rps: u32,
         consensus: Option<Consensus<N>>,
         ledger: Ledger<N, C>,
-        routing: Arc<R>,
     ) -> Result<Self> {
         // Initialize the server.
         let mut server = Self {
             consensus,
             ledger,
-            routing,
             handles: Default::default(),
         };
         // Spawn the server.
@@ -91,7 +87,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
+impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     /// Returns the ledger.
     pub const fn ledger(&self) -> &Ledger<N, C> {
         &self.ledger
@@ -103,7 +99,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
+impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     async fn spawn_server(&mut self, rest_ip: SocketAddr, rest_rps: u32) {
         let cors = CorsLayer::new()
             .allow_origin(Any)
