@@ -22,15 +22,8 @@ edition = "2021"
 [features]
 test_targets = ["snarkvm/test_targets"]
 
-[dependencies.anyhow]
-version = "1.0.79"
-
 [dependencies.colored]
 version = "2"
-
-[dependencies.rand]
-version = "0.8"
-default-features = false
 
 [dependencies.snarkvm]
 workspace = true

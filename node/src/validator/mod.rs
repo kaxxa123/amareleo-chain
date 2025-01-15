@@ -13,33 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod router;
-
-use crate::traits::NodeInterface;
 use snarkos_lite_account::Account;
-use snarkos_lite_node_bft::{
-    helpers::init_primary_channels, ledger_service::CoreLedgerService, spawn_blocking,
-};
+use snarkos_lite_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use snarkos_lite_node_consensus::Consensus;
 use snarkos_lite_node_rest::Rest;
-use snarkos_lite_node_router::{
-    messages::{NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
-    Heartbeat, Inbound, Outbound, Router, Routing,
-};
-use snarkos_lite_node_sync::{BlockSync, BlockSyncMode};
-use snarkos_lite_node_tcp::{
-    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
-    P2P,
-};
 use snarkvm::prelude::{block::Block, store::ConsensusStorage, Ledger, Network};
 
 use aleo_std::StorageMode;
 use anyhow::Result;
 use core::future::Future;
+use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use std::{
+    io,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::{atomic::AtomicBool, Arc},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 use tokio::task::JoinHandle;
@@ -51,12 +42,8 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
     /// The consensus module of the node.
     consensus: Consensus<N>,
-    /// The router of the node.
-    router: Router<N>,
     /// The REST server of the node.
-    rest: Option<Rest<N, C, Self>>,
-    /// The sync module.
-    sync: BlockSync<N>,
+    rest: Option<Rest<N, C>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
@@ -66,13 +53,11 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Initializes a new validator node.
     pub async fn new(
-        node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
         rest_rps: u32,
         account: Account<N>,
         genesis: Block<N>,
         storage_mode: StorageMode,
-        dev_txs: bool,
         shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
         // Initialize the signal handler.
@@ -100,46 +85,20 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Start the consensus.
         consensus.run(primary_sender, primary_receiver).await?;
 
-        // Initialize the node router.
-        let router = Router::new(
-            node_ip,
-            NodeType::Validator,
-            account,
-            Self::MAXIMUM_NUMBER_OF_PEERS as u16,
-        )
-        .await?;
-
-        // Initialize the sync module.
-        let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service);
-
         // Initialize the node.
         let mut node = Self {
             ledger: ledger.clone(),
             consensus: consensus.clone(),
-            router,
             rest: None,
-            sync,
             handles: Default::default(),
             shutdown,
         };
-        // Initialize the transaction pool.
-        node.initialize_transaction_pool(dev_txs)?;
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(
-                Rest::start(
-                    rest_ip,
-                    rest_rps,
-                    Some(consensus),
-                    ledger.clone(),
-                    Arc::new(node.clone()),
-                )
-                .await?,
-            );
+            node.rest =
+                Some(Rest::start(rest_ip, rest_rps, Some(consensus), ledger.clone()).await?);
         }
-        // Initialize the routing.
-        node.initialize_routing().await;
 
         // Initialize the notification message loop.
         node.handles
@@ -158,76 +117,73 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     }
 
     /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Rest<N, C, Self>> {
+    pub fn rest(&self) -> &Option<Rest<N, C>> {
         &self.rest
     }
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
-    /// Initialize the transaction pool.
-    fn initialize_transaction_pool(&self, dev_txs: bool) -> Result<()> {
-        use snarkvm::console::{
-            program::{Identifier, Literal, ProgramID, Value},
-            types::U64,
-        };
-        use std::str::FromStr;
+    /// Handles OS signals for the node to intercept and perform a clean shutdown.
+    /// The optional `shutdown_flag` flag can be used to cleanly terminate the syncing process.
+    fn handle_signals(shutdown_flag: Arc<AtomicBool>) -> Arc<OnceCell<Self>> {
+        // In order for the signal handler to be started as early as possible, a reference to the node needs
+        // to be passed to it at a later time.
+        let node: Arc<OnceCell<Self>> = Default::default();
 
-        // Initialize the locator.
-        let locator = (
-            ProgramID::from_str("credits.aleo")?,
-            Identifier::from_str("transfer_public")?,
-        );
+        #[cfg(target_family = "unix")]
+        fn signal_listener() -> impl Future<Output = io::Result<()>> {
+            use tokio::signal::unix::{signal, SignalKind};
 
-        // Determine whether to start the loop.
-        if !dev_txs {
-            return Ok(());
+            // Handle SIGINT, SIGTERM, SIGQUIT, and SIGHUP.
+            let mut s_int = signal(SignalKind::interrupt()).unwrap();
+            let mut s_term = signal(SignalKind::terminate()).unwrap();
+            let mut s_quit = signal(SignalKind::quit()).unwrap();
+            let mut s_hup = signal(SignalKind::hangup()).unwrap();
+
+            // Return when any of the signals above is received.
+            async move {
+                tokio::select!(
+                    _ = s_int.recv() => (),
+                    _ = s_term.recv() => (),
+                    _ = s_quit.recv() => (),
+                    _ = s_hup.recv() => (),
+                );
+                Ok(())
+            }
+        }
+        #[cfg(not(target_family = "unix"))]
+        fn signal_listener() -> impl Future<Output = io::Result<()>> {
+            tokio::signal::ctrl_c()
         }
 
-        let self_ = self.clone();
-        self.spawn(async move {
-            tokio::time::sleep(Duration::from_secs(3)).await;
-            info!("Starting transaction pool...");
+        let node_clone = node.clone();
+        tokio::task::spawn(async move {
+            match signal_listener().await {
+                Ok(()) => {
+                    warn!("==========================================================================================");
+                    warn!("⚠️  Attention - Starting the graceful shutdown procedure (ETA: 30 seconds)...");
+                    warn!("⚠️  Attention - To avoid DATA CORRUPTION, do NOT interrupt amareleo (or press Ctrl+C again)");
+                    warn!("⚠️  Attention - Please wait until the shutdown gracefully completes (ETA: 30 seconds)");
+                    warn!("==========================================================================================");
 
-            // Start the transaction loop.
-            loop {
-                tokio::time::sleep(Duration::from_millis(500)).await;
-
-                // Prepare the inputs.
-                let inputs = [
-                    Value::from(Literal::Address(self_.address())),
-                    Value::from(Literal::U64(U64::new(1))),
-                ];
-                // Execute the transaction.
-                let self__ = self_.clone();
-                let transaction = match spawn_blocking!(self__.ledger.vm().execute(
-                    self__.private_key(),
-                    locator,
-                    inputs.into_iter(),
-                    None,
-                    10_000,
-                    None,
-                    &mut rand::thread_rng(),
-                )) {
-                    Ok(transaction) => transaction,
-                    Err(error) => {
-                        error!("Transaction pool encountered an execution error - {error}");
-                        continue;
+                    match node_clone.get() {
+                        // If the node is already initialized, then shut it down.
+                        Some(node) => node.shut_down().await,
+                        // Otherwise, if the node is not yet initialized, then set the shutdown flag directly.
+                        None => shutdown_flag.store(true, Ordering::Relaxed),
                     }
-                };
-                // Broadcast the transaction.
-                if self_
-                    .unconfirmed_transaction(
-                        self_.router.local_ip(),
-                        UnconfirmedTransaction::from(transaction.clone()),
-                        transaction.clone(),
-                    )
-                    .await
-                {
-                    info!("Transaction pool broadcasted the transaction");
+
+                    // A best-effort attempt to let any ongoing activity conclude.
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+
+                    // Terminate the process.
+                    std::process::exit(0);
                 }
+                Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),
             }
         });
-        Ok(())
+
+        node
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
@@ -236,8 +192,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     }
 }
 
-#[async_trait]
-impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
+impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Shuts down the node.
     async fn shut_down(&self) {
         info!("Shutting down...");
@@ -250,9 +205,6 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
         // Abort the tasks.
         trace!("Shutting down the validator...");
         self.handles.lock().iter().for_each(|handle| handle.abort());
-
-        // Shut down the router.
-        self.router.shut_down().await;
 
         // Shut down consensus.
         trace!("Shutting down consensus...");
@@ -282,10 +234,8 @@ mod tests {
     #[tokio::test]
     async fn test_profiler() -> Result<()> {
         // Specify the node attributes.
-        let node = SocketAddr::from_str("0.0.0.0:4130").unwrap();
         let rest = SocketAddr::from_str("0.0.0.0:3030").unwrap();
         let storage_mode = StorageMode::Development(0);
-        let dev_txs = true;
 
         // Initialize an (insecure) fixed RNG.
         let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
@@ -302,13 +252,11 @@ mod tests {
         println!("Initializing validator node...");
 
         let validator = Validator::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
-            node,
             Some(rest),
             10,
             account,
             genesis,
             storage_mode,
-            dev_txs,
             Default::default(),
         )
         .await

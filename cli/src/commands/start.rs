@@ -24,7 +24,7 @@ use rand_chacha::ChaChaRng;
 use crate::commands::Clean;
 use snarkos_lite_account::Account;
 use snarkos_lite_node::bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode};
-use snarkos_lite_node::Node;
+use snarkos_lite_node::Validator;
 use snarkos_lite_resources::{
     BLOCK0_CANARY, BLOCK0_CANARY_ID, BLOCK0_MAINNET, BLOCK0_MAINNET_ID, BLOCK0_TESTNET,
     BLOCK0_TESTNET_ID,
@@ -41,7 +41,7 @@ use snarkvm::{
         committee::{Committee, MIN_VALIDATOR_STAKE},
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
     },
-    prelude::{FromBytes, ToBits, ToBytes},
+    prelude::{FromBytes, ToBits, ToBytes, store::helpers::rocksdb::ConsensusDB},
     synthesizer::VM,
     utilities::to_bytes_le,
 };
@@ -65,10 +65,6 @@ pub struct Start {
     /// Specify the network ID of this node
     #[clap(default_value = "1", long = "network")]
     pub network: u16,
-
-    /// Specify the IP address and port for the node server
-    #[clap(long = "node")]
-    pub node: Option<SocketAddr>,
 
     /// Specify the IP address and port for the REST server
     #[clap(long = "rest")]
@@ -94,10 +90,6 @@ pub struct Start {
     /// Specify the path to a directory containing the storage database for the ledger
     #[clap(long = "storage")]
     pub storage: Option<PathBuf>,
-
-    /// Specify whether node should generate traffic to drive the network
-    #[clap(default_value = "false", long = "dev-txs")]
-    pub dev_txs: bool,
 
     /// Specify whether the chain state of the last run should be retained, or restart from genesis.
     #[clap(default_value = "false", long = "keep-state")]
@@ -270,7 +262,7 @@ impl Start {
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
-    async fn parse_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<Node<N>> {
+    async fn parse_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<Arc<Validator<N, ConsensusDB<N>>>> {
         // Print the welcome.
         println!("{}", crate::helpers::welcome_message());
 
@@ -283,24 +275,13 @@ impl Start {
         // Parse the private key of the node.
         let account = self.parse_private_key::<N>()?;
 
-        // Parse the node IP.
-        // Note: the `node` flag is an option to detect remote devnet testing.
-        let node_ip = match self.node {
-            Some(node_ip) => node_ip,
-            None => SocketAddr::from_str("0.0.0.0:4130").unwrap(),
-        };
-
         // Parse the REST IP.
         let rest_ip = self.rest.or_else(|| Some("0.0.0.0:3030".parse().unwrap()));
 
         // Print the Aleo address.
         println!("👛 Your Aleo address is {}.\n", account.address().to_string().bold());
         // Print the node type and network.
-        println!(
-            "🧭 Starting node on {} at {}.\n",
-            N::NAME.bold(),
-            node_ip.to_string().bold()
-        );
+        println!("🧭 Starting node on {}.\n",N::NAME.bold());
 
         // If the node is running a REST server, print the REST IP and JWT.
         if let Some(rest_ip) = rest_ip {
@@ -333,7 +314,9 @@ impl Start {
         let storage_mode = amareleo_storage_mode(self.network, Some(ledger_path));
 
         // Initialize the node.
-        Node::new_validator(node_ip, rest_ip, self.rest_rps, account, genesis, storage_mode, self.dev_txs, shutdown.clone()).await
+        Ok(Arc::new(
+            Validator::new(rest_ip, self.rest_rps, account, genesis, storage_mode, shutdown.clone()).await?,
+        ))      
     }
 
     /// Returns a runtime for the node.

@@ -112,11 +112,6 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
     __Dependent__ on `LedgerService`, `StorageService`, `Ready`, `Proposal`
 
 
-* `/node/sync/src/block_sync.rs` - Implements `BlockSyncMode` and `BlockSync`. `BlockSync` is reponsible for syncing Blocks across peers. This is largely unecessary for amareleo-chain. At this stage we are keeping a minimal implementation with no network access. Later we might remove this altogether.
-
-    __Dependent__ on `LedgerService`, `BlockLocators`
-
-
 * `/node/bft/src/sync/mod.rs` - Implements the `Sync` module which is resposnbile to sync the ledger from storage and keeping the ledger in a synced state. In snarkos, `Sync` receives messages from other peer `Worker` instances. However in amareleo-chain all that communication was removed. In snarkos, `Sync` employes `BlockSync` for exchanging blocks with peers. In amareleo-chain this `BlockSync` dependency was removed with some of its functianality merged into `Sync`.
 
     __Dependent__ on `Storage`, `LedgerService`, `BlockLocators`
@@ -142,16 +137,6 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
     __Dependent__ on `BFT`, `Ledger`, `Storage`
 
 
-* `/node/tcp` - Implements tcp components needed for the `REST` | `Router` | `Tcp` stack.
-
-    __No cross-dependencies__
-
-
-* `/node/router` - Implements router components needed for the `REST` | `Router` | `Tcp` stack.
-
-    __Dependent__ on `Tcp`, `Sync`, `BlockLocators`
-
-
 * `/node/rest` - Implements rest server.
 
-    __Dependent__ on `Consensus`, `Router`
+    __Dependent__ on `Consensus`

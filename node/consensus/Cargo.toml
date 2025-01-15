@@ -49,9 +49,6 @@ optional = true
 [dependencies.parking_lot]
 version = "0.12"
 
-[dependencies.rand]
-version = "0.8"
-
 [dependencies.snarkos-lite-account]
 path = "../../account"
 version = "=3.1.0"
