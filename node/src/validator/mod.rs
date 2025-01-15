@@ -27,7 +27,7 @@ use snarkos_lite_node_router::{
 use snarkos_lite_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_lite_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
-    P2P,
+    Config, Tcp, P2P,
 };
 use snarkvm::prelude::{block::Block, store::ConsensusStorage, Ledger, Network};
 
@@ -48,12 +48,12 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
     /// The consensus module of the node.
     consensus: Consensus<N>,
+    /// The TCP stack.
+    tcp: Tcp,
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
     rest: Option<Rest<N, C, Self>>,
-    /// The sync module.
-    sync: BlockSync<N>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
@@ -96,6 +96,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Start the consensus.
         consensus.run(primary_sender, primary_receiver).await?;
 
+        // Initialize the TCP stack.
+        let tcp = Tcp::new(Config::new(node_ip, Self::MAXIMUM_NUMBER_OF_PEERS as u16));
+
         // Initialize the node router.
         let router = Router::new(
             node_ip,
@@ -105,16 +108,13 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         )
         .await?;
 
-        // Initialize the sync module.
-        let sync = BlockSync::new(BlockSyncMode::Gateway, ledger_service);
-
         // Initialize the node.
         let mut node = Self {
             ledger: ledger.clone(),
             consensus: consensus.clone(),
+            tcp,
             router,
             rest: None,
-            sync,
             handles: Default::default(),
             shutdown,
         };
