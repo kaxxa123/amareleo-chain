@@ -17,7 +17,6 @@ use snarkos_lite_account::Account;
 use snarkos_lite_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use snarkos_lite_node_consensus::Consensus;
 use snarkos_lite_node_rest::Rest;
-use snarkos_lite_node_sync::{BlockSync, BlockSyncMode};
 use snarkvm::prelude::{block::Block, store::ConsensusStorage, Ledger, Network};
 
 use aleo_std::StorageMode;
@@ -54,7 +53,6 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Initializes a new validator node.
     pub async fn new(
-        node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
         rest_rps: u32,
         account: Account<N>,
@@ -236,7 +234,6 @@ mod tests {
     #[tokio::test]
     async fn test_profiler() -> Result<()> {
         // Specify the node attributes.
-        let node = SocketAddr::from_str("0.0.0.0:4130").unwrap();
         let rest = SocketAddr::from_str("0.0.0.0:3030").unwrap();
         let storage_mode = StorageMode::Development(0);
 
@@ -255,7 +252,6 @@ mod tests {
         println!("Initializing validator node...");
 
         let validator = Validator::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
-            node,
             Some(rest),
             10,
             account,

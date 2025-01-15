@@ -15,11 +15,11 @@
 
 #![forbid(unsafe_code)]
 
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+/// This is a dummy IP address that is used to represent the local node.
+/// Note: This here does not need to be a real IP address, but it must be unique/distinct from all other connections.
+pub const DUMMY_SELF_IP: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
+
 // pub use snarkos_node_sync_communication_service as communication_service;
 pub use snarkos_lite_node_sync_locators as locators;
-
-mod block_sync;
-pub use block_sync::*;
-
-// mod helpers;
-// pub use helpers::*;

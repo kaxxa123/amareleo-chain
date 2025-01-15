@@ -66,10 +66,6 @@ pub struct Start {
     #[clap(default_value = "1", long = "network")]
     pub network: u16,
 
-    /// Specify the IP address and port for the node server
-    #[clap(long = "node")]
-    pub node: Option<SocketAddr>,
-
     /// Specify the IP address and port for the REST server
     #[clap(long = "rest")]
     pub rest: Option<SocketAddr>,
@@ -279,24 +275,13 @@ impl Start {
         // Parse the private key of the node.
         let account = self.parse_private_key::<N>()?;
 
-        // Parse the node IP.
-        // Note: the `node` flag is an option to detect remote devnet testing.
-        let node_ip = match self.node {
-            Some(node_ip) => node_ip,
-            None => SocketAddr::from_str("0.0.0.0:4130").unwrap(),
-        };
-
         // Parse the REST IP.
         let rest_ip = self.rest.or_else(|| Some("0.0.0.0:3030".parse().unwrap()));
 
         // Print the Aleo address.
         println!("👛 Your Aleo address is {}.\n", account.address().to_string().bold());
         // Print the node type and network.
-        println!(
-            "🧭 Starting node on {} at {}.\n",
-            N::NAME.bold(),
-            node_ip.to_string().bold()
-        );
+        println!("🧭 Starting node on {}.\n",N::NAME.bold());
 
         // If the node is running a REST server, print the REST IP and JWT.
         if let Some(rest_ip) = rest_ip {
@@ -329,7 +314,7 @@ impl Start {
         let storage_mode = amareleo_storage_mode(self.network, Some(ledger_path));
 
         // Initialize the node.
-        Node::new_validator(node_ip, rest_ip, self.rest_rps, account, genesis, storage_mode, shutdown.clone()).await
+        Node::new_validator(rest_ip, self.rest_rps, account, genesis, storage_mode, shutdown.clone()).await
     }
 
     /// Returns a runtime for the node.
