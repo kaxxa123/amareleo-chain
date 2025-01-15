@@ -41,7 +41,6 @@ impl<N: Network> Node<N> {
         account: Account<N>,
         genesis: Block<N>,
         storage_mode: StorageMode,
-        dev_txs: bool,
         shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
         Ok(Self {
@@ -53,7 +52,6 @@ impl<N: Network> Node<N> {
                     account,
                     genesis,
                     storage_mode,
-                    dev_txs,
                     shutdown,
                 )
                 .await?,

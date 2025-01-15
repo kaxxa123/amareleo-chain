@@ -95,10 +95,6 @@ pub struct Start {
     #[clap(long = "storage")]
     pub storage: Option<PathBuf>,
 
-    /// Specify whether node should generate traffic to drive the network
-    #[clap(default_value = "false", long = "dev-txs")]
-    pub dev_txs: bool,
-
     /// Specify whether the chain state of the last run should be retained, or restart from genesis.
     #[clap(default_value = "false", long = "keep-state")]
     pub keep_state: bool,
@@ -333,7 +329,7 @@ impl Start {
         let storage_mode = amareleo_storage_mode(self.network, Some(ledger_path));
 
         // Initialize the node.
-        Node::new_validator(node_ip, rest_ip, self.rest_rps, account, genesis, storage_mode, self.dev_txs, shutdown.clone()).await
+        Node::new_validator(node_ip, rest_ip, self.rest_rps, account, genesis, storage_mode, shutdown.clone()).await
     }
 
     /// Returns a runtime for the node.

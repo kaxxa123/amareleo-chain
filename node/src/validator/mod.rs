@@ -17,13 +17,11 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_lite_account::Account;
-use snarkos_lite_node_bft::{
-    helpers::init_primary_channels, ledger_service::CoreLedgerService, spawn_blocking,
-};
+use snarkos_lite_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use snarkos_lite_node_consensus::Consensus;
 use snarkos_lite_node_rest::Rest;
 use snarkos_lite_node_router::{
-    messages::{NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction},
+    messages::{NodeType, PuzzleResponse, UnconfirmedSolution},
     Heartbeat, Inbound, Outbound, Router, Routing,
 };
 use snarkos_lite_node_sync::{BlockSync, BlockSyncMode};
@@ -40,7 +38,6 @@ use parking_lot::Mutex;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{atomic::AtomicBool, Arc},
-    time::Duration,
 };
 use tokio::task::JoinHandle;
 
@@ -72,7 +69,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         account: Account<N>,
         genesis: Block<N>,
         storage_mode: StorageMode,
-        dev_txs: bool,
         shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
         // Initialize the signal handler.
@@ -122,8 +118,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             handles: Default::default(),
             shutdown,
         };
-        // Initialize the transaction pool.
-        node.initialize_transaction_pool(dev_txs)?;
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
@@ -164,72 +158,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
-    /// Initialize the transaction pool.
-    fn initialize_transaction_pool(&self, dev_txs: bool) -> Result<()> {
-        use snarkvm::console::{
-            program::{Identifier, Literal, ProgramID, Value},
-            types::U64,
-        };
-        use std::str::FromStr;
-
-        // Initialize the locator.
-        let locator = (
-            ProgramID::from_str("credits.aleo")?,
-            Identifier::from_str("transfer_public")?,
-        );
-
-        // Determine whether to start the loop.
-        if !dev_txs {
-            return Ok(());
-        }
-
-        let self_ = self.clone();
-        self.spawn(async move {
-            tokio::time::sleep(Duration::from_secs(3)).await;
-            info!("Starting transaction pool...");
-
-            // Start the transaction loop.
-            loop {
-                tokio::time::sleep(Duration::from_millis(500)).await;
-
-                // Prepare the inputs.
-                let inputs = [
-                    Value::from(Literal::Address(self_.address())),
-                    Value::from(Literal::U64(U64::new(1))),
-                ];
-                // Execute the transaction.
-                let self__ = self_.clone();
-                let transaction = match spawn_blocking!(self__.ledger.vm().execute(
-                    self__.private_key(),
-                    locator,
-                    inputs.into_iter(),
-                    None,
-                    10_000,
-                    None,
-                    &mut rand::thread_rng(),
-                )) {
-                    Ok(transaction) => transaction,
-                    Err(error) => {
-                        error!("Transaction pool encountered an execution error - {error}");
-                        continue;
-                    }
-                };
-                // Broadcast the transaction.
-                if self_
-                    .unconfirmed_transaction(
-                        self_.router.local_ip(),
-                        UnconfirmedTransaction::from(transaction.clone()),
-                        transaction.clone(),
-                    )
-                    .await
-                {
-                    info!("Transaction pool broadcasted the transaction");
-                }
-            }
-        });
-        Ok(())
-    }
-
     /// Spawns a task with the given future; it should only be used for long-running tasks.
     pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
         self.handles.lock().push(tokio::spawn(future));
@@ -285,7 +213,6 @@ mod tests {
         let node = SocketAddr::from_str("0.0.0.0:4130").unwrap();
         let rest = SocketAddr::from_str("0.0.0.0:3030").unwrap();
         let storage_mode = StorageMode::Development(0);
-        let dev_txs = true;
 
         // Initialize an (insecure) fixed RNG.
         let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
@@ -308,7 +235,6 @@ mod tests {
             account,
             genesis,
             storage_mode,
-            dev_txs,
             Default::default(),
         )
         .await
