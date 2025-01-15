@@ -58,24 +58,4 @@ impl<N: Network> Node<N> {
             ),
         })
     }
-
-    /// Returns the node type.
-    pub fn node_type(&self) -> NodeType {
-        self.validator.node_type()
-    }
-
-    /// Returns the account private key of the node.
-    pub fn private_key(&self) -> &PrivateKey<N> {
-        self.validator.private_key()
-    }
-
-    /// Returns the account view key of the node.
-    pub fn view_key(&self) -> &ViewKey<N> {
-        self.validator.view_key()
-    }
-
-    /// Returns the account address of the node.
-    pub fn address(&self) -> Address<N> {
-        self.validator.address()
-    }
 }
