@@ -88,9 +88,6 @@ version = "0.3"
 [dependencies.tokio]
 version = "1"
 
-[dependencies.tower]
-version = "0.4"
-
 [dependencies.tower_governor]
 version = "0.3"
 

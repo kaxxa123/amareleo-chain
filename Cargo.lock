@@ -3232,9 +3232,7 @@ dependencies = [
 name = "snarkos-lite-account"
 version = "3.1.0"
 dependencies = [
- "anyhow",
  "colored",
- "rand",
  "snarkvm",
 ]
 
@@ -3242,7 +3240,6 @@ dependencies = [
 name = "snarkos-lite-cli"
 version = "3.1.0"
 dependencies = [
- "aleo-std",
  "anstyle",
  "anyhow",
  "clap",
@@ -3261,7 +3258,6 @@ dependencies = [
  "snarkos-lite-node-rest",
  "snarkos-lite-resources",
  "snarkvm",
- "sys-info",
  "thiserror 1.0.69",
  "time",
  "tokio",
@@ -3275,7 +3271,6 @@ version = "3.1.0"
 dependencies = [
  "aleo-std",
  "anyhow",
- "async-trait",
  "once_cell",
  "parking_lot",
  "rand",
@@ -3289,7 +3284,6 @@ dependencies = [
  "snarkos-lite-node-sync",
  "snarkvm",
  "tokio",
- "tokio-util",
  "tracing",
  "tracing-subscriber 0.3.19",
 ]
@@ -3321,7 +3315,6 @@ dependencies = [
  "rand_chacha",
  "rand_distr",
  "rayon",
- "serde",
  "sha2",
  "snarkos-lite-account",
  "snarkos-lite-node-bft-events",
@@ -3333,8 +3326,6 @@ dependencies = [
  "test-strategy",
  "time",
  "tokio",
- "tokio-stream",
- "tokio-util",
  "tower-http",
  "tracing",
  "tracing-subscriber 0.3.19",
@@ -3400,7 +3391,6 @@ dependencies = [
  "lru",
  "once_cell",
  "parking_lot",
- "rand",
  "snarkos-lite-account",
  "snarkos-lite-node-bft",
  "snarkos-lite-node-bft-ledger-service",
@@ -3421,7 +3411,6 @@ dependencies = [
  "rayon",
  "snarkvm",
  "time",
- "tokio",
 ]
 
 [[package]]
@@ -3445,7 +3434,6 @@ dependencies = [
  "snarkvm-synthesizer",
  "time",
  "tokio",
- "tower 0.4.13",
  "tower-http",
  "tower_governor",
  "tracing",
@@ -3455,19 +3443,9 @@ dependencies = [
 name = "snarkos-lite-node-sync"
 version = "3.1.0"
 dependencies = [
- "anyhow",
- "indexmap 2.7.0",
- "itertools 0.12.1",
- "once_cell",
- "parking_lot",
- "rand",
- "serde",
- "snarkos-lite-node-bft-ledger-service",
  "snarkos-lite-node-metrics",
  "snarkos-lite-node-sync-locators",
  "snarkvm",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -4574,16 +4552,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sys-info"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b3a0d0aba8bf96a0e1ddfdc352fc53b3df7f39318c71854910c3c4b024ae52c"
-dependencies = [
- "cc",
- "libc",
-]
-
-[[package]]
 name = "system-configuration"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4806,17 +4774,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbae76ab933c85776efabc971569dd6119c580d8f5d448769dec1764bf796ef2"
 dependencies = [
  "native-tls",
- "tokio",
-]
-
-[[package]]
-name = "tokio-stream"
-version = "0.1.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eca58d7bba4a75707817a2c44174253f9236b2d5fbd055602e9d5c07c139a047"
-dependencies = [
- "futures-core",
- "pin-project-lite",
  "tokio",
 ]
 

@@ -23,9 +23,6 @@ edition = "2021"
 default = ["snarkos-lite-node/metrics"]
 test_targets = ["snarkvm/test_targets"]
 
-[dependencies.aleo-std]
-workspace = true
-
 [dependencies.anstyle]
 version = "1"
 
@@ -87,9 +84,6 @@ version = "=3.1.0"
 
 [dependencies.snarkvm]
 workspace = true
-
-[dependencies.sys-info]
-version = "0.9"
 
 [dependencies.time]
 version = "0.3"
