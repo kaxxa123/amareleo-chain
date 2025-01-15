@@ -24,7 +24,7 @@ use rand_chacha::ChaChaRng;
 use crate::commands::Clean;
 use snarkos_lite_account::Account;
 use snarkos_lite_node::bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode};
-use snarkos_lite_node::Node;
+use snarkos_lite_node::Validator;
 use snarkos_lite_resources::{
     BLOCK0_CANARY, BLOCK0_CANARY_ID, BLOCK0_MAINNET, BLOCK0_MAINNET_ID, BLOCK0_TESTNET,
     BLOCK0_TESTNET_ID,
@@ -41,7 +41,7 @@ use snarkvm::{
         committee::{Committee, MIN_VALIDATOR_STAKE},
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
     },
-    prelude::{FromBytes, ToBits, ToBytes},
+    prelude::{FromBytes, ToBits, ToBytes, store::helpers::rocksdb::ConsensusDB},
     synthesizer::VM,
     utilities::to_bytes_le,
 };
@@ -262,7 +262,7 @@ impl Start {
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
-    async fn parse_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<Node<N>> {
+    async fn parse_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<Arc<Validator<N, ConsensusDB<N>>>> {
         // Print the welcome.
         println!("{}", crate::helpers::welcome_message());
 
@@ -314,7 +314,9 @@ impl Start {
         let storage_mode = amareleo_storage_mode(self.network, Some(ledger_path));
 
         // Initialize the node.
-        Node::new_validator(rest_ip, self.rest_rps, account, genesis, storage_mode, shutdown.clone()).await
+        Ok(Arc::new(
+            Validator::new(rest_ip, self.rest_rps, account, genesis, storage_mode, shutdown.clone()).await?,
+        ))      
     }
 
     /// Returns a runtime for the node.

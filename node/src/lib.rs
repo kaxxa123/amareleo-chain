@@ -29,9 +29,6 @@ pub use snarkvm;
 mod validator;
 pub use validator::*;
 
-mod node;
-pub use node::*;
-
 /// Starts the notification message loop.
 pub fn start_notification_message_loop() -> tokio::task::JoinHandle<()> {
     // let mut interval = tokio::time::interval(std::time::Duration::from_secs(180));
