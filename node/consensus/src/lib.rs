@@ -107,6 +107,7 @@ impl<N: Network> Consensus<N> {
     pub fn new(
         account: Account<N>,
         ledger: Arc<dyn LedgerService<N>>,
+        keep_state: bool,
         storage_mode: StorageMode,
     ) -> Result<Self> {
         // Initialize the Narwhal transmissions.
@@ -118,7 +119,7 @@ impl<N: Network> Consensus<N> {
             BatchHeader::<N>::MAX_GC_ROUNDS as u64,
         );
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, storage_mode, ledger.clone())?;
+        let bft = BFT::new(account, storage, keep_state, storage_mode, ledger.clone())?;
         // Return the consensus.
         Ok(Self {
             ledger,

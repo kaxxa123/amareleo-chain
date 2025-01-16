@@ -73,11 +73,12 @@ impl<N: Network> BFT<N> {
     pub fn new(
         account: Account<N>,
         storage: Storage<N>,
+        keep_state: bool,
         storage_mode: StorageMode,
         ledger: Arc<dyn LedgerService<N>>,
     ) -> Result<Self> {
         Ok(Self {
-            primary: Primary::new(account, storage, storage_mode, ledger)?,
+            primary: Primary::new(account, storage, keep_state, storage_mode, ledger)?,
             dag: Default::default(),
             leader_certificate: Default::default(),
             leader_certificate_timer: Default::default(),
@@ -1078,6 +1079,7 @@ mod tests {
         let bft = BFT::new(
             account.clone(),
             storage.clone(),
+            false,
             StorageMode::Development(0),
             ledger.clone(),
         )?;
@@ -1115,7 +1117,7 @@ mod tests {
         assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
 
         // Store is at round 1, and we are checking for round 2.
@@ -1137,7 +1139,7 @@ mod tests {
         assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
 
         // Ensure this call fails on an even round.
@@ -1181,6 +1183,7 @@ mod tests {
         let bft = BFT::new(
             account.clone(),
             storage.clone(),
+            false,
             StorageMode::Development(0),
             ledger.clone(),
         )?;
@@ -1199,6 +1202,7 @@ mod tests {
         let bft_timer = BFT::new(
             account.clone(),
             storage.clone(),
+            false,
             StorageMode::Development(0),
             ledger.clone(),
         )?;
@@ -1240,7 +1244,7 @@ mod tests {
         assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
 
         // Ensure this call fails on an odd round.
         let result = bft.update_leader_certificate_to_even_round(1);
@@ -1258,7 +1262,7 @@ mod tests {
         assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
 
         // Ensure this call succeeds on an even round.
         let result = bft.update_leader_certificate_to_even_round(6);
@@ -1316,6 +1320,7 @@ mod tests {
         let bft = BFT::new(
             account,
             storage.clone(),
+            false,
             StorageMode::Development(0),
             ledger,
         )?;
@@ -1359,6 +1364,7 @@ mod tests {
             let bft = BFT::new(
                 account.clone(),
                 storage,
+                false,
                 StorageMode::Development(0),
                 ledger.clone(),
             )?;
@@ -1399,7 +1405,7 @@ mod tests {
             // Initialize the storage.
             let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
             // Initialize the BFT.
-            let bft = BFT::new(account, storage, StorageMode::Development(0), ledger)?;
+            let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
 
             // Insert a mock DAG in the BFT.
             *bft.dag.write() =
@@ -1466,7 +1472,7 @@ mod tests {
         /* Test missing previous certificate. */
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
 
         // The expected error message.
         let error_msg = format!(
@@ -1533,6 +1539,7 @@ mod tests {
         let bft = BFT::new(
             account,
             storage.clone(),
+            false,
             StorageMode::Development(0),
             ledger,
         )?;
@@ -1619,6 +1626,7 @@ mod tests {
         let bft = BFT::new(
             account.clone(),
             storage,
+            false,
             StorageMode::Development(0),
             ledger.clone(),
         )?;
@@ -1648,7 +1656,13 @@ mod tests {
             max_gc_rounds,
         );
         // Initialize a new instance of BFT.
-        let bootup_bft = BFT::new(account, storage_2, StorageMode::Development(0), ledger)?;
+        let bootup_bft = BFT::new(
+            account,
+            storage_2,
+            false,
+            StorageMode::Development(0),
+            ledger,
+        )?;
 
         // Sync the BFT DAG at bootup.
         bootup_bft
@@ -1840,6 +1854,7 @@ mod tests {
         let bft = BFT::new(
             account.clone(),
             storage,
+            false,
             StorageMode::Development(0),
             ledger.clone(),
         )?;
@@ -1882,6 +1897,7 @@ mod tests {
         let bootup_bft = BFT::new(
             account,
             bootup_storage.clone(),
+            false,
             StorageMode::Development(0),
             ledger.clone(),
         )?;
@@ -2129,6 +2145,7 @@ mod tests {
         let bootup_bft = BFT::new(
             account.clone(),
             storage.clone(),
+            false,
             StorageMode::Development(0),
             ledger.clone(),
         )?;

@@ -25,46 +25,70 @@ use aleo_std::StorageMode;
 use indexmap::IndexSet;
 use std::{fs, path::PathBuf};
 
-/// Returns the path where a proposal cache file may be stored.
-pub fn proposal_cache_path(network: u16, dev: Option<u16>, storage_mode: &StorageMode) -> PathBuf {
-    const PROPOSAL_CACHE_FILE_NAME: &str = "amareleo-proposal-cache";
+const PROPOSAL_STD_CACHE_FILE_NAME: &str = "amareleo-proposal-cache";
+const PROPOSAL_TMP_CACHE_FILE_NAME: &str = "amareleo-tmp-proposal-cache";
+const LEDGER_STD_DIR: &str = "amareleo-ledger";
+const LEDGER_TMP_DIR: &str = "amareleo-tmp-ledger";
 
+/// Returns the path where a proposal cache file may be stored.
+pub fn proposal_cache_path(network: u16, keep_state: bool, storage_mode: &StorageMode) -> PathBuf {
     // Obtain the path to the ledger.
     let mut path = match &storage_mode {
         StorageMode::Custom(path) => path.clone(),
-        _ => amareleo_ledger_dir(network),
+        _ => amareleo_ledger_dir(network, keep_state),
     };
 
     // Go to the folder right above the ledger.
     path.pop();
     // Append the proposal store's file name.
-    match dev {
-        Some(id) => path.push(format!(".{PROPOSAL_CACHE_FILE_NAME}-{network}-{id}")),
-        None => path.push(format!("{PROPOSAL_CACHE_FILE_NAME}-{network}")),
-    }
-
+    path.push(format!(
+        ".{}-{network}-0",
+        if keep_state {
+            PROPOSAL_STD_CACHE_FILE_NAME
+        } else {
+            PROPOSAL_TMP_CACHE_FILE_NAME
+        }
+    ));
     path
 }
 
-pub fn amareleo_ledger_dir(network: u16) -> PathBuf {
+pub fn amareleo_ledger_dir(network: u16, keep_state: bool) -> PathBuf {
     let mut path = match std::env::current_dir() {
         Ok(current_dir) => current_dir,
         _ => PathBuf::from(env!("CARGO_MANIFEST_DIR")),
     };
-    path.push(format!(".amareleo-ledger-{}-0", network));
+    path.push(format!(
+        ".{}-{network}-0",
+        if keep_state {
+            LEDGER_STD_DIR
+        } else {
+            LEDGER_TMP_DIR
+        }
+    ));
     path
 }
 
-pub fn custom_ledger_dir(network: u16, base: PathBuf) -> PathBuf {
+pub fn custom_ledger_dir(network: u16, keep_state: bool, base: PathBuf) -> PathBuf {
     let mut path = base.clone();
-    path.push(format!(".amareleo-ledger-{}-0", network));
+    path.push(format!(
+        ".{}-{network}-0",
+        if keep_state {
+            LEDGER_STD_DIR
+        } else {
+            LEDGER_TMP_DIR
+        }
+    ));
     path
 }
 
-pub fn amareleo_storage_mode(network: u16, ledger_path: Option<PathBuf>) -> StorageMode {
+pub fn amareleo_storage_mode(
+    network: u16,
+    keep_state: bool,
+    ledger_path: Option<PathBuf>,
+) -> StorageMode {
     match ledger_path {
         Some(path) => StorageMode::Custom(path),
-        None => StorageMode::Custom(amareleo_ledger_dir(network)),
+        None => StorageMode::Custom(amareleo_ledger_dir(network, keep_state)),
     }
 }
 
@@ -109,19 +133,19 @@ impl<N: Network> ProposalCache<N> {
             && self.signed_proposals.is_valid(expected_signer)
     }
 
-    /// Returns `true` if a proposal cache exists for the given network and `dev`.
-    pub fn exists(dev: Option<u16>, storage_mode: &StorageMode) -> bool {
-        proposal_cache_path(N::ID, dev, storage_mode).exists()
+    /// Returns `true` if a proposal cache exists for the given network.
+    pub fn exists(keep_state: bool, storage_mode: &StorageMode) -> bool {
+        proposal_cache_path(N::ID, keep_state, storage_mode).exists()
     }
 
     /// Load the proposal cache from the file system and ensure that the proposal cache is valid.
     pub fn load(
         expected_signer: Address<N>,
-        dev: Option<u16>,
+        keep_state: bool,
         storage_mode: &StorageMode,
     ) -> Result<Self> {
         // Construct the proposal cache file system path.
-        let path = proposal_cache_path(N::ID, dev, storage_mode);
+        let path = proposal_cache_path(N::ID, keep_state, storage_mode);
 
         // Deserialize the proposal cache from the file system.
         let proposal_cache = match fs::read(&path) {
@@ -150,8 +174,8 @@ impl<N: Network> ProposalCache<N> {
     }
 
     /// Store the proposal cache to the file system.
-    pub fn store(&self, dev: Option<u16>, storage_mode: &StorageMode) -> Result<()> {
-        let path = proposal_cache_path(N::ID, dev, storage_mode);
+    pub fn store(&self, keep_state: bool, storage_mode: &StorageMode) -> Result<()> {
+        let path = proposal_cache_path(N::ID, keep_state, storage_mode);
         info!("Storing the proposal cache to {}...", path.display());
 
         // Serialize the proposal cache.

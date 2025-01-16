@@ -57,6 +57,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         rest_rps: u32,
         account: Account<N>,
         genesis: Block<N>,
+        keep_state: bool,
         storage_mode: StorageMode,
         shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
@@ -73,6 +74,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let mut consensus = Consensus::new(
             account.clone(),
             ledger_service.clone(),
+            keep_state,
             storage_mode.clone(),
         )?;
         // Initialize the primary channels.
@@ -251,6 +253,7 @@ mod tests {
             10,
             account,
             genesis,
+            false,
             storage_mode,
             Default::default(),
         )

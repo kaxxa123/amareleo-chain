@@ -35,26 +35,40 @@ pub struct Clean {
 
 impl Clean {
     /// Cleans the snarkOS node storage.
-    pub fn parse(self) -> Result<String> {
+    pub fn parse(&self) -> Result<String> {
+        let mut res = self.remove_all(false);
+
+        if let Ok(msg) = res {
+            println!("{msg}\n");
+            res = self.remove_all(true);
+        }
+        res
+    }
+
+    pub fn remove_all(&self, keep_state: bool) -> Result<String> {
         // Determine the ledger path
         let ledger_path = match &self.path {
-            Some(path) => custom_ledger_dir(self.network, path.clone()),
-            None => amareleo_ledger_dir(self.network),
+            Some(path) => custom_ledger_dir(self.network, keep_state, path.clone()),
+            None => amareleo_ledger_dir(self.network, keep_state),
         };
 
         // Remove the current proposal cache file, if it exists.
-        Self::remove_proposal_cache(self.network, ledger_path.clone())?;
+        Self::remove_proposal_cache(self.network, keep_state, ledger_path.clone())?;
 
         // Remove the specified ledger from storage.
-        Self::remove_ledger(ledger_path)
+        Self::remove_ledger(keep_state, ledger_path)
     }
 
     /// Removes the specified ledger from storage.
-    pub(crate) fn remove_proposal_cache(network: u16, path: PathBuf) -> Result<()> {
-        let storage_mode = amareleo_storage_mode(network, Some(path));
+    pub(crate) fn remove_proposal_cache(
+        network: u16,
+        keep_state: bool,
+        path: PathBuf,
+    ) -> Result<()> {
+        let storage_mode = amareleo_storage_mode(network, keep_state, Some(path));
 
         // Remove the current proposal cache file, if it exists.
-        let proposal_cache_path = proposal_cache_path(network, Some(0u16), &storage_mode);
+        let proposal_cache_path = proposal_cache_path(network, keep_state, &storage_mode);
         if proposal_cache_path.exists() {
             if let Err(err) = std::fs::remove_file(&proposal_cache_path) {
                 bail!(
@@ -68,27 +82,33 @@ impl Clean {
     }
 
     /// Removes the specified ledger from storage.
-    pub(crate) fn remove_ledger(path: PathBuf) -> Result<String> {
+    pub(crate) fn remove_ledger(keep_state: bool, path: PathBuf) -> Result<String> {
         // Prepare the path string.
         let path_string = format!("(in \"{}\")", path.display()).dimmed();
+
+        let store_desc: &str = if keep_state {
+            "persistent"
+        } else {
+            "temporary"
+        };
 
         // Check if the path to the ledger exists in storage.
         if path.exists() {
             // Remove the ledger files from storage.
             match std::fs::remove_dir_all(&path) {
                 Ok(_) => Ok(format!(
-                    "✅ Cleaned the amareleo node storage {path_string}"
+                    "✅ Cleaned the {store_desc} amareleo node storage {path_string}"
                 )),
                 Err(error) => {
                     bail!(
-                        "Failed to remove the amareleo node storage {path_string}\n{}",
+                        "Failed to remove the {store_desc} amareleo node storage {path_string}\n{}",
                         error.to_string().dimmed()
                     )
                 }
             }
         } else {
             Ok(format!(
-                "✅ No amareleo node storage was found {path_string}"
+                "✅ No {store_desc} amareleo node storage was found {path_string}"
             ))
         }
     }

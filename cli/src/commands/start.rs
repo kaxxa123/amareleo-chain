@@ -299,23 +299,23 @@ impl Start {
 
         // Determine the ledger path
         let ledger_path = match &self.storage {
-            Some(path) => custom_ledger_dir(self.network,path.clone()),
-            None => amareleo_ledger_dir(self.network),
+            Some(path) => custom_ledger_dir(self.network, self.keep_state, path.clone()),
+            None => amareleo_ledger_dir(self.network, self.keep_state),
         };
 
         if !self.keep_state {
             // Remove old ledger state
-            Clean::remove_proposal_cache(self.network, ledger_path.clone())?;
-            let res_text = Clean::remove_ledger(ledger_path.clone())?;
+            Clean::remove_proposal_cache(self.network, self.keep_state, ledger_path.clone())?;
+            let res_text = Clean::remove_ledger(self.keep_state, ledger_path.clone())?;
             println!("{res_text}\n");
         }
 
         // Initialize the storage mode.
-        let storage_mode = amareleo_storage_mode(self.network, Some(ledger_path));
+        let storage_mode = amareleo_storage_mode(self.network, self.keep_state, Some(ledger_path));
 
         // Initialize the node.
         Ok(Arc::new(
-            Validator::new(rest_ip, self.rest_rps, account, genesis, storage_mode, shutdown.clone()).await?,
+            Validator::new(rest_ip, self.rest_rps, account, genesis, self.keep_state, storage_mode, shutdown.clone()).await?,
         ))      
     }
 
