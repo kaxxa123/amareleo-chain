@@ -23,7 +23,7 @@ use rand_chacha::ChaChaRng;
 
 use crate::commands::Clean;
 use snarkos_lite_account::Account;
-use snarkos_lite_node::bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode};
+use snarkos_lite_node::bft::helpers::{amareleo_ledger_dir, custom_ledger_dir, amareleo_storage_mode};
 use snarkos_lite_node::Validator;
 use snarkos_lite_resources::{
     BLOCK0_CANARY, BLOCK0_CANARY_ID, BLOCK0_MAINNET, BLOCK0_MAINNET_ID, BLOCK0_TESTNET,
@@ -299,7 +299,7 @@ impl Start {
 
         // Determine the ledger path
         let ledger_path = match &self.storage {
-            Some(path) => path.clone(),
+            Some(path) => custom_ledger_dir(self.network,path.clone()),
             None => amareleo_ledger_dir(self.network),
         };
 

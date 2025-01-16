@@ -55,6 +55,12 @@ pub fn amareleo_ledger_dir(network: u16) -> PathBuf {
     path
 }
 
+pub fn custom_ledger_dir(network: u16, base: PathBuf) -> PathBuf {
+    let mut path = base.clone();
+    path.push(format!(".amareleo-ledger-{}-0", network));
+    path
+}
+
 pub fn amareleo_storage_mode(network: u16, ledger_path: Option<PathBuf>) -> StorageMode {
     match ledger_path {
         Some(path) => StorageMode::Custom(path),

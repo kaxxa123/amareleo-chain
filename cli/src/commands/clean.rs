@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use snarkos_lite_node::bft::helpers::{
-    amareleo_ledger_dir, amareleo_storage_mode, proposal_cache_path,
+    amareleo_ledger_dir, amareleo_storage_mode, custom_ledger_dir, proposal_cache_path,
 };
 
 use anyhow::{bail, Result};
@@ -38,7 +38,7 @@ impl Clean {
     pub fn parse(self) -> Result<String> {
         // Determine the ledger path
         let ledger_path = match &self.path {
-            Some(path) => path.clone(),
+            Some(path) => custom_ledger_dir(self.network, path.clone()),
             None => amareleo_ledger_dir(self.network),
         };
 
