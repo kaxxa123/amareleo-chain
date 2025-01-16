@@ -62,7 +62,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
         // Initialize the signal handler.
-        let signal_node = Self::handle_signals(shutdown.clone());
+        let signal_node = Self::handle_signals(keep_state, shutdown.clone());
 
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, storage_mode.clone())?;
@@ -122,7 +122,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Handles OS signals for the node to intercept and perform a clean shutdown.
     /// The optional `shutdown_flag` flag can be used to cleanly terminate the syncing process.
-    fn handle_signals(shutdown_flag: Arc<AtomicBool>) -> Arc<OnceCell<Self>> {
+    fn handle_signals(keep_state: bool, shutdown_flag: Arc<AtomicBool>) -> Arc<OnceCell<Self>> {
         // In order for the signal handler to be started as early as possible, a reference to the node needs
         // to be passed to it at a later time.
         let node: Arc<OnceCell<Self>> = Default::default();
@@ -157,6 +157,14 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         tokio::task::spawn(async move {
             match signal_listener().await {
                 Ok(()) => {
+                    // If not presrving stte kill the process immidiately.
+                    if !keep_state {
+                        info!("================================================================");
+                        info!(" Node state preservation not required. Terminating immediately. ");
+                        info!("================================================================");
+                        std::process::exit(0);
+                    }
+
                     warn!("==========================================================================================");
                     warn!("⚠️  Attention - Starting the graceful shutdown procedure (ETA: 30 seconds)...");
                     warn!("⚠️  Attention - To avoid DATA CORRUPTION, do NOT interrupt amareleo (or press Ctrl+C again)");

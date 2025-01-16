@@ -1344,24 +1344,28 @@ impl<N: Network> Primary<N> {
         info!("Shutting down the primary...");
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
+
         // Save the current proposal cache to disk.
-        let proposal_cache = {
-            let proposal = self.proposed_batch.write().take();
-            let signed_proposals = self.signed_proposals.read().clone();
-            let latest_round = proposal
-                .as_ref()
-                .map(Proposal::round)
-                .unwrap_or(*self.propose_lock.lock().await);
-            let pending_certificates = self.storage.get_pending_certificates();
-            ProposalCache::new(
-                latest_round,
-                proposal,
-                signed_proposals,
-                pending_certificates,
-            )
-        };
-        if let Err(err) = proposal_cache.store(self.keep_state, &self.storage_mode) {
-            error!("Failed to store the current proposal cache: {err}");
+        if self.keep_state {
+            let proposal_cache = {
+                let proposal = self.proposed_batch.write().take();
+                let signed_proposals = self.signed_proposals.read().clone();
+                let latest_round = proposal
+                    .as_ref()
+                    .map(Proposal::round)
+                    .unwrap_or(*self.propose_lock.lock().await);
+                let pending_certificates = self.storage.get_pending_certificates();
+                ProposalCache::new(
+                    latest_round,
+                    proposal,
+                    signed_proposals,
+                    pending_certificates,
+                )
+            };
+
+            if let Err(err) = proposal_cache.store(self.keep_state, &self.storage_mode) {
+                error!("Failed to store the current proposal cache: {err}");
+            }
         }
     }
 }
