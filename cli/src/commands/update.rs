@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// AlexZ: Identical except for the renaming of snarkos to amareleo-chain
-
 use crate::helpers::Updater;
 
 use anyhow::Result;

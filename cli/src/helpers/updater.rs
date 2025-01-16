@@ -13,10 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//AlexZ: Identical except for renaming of:
-// Bin Name:   snarkos -> amareleo-chain
-// Repo Name:  snarkOS -> amareleo-chain
-// Repo Owner: AleoNet -> kaxxa123
 use colored::Colorize;
 use self_update::{backends::github, version::bump_is_greater, Status};
 use std::fmt::Write;

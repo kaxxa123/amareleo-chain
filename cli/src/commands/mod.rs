@@ -13,10 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// AlexZ: Identical except for the removal of code related to cli options
-//  snarkos account ...
-//  snarkos develoepr ...
-
 mod clean;
 pub use clean::*;
 

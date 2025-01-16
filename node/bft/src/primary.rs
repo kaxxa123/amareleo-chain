@@ -39,7 +39,6 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 
-// AlexZ: Needed for Validator to forge signatures.
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use snarkvm::console::account::PrivateKey;
@@ -98,8 +97,6 @@ impl<N: Network> Primary<N> {
         storage: Storage<N>,
         storage_mode: StorageMode,
         ledger: Arc<dyn LedgerService<N>>,
-        _trusted_validators: &[SocketAddr],
-        _dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the sync module.
         let sync = Sync::new(storage.clone(), ledger.clone());
@@ -1080,9 +1077,6 @@ impl<N: Network> Primary<N> {
         {
             // Ensure that the previous certificate was created at least `MIN_BATCH_DELAY_IN_MS` seconds ago.
             Some(certificate) => certificate.timestamp(),
-
-            // AlexZ: Function was handling special case for: self.account.address() == author
-            //        Short-circuited to case when this is true.
             None => *self.latest_proposed_batch_timestamp.read(),
         };
 

@@ -26,7 +26,7 @@ use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use std::{
     io,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::SocketAddr,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -70,14 +70,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone(), shutdown.clone()));
 
         // Initialize the consensus.
-        let trusted_validators: [SocketAddr; 1] = [SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            5001,
-        )];
         let mut consensus = Consensus::new(
             account.clone(),
             ledger_service.clone(),
-            &trusted_validators,
             storage_mode.clone(),
         )?;
         // Initialize the primary channels.

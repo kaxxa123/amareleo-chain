@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// AlexZ: Identical
-
 use std::io;
 use tokio::sync::mpsc;
 
@@ -28,7 +26,11 @@ pub enum LogWriter {
 impl LogWriter {
     /// Initialize a new log writer.
     pub fn new(log_sender: &Option<mpsc::Sender<Vec<u8>>>) -> Self {
-        if let Some(sender) = log_sender { Self::Sender(sender.clone()) } else { Self::Stdout(io::stdout()) }
+        if let Some(sender) = log_sender {
+            Self::Sender(sender.clone())
+        } else {
+            Self::Stdout(io::stdout())
+        }
     }
 }
 

@@ -13,10 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// AlexZ: Identical, except for:
-// - removal of `--nodisplay` parameter support assuming this is always true.
-//   doing this to shrink the code size.
-
 use crate::helpers::{DynamicFormatter, LogWriter};
 
 use crossterm::tty::IsTty;
@@ -99,22 +95,29 @@ pub fn initialize_logger<P: AsRef<Path>>(
     });
 
     // Create the directories tree for a logfile if it doesn't exist.
-    let logfile_dir = logfile.as_ref().parent().expect("Root directory passed as a logfile");
+    let logfile_dir = logfile
+        .as_ref()
+        .parent()
+        .expect("Root directory passed as a logfile");
     if !logfile_dir.exists() {
-        std::fs::create_dir_all(logfile_dir)
-            .expect("Failed to create a directories: '{logfile_dir}', please check if user has permissions");
+        std::fs::create_dir_all(logfile_dir).expect(
+            "Failed to create a directories: '{logfile_dir}', please check if user has permissions",
+        );
     }
     // Create a file to write logs to.
-    let logfile =
-        File::options().append(true).create(true).open(logfile).expect("Failed to open the file for writing logs");
+    let logfile = File::options()
+        .append(true)
+        .create(true)
+        .open(logfile)
+        .expect("Failed to open the file for writing logs");
 
     // Initialize the log channel.
-    let (_ , log_receiver) = mpsc::channel(1024);
+    let (_, log_receiver) = mpsc::channel(1024);
 
     // Initialize the log sender.
-    // AlexZ: hardcoding to None as a result of 
-    //        snarkos start --nodisplay being always true.
-    let log_sender =  None;
+    // Hardcoding to None as a result of
+    // snarkos start --nodisplay being always true.
+    let log_sender = None;
 
     // Initialize tracing.
     let _ = tracing_subscriber::registry()
@@ -162,6 +165,7 @@ pub fn welcome_message() -> String {
 "#
     .white()
     .bold();
-    output += &"👋 Welcome to Aleo! We thank you for running a node and supporting privacy.\n".bold();
+    output +=
+        &"👋 Welcome to Aleo! We thank you for running a node and supporting privacy.\n".bold();
     output
 }

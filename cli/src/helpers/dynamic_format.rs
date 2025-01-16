@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// AlexZ: Identical
-
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -43,7 +41,12 @@ where
     S: Subscriber + for<'a> LookupSpan<'a>,
     N: for<'a> FormatFields<'a> + 'static,
 {
-    fn format_event(&self, ctx: &FmtContext<'_, S, N>, writer: Writer<'_>, event: &Event<'_>) -> std::fmt::Result {
+    fn format_event(
+        &self,
+        ctx: &FmtContext<'_, S, N>,
+        writer: Writer<'_>,
+        event: &Event<'_>,
+    ) -> std::fmt::Result {
         if self.dim.load(Ordering::Relaxed) {
             self.dim_format.format_event(ctx, writer, event)
         } else {
@@ -56,7 +59,11 @@ impl DynamicFormatter {
     pub fn new(dim: Arc<AtomicBool>) -> Self {
         let dim_format = DimFormat::new();
         let default_format = tracing_subscriber::fmt::format::Format::default();
-        Self { dim_format, default_format, dim }
+        Self {
+            dim_format,
+            default_format,
+            dim,
+        }
     }
 }
 
@@ -69,9 +76,10 @@ struct DimFormat {
 /// It does support all the default fields of the default formatter.
 impl DimFormat {
     fn new() -> Self {
-        let format =
-            format_description::parse_owned::<2>("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:6]Z")
-                .expect("failed to set timestampt format");
+        let format = format_description::parse_owned::<2>(
+            "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:6]Z",
+        )
+        .expect("failed to set timestampt format");
         Self { fmt: format }
     }
 }
@@ -82,14 +90,23 @@ where
     N: for<'a> FormatFields<'a> + 'static,
 {
     /// Format like the `Full` format, but using the DIM tty style.
-    fn format_event(&self, ctx: &FmtContext<'_, S, N>, mut writer: Writer<'_>, event: &Event<'_>) -> std::fmt::Result {
+    fn format_event(
+        &self,
+        ctx: &FmtContext<'_, S, N>,
+        mut writer: Writer<'_>,
+        event: &Event<'_>,
+    ) -> std::fmt::Result {
         // set the DIM style if we are in TTY mode
         if writer.has_ansi_escapes() {
             write!(writer, "\x1b[2m")?;
         }
 
         let date_time = OffsetDateTime::now_utc();
-        write!(writer, "{}  ", date_time.format(&self.fmt).map_err(|_| std::fmt::Error)?)?;
+        write!(
+            writer,
+            "{}  ",
+            date_time.format(&self.fmt).map_err(|_| std::fmt::Error)?
+        )?;
 
         let meta = event.metadata();
         let fmt_level = match *meta.level() {

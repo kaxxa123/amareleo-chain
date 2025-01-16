@@ -43,7 +43,7 @@ use colored::Colorize;
 use indexmap::IndexMap;
 use lru::LruCache;
 use parking_lot::Mutex;
-use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc, time::Duration};
+use std::{future::Future, num::NonZeroUsize, sync::Arc, time::Duration};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
@@ -107,11 +107,8 @@ impl<N: Network> Consensus<N> {
     pub fn new(
         account: Account<N>,
         ledger: Arc<dyn LedgerService<N>>,
-        trusted_validators: &[SocketAddr],
         storage_mode: StorageMode,
     ) -> Result<Self> {
-        // Recover the development ID, if it is present.
-        let dev = Some(0u16);
         // Initialize the Narwhal transmissions.
         let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode.clone())?);
         // Initialize the Narwhal storage.
@@ -121,14 +118,7 @@ impl<N: Network> Consensus<N> {
             BatchHeader::<N>::MAX_GC_ROUNDS as u64,
         );
         // Initialize the BFT.
-        let bft = BFT::new(
-            account,
-            storage,
-            storage_mode,
-            ledger.clone(),
-            trusted_validators,
-            dev,
-        )?;
+        let bft = BFT::new(account, storage, storage_mode, ledger.clone())?;
         // Return the consensus.
         Ok(Self {
             ledger,

@@ -26,7 +26,7 @@ use anyhow::{bail, Result};
 use indexmap::IndexMap;
 use rayon::prelude::*;
 use std::{collections::HashMap, sync::Arc};
-use tokio::sync::{Mutex as TMutex, OnceCell};
+use tokio::sync::OnceCell;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -38,8 +38,6 @@ pub struct Sync<N: Network> {
     ledger: Arc<dyn LedgerService<N>>,
     /// The BFT sender.
     bft_sender: Arc<OnceCell<BFTSender<N>>>,
-    /// The sync lock.
-    sync_lock: Arc<TMutex<()>>,
     /// The boolean indicator of whether the node is synced up to the latest block (within the given tolerance).
     is_block_synced: Arc<AtomicBool>,
 }
@@ -52,7 +50,6 @@ impl<N: Network> Sync<N> {
             storage,
             ledger,
             bft_sender: Default::default(),
-            sync_lock: Default::default(),
             is_block_synced: Default::default(),
         }
     }
@@ -105,9 +102,6 @@ impl<N: Network> Sync<N> {
         let blocks = self
             .ledger
             .get_blocks(gc_height..block_height.saturating_add(1))?;
-
-        // Acquire the sync lock.
-        let _lock = self.sync_lock.lock().await;
 
         debug!(
             "Syncing storage with the ledger from block {} to {}...",
@@ -223,14 +217,5 @@ impl<N: Network> Sync<N> {
 
         // Construct the block locators.
         BlockLocators::new(recents, checkpoints)
-    }
-}
-
-impl<N: Network> Sync<N> {
-    /// Shuts down the primary.
-    pub async fn shut_down(&self) {
-        info!("Shutting down the sync module...");
-        // Acquire the sync lock.
-        let _lock = self.sync_lock.lock().await;
     }
 }
