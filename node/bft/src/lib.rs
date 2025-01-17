@@ -39,7 +39,7 @@ mod worker;
 pub use worker::*;
 
 /// The maximum number of milliseconds to wait before proposing a batch.
-pub const MAX_BATCH_DELAY_IN_MS: u64 = 2500; // ms
+pub const MAX_BATCH_DELAY_IN_MS: u64 = 2000; // ms
 /// The minimum number of seconds to wait before proposing a batch.
 pub const MIN_BATCH_DELAY_IN_SECS: u64 = 1; // seconds
 /// The maximum number of seconds allowed for the leader to send their certificate.
@@ -48,10 +48,6 @@ pub const MAX_LEADER_CERTIFICATE_DELAY_IN_SECS: i64 = 2 * MAX_BATCH_DELAY_IN_MS 
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of workers that can be spawned.
 pub const MAX_WORKERS: u8 = 1; // worker(s)
-
-/// The frequency at which each primary broadcasts a ping to every other node.
-/// Note: If this is updated, be sure to update `MAX_BLOCKS_BEHIND` to correspond properly.
-pub const PRIMARY_PING_IN_MS: u64 = 2 * MAX_BATCH_DELAY_IN_MS; // ms
 
 /// A helper macro to spawn a blocking task.
 #[macro_export]
