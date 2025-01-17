@@ -66,32 +66,32 @@ pub struct Start {
     #[clap(default_value = "1", long = "network")]
     pub network: u16,
 
-    /// Specify the IP address and port for the REST server
+    /// Specify the IP address and port for the REST server [default: 127.0.0.1:3030]
     #[clap(long = "rest")]
     pub rest: Option<SocketAddr>,
-    /// Specify the requests per second (RPS) rate limit per IP for the REST server
+    /// Specify the REST server requests per second (RPS) rate limit per IP
     #[clap(default_value = "10", long = "rest-rps")]
     pub rest_rps: u32,
 
-    /// Specify the verbosity of the node [options: 0, 1, 2, 3, 4]
+    /// Specify the verbosity level [options: 0, 1, 2, 3, 4]
     #[clap(default_value = "1", long = "verbosity")]
     pub verbosity: u8,
-    /// Specify the path to the file where logs will be stored
+    /// Specify the path to the log file
     #[clap(default_value_os_t = std::env::temp_dir().join("amareleo-chain.log"), long = "logfile")]
     pub logfile: PathBuf,
 
     /// Enables the metrics exporter
     #[clap(default_value = "false", long = "metrics")]
     pub metrics: bool,
-    /// Specify the IP address and port for the metrics exporter
+    /// Specify the IP address and port for the metrics exporter [default: 127.0.0.1:9000]
     #[clap(long = "metrics-ip")]
     pub metrics_ip: Option<SocketAddr>,
 
-    /// Specify the path to a directory containing the storage database for the ledger
+    /// Specify the path to the ledger storage directory [default: current directory]
     #[clap(long = "storage")]
     pub storage: Option<PathBuf>,
 
-    /// Specify whether the chain state of the last run should be retained, or restart from genesis.
+    /// Enables preserving the chain state across runs
     #[clap(default_value = "false", long = "keep-state")]
     pub keep_state: bool,
 }

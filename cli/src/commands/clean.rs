@@ -25,10 +25,10 @@ use std::path::PathBuf;
 /// Cleans the amareleo-chain node storage.
 #[derive(Debug, Parser)]
 pub struct Clean {
-    /// Specify the network to remove from storage.
+    /// Specify the network ID to remove from storage
     #[clap(default_value = "1", long = "network")]
     pub network: u16,
-    /// Specify the path to a directory containing the ledger
+    /// Specify the path to the ledger storage directory [default: current directory]
     #[clap(long = "path")]
     pub path: Option<PathBuf>,
 }
