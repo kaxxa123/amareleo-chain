@@ -22,7 +22,7 @@ use clap::Parser;
 use colored::Colorize;
 use std::path::PathBuf;
 
-/// Cleans the snarkOS node storage.
+/// Cleans the amareleo-chain node storage.
 #[derive(Debug, Parser)]
 pub struct Clean {
     /// Specify the network to remove from storage.
@@ -34,7 +34,7 @@ pub struct Clean {
 }
 
 impl Clean {
-    /// Cleans the snarkOS node storage.
+    /// Cleans the amareleo-chain node storage.
     pub fn parse(&self) -> Result<String> {
         let mut res = self.remove_all(false);
 
