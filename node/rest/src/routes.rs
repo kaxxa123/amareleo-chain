@@ -16,7 +16,7 @@
 use super::*;
 use snarkvm::{
     ledger::puzzle::Solution,
-    prelude::{block::Transaction, Address, Identifier, LimitedWriter, Plaintext, ToBytes},
+    prelude::{Address, Identifier, LimitedWriter, Plaintext, ToBytes, block::Transaction},
 };
 
 use indexmap::IndexMap;
@@ -67,11 +67,9 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         let block = if let Ok(height) = height_or_hash.parse::<u32>() {
             rest.ledger.get_block(height)?
         } else {
-            let hash = height_or_hash.parse::<N::BlockHash>().map_err(|_| {
-                RestError(
-                    "invalid input, it is neither a block height nor a block hash".to_string(),
-                )
-            })?;
+            let hash = height_or_hash
+                .parse::<N::BlockHash>()
+                .map_err(|_| RestError("invalid input, it is neither a block height nor a block hash".to_string()))?;
 
             rest.ledger.get_block_by_hash(&hash)?
         };
@@ -114,9 +112,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         // Fetch the blocks from ledger and serialize to json.
         match tokio::task::spawn_blocking(get_json_blocks).await {
             Ok(json) => json,
-            Err(err) => Err(RestError(format!(
-                "Failed to get blocks '{start_height}..{end_height}' - {err}"
-            ))),
+            Err(err) => Err(RestError(format!("Failed to get blocks '{start_height}..{end_height}' - {err}"))),
         }
     }
 
@@ -149,56 +145,32 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         State(rest): State<Self>,
         Path(tx_id): Path<N::TransactionID>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(
-            rest.ledger.get_confirmed_transaction(tx_id)?,
-        ))
+        Ok(ErasedJson::pretty(rest.ledger.get_confirmed_transaction(tx_id)?))
     }
 
     // GET /<network>/memoryPool/transmissions
-    pub(crate) async fn get_memory_pool_transmissions(
-        State(rest): State<Self>,
-    ) -> Result<ErasedJson, RestError> {
+    pub(crate) async fn get_memory_pool_transmissions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
-            Some(consensus) => Ok(ErasedJson::pretty(
-                consensus
-                    .unconfirmed_transmissions()
-                    .collect::<IndexMap<_, _>>(),
-            )),
-            None => Err(RestError(
-                "Route isn't available for this node type".to_string(),
-            )),
+            Some(consensus) => {
+                Ok(ErasedJson::pretty(consensus.unconfirmed_transmissions().collect::<IndexMap<_, _>>()))
+            }
+            None => Err(RestError("Route isn't available for this node type".to_string())),
         }
     }
 
     // GET /<network>/memoryPool/solutions
-    pub(crate) async fn get_memory_pool_solutions(
-        State(rest): State<Self>,
-    ) -> Result<ErasedJson, RestError> {
+    pub(crate) async fn get_memory_pool_solutions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
-            Some(consensus) => Ok(ErasedJson::pretty(
-                consensus
-                    .unconfirmed_solutions()
-                    .collect::<IndexMap<_, _>>(),
-            )),
-            None => Err(RestError(
-                "Route isn't available for this node type".to_string(),
-            )),
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_solutions().collect::<IndexMap<_, _>>())),
+            None => Err(RestError("Route isn't available for this node type".to_string())),
         }
     }
 
     // GET /<network>/memoryPool/transactions
-    pub(crate) async fn get_memory_pool_transactions(
-        State(rest): State<Self>,
-    ) -> Result<ErasedJson, RestError> {
+    pub(crate) async fn get_memory_pool_transactions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
-            Some(consensus) => Ok(ErasedJson::pretty(
-                consensus
-                    .unconfirmed_transactions()
-                    .collect::<IndexMap<_, _>>(),
-            )),
-            None => Err(RestError(
-                "Route isn't available for this node type".to_string(),
-            )),
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_transactions().collect::<IndexMap<_, _>>())),
+            None => Err(RestError("Route isn't available for this node type".to_string())),
         }
     }
 
@@ -215,12 +187,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         State(rest): State<Self>,
         Path(id): Path<ProgramID<N>>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(
-            rest.ledger
-                .vm()
-                .finalize_store()
-                .get_mapping_names_confirmed(&id)?,
-        ))
+        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_mapping_names_confirmed(&id)?))
     }
 
     // GET /<network>/program/{programID}/mapping/{mappingName}/{mappingKey}
@@ -231,11 +198,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         metadata: Query<Metadata>,
     ) -> Result<ErasedJson, RestError> {
         // Retrieve the mapping value.
-        let mapping_value = rest
-            .ledger
-            .vm()
-            .finalize_store()
-            .get_value_confirmed(id, name, &key)?;
+        let mapping_value = rest.ledger.vm().finalize_store().get_value_confirmed(id, name, &key)?;
 
         // Check if metadata is requested and return the value with metadata if so.
         if metadata.metadata.unwrap_or(false) {
@@ -257,22 +220,15 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     ) -> Result<ErasedJson, RestError> {
         // Return an error if the `all` query parameter is not set to `true`.
         if metadata.all != Some(true) {
-            return Err(RestError(
-                "Invalid query parameter. At this time, 'all=true' must be included".to_string(),
-            ));
+            return Err(RestError("Invalid query parameter. At this time, 'all=true' must be included".to_string()));
         }
 
         // Retrieve the latest height.
         let height = rest.ledger.latest_height();
 
         // Retrieve all the mapping values from the mapping.
-        match tokio::task::spawn_blocking(move || {
-            rest.ledger
-                .vm()
-                .finalize_store()
-                .get_mapping_confirmed(id, name)
-        })
-        .await
+        match tokio::task::spawn_blocking(move || rest.ledger.vm().finalize_store().get_mapping_confirmed(id, name))
+            .await
         {
             Ok(Ok(mapping_values)) => {
                 // Check if metadata is requested and return the mapping with metadata if so.
@@ -296,9 +252,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         State(rest): State<Self>,
         Path(commitment): Path<Field<N>>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(
-            rest.ledger.get_state_path_for_commitment(&commitment)?,
-        ))
+        Ok(ErasedJson::pretty(rest.ledger.get_state_path_for_commitment(&commitment)?))
     }
 
     // GET /<network>/stateRoot/latest
@@ -315,9 +269,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     }
 
     // GET /<network>/committee/latest
-    pub(crate) async fn get_committee_latest(
-        State(rest): State<Self>,
-    ) -> Result<ErasedJson, RestError> {
+    pub(crate) async fn get_committee_latest(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.latest_committee()?))
     }
 
@@ -335,11 +287,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         Path(validator): Path<Address<N>>,
     ) -> Result<ErasedJson, RestError> {
         // Return the delegators for the given validator.
-        match tokio::task::spawn_blocking(move || {
-            rest.ledger.get_delegators_for_validator(&validator)
-        })
-        .await
-        {
+        match tokio::task::spawn_blocking(move || rest.ledger.get_delegators_for_validator(&validator)).await {
             Ok(Ok(delegators)) => Ok(ErasedJson::pretty(delegators)),
             Ok(Err(err)) => Err(RestError(format!("Unable to request delegators - {err}"))),
             Err(err) => Err(RestError(format!("Unable to request delegators - {err}"))),
@@ -379,9 +327,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         State(rest): State<Self>,
         Path(state_root): Path<N::StateRoot>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(
-            rest.ledger.find_block_height_from_state_root(state_root)?,
-        ))
+        Ok(ErasedJson::pretty(rest.ledger.find_block_height_from_state_root(state_root)?))
     }
 
     // GET /<network>/find/transactionID/deployment/{programID}
@@ -389,10 +335,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         State(rest): State<Self>,
         Path(program_id): Path<ProgramID<N>>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(
-            rest.ledger
-                .find_transaction_id_from_program_id(&program_id)?,
-        ))
+        Ok(ErasedJson::pretty(rest.ledger.find_transaction_id_from_program_id(&program_id)?))
     }
 
     // GET /<network>/find/transactionID/{transitionID}
@@ -400,10 +343,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         State(rest): State<Self>,
         Path(transition_id): Path<N::TransitionID>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(
-            rest.ledger
-                .find_transaction_id_from_transition_id(&transition_id)?,
-        ))
+        Ok(ErasedJson::pretty(rest.ledger.find_transaction_id_from_transition_id(&transition_id)?))
     }
 
     // GET /<network>/find/transitionID/{inputOrOutputID}
@@ -411,9 +351,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         State(rest): State<Self>,
         Path(input_or_output_id): Path<Field<N>>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(
-            rest.ledger.find_transition_id(&input_or_output_id)?,
-        ))
+        Ok(ErasedJson::pretty(rest.ledger.find_transition_id(&input_or_output_id)?))
     }
 
     // POST /<network>/transaction/broadcast
@@ -426,13 +364,8 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         // most transactions will be smaller and this reduces unnecessary allocations.
         // TODO: Should this be a blocking task?
         let buffer = Vec::with_capacity(3000);
-        if tx
-            .write_le(LimitedWriter::new(buffer, N::MAX_TRANSACTION_SIZE))
-            .is_err()
-        {
-            return Err(RestError(
-                "Transaction size exceeds the byte limit".to_string(),
-            ));
+        if tx.write_le(LimitedWriter::new(buffer, N::MAX_TRANSACTION_SIZE)).is_err() {
+            return Err(RestError("Transaction size exceeds the byte limit".to_string()));
         }
 
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
@@ -463,24 +396,14 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                 // Ensure that the solution is valid for the given epoch.
                 let puzzle = rest.ledger.puzzle().clone();
                 // Verify the solution in a blocking task.
-                match tokio::task::spawn_blocking(move || {
-                    puzzle.check_solution(&solution, epoch_hash, proof_target)
-                })
-                .await
+                match tokio::task::spawn_blocking(move || puzzle.check_solution(&solution, epoch_hash, proof_target))
+                    .await
                 {
                     Ok(Ok(())) => {}
                     Ok(Err(err)) => {
-                        return Err(RestError(format!(
-                            "Invalid solution '{}' - {err}",
-                            fmt_id(solution.id())
-                        )));
+                        return Err(RestError(format!("Invalid solution '{}' - {err}", fmt_id(solution.id()))));
                     }
-                    Err(err) => {
-                        return Err(RestError(format!(
-                            "Invalid solution '{}' - {err}",
-                            fmt_id(solution.id())
-                        )))
-                    }
+                    Err(err) => return Err(RestError(format!("Invalid solution '{}' - {err}", fmt_id(solution.id())))),
                 }
             }
         }
@@ -495,15 +418,10 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         Path((height, mapping)): Path<(u32, snarkvm::synthesizer::MappingName)>,
     ) -> Result<impl axum::response::IntoResponse, RestError> {
         // Retrieve the history for the given block height and variant.
-        let history = snarkvm::synthesizer::History::new(
-            N::ID,
-            rest.ledger.vm().finalize_store().storage_mode(),
-        );
-        let result = history.load_mapping(height, mapping).map_err(|_| {
-            RestError(format!(
-                "Could not load mapping '{mapping}' from block '{height}'"
-            ))
-        })?;
+        let history = snarkvm::synthesizer::History::new(N::ID, rest.ledger.vm().finalize_store().storage_mode());
+        let result = history
+            .load_mapping(height, mapping)
+            .map_err(|_| RestError(format!("Could not load mapping '{mapping}' from block '{height}'")))?;
 
         Ok((StatusCode::OK, [(CONTENT_TYPE, "application/json")], result))
     }

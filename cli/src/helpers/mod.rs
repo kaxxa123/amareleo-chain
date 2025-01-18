@@ -24,4 +24,3 @@ pub use logger::*;
 
 pub mod updater;
 pub use updater::*;
-

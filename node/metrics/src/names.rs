@@ -13,10 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub(super) const COUNTER_NAMES: [&str; 2] = [
-    bft::LEADERS_ELECTED,
-    consensus::STALE_UNCONFIRMED_TRANSMISSIONS,
-];
+pub(super) const COUNTER_NAMES: [&str; 2] = [bft::LEADERS_ELECTED, consensus::STALE_UNCONFIRMED_TRANSMISSIONS];
 
 pub(super) const GAUGE_NAMES: [&str; 26] = [
     bft::CONNECTED,
@@ -47,11 +44,8 @@ pub(super) const GAUGE_NAMES: [&str; 26] = [
     tcp::TCP_TASKS,
 ];
 
-pub(super) const HISTOGRAM_NAMES: [&str; 3] = [
-    bft::COMMIT_ROUNDS_LATENCY,
-    consensus::CERTIFICATE_COMMIT_LATENCY,
-    consensus::BLOCK_LATENCY,
-];
+pub(super) const HISTOGRAM_NAMES: [&str; 3] =
+    [bft::COMMIT_ROUNDS_LATENCY, consensus::CERTIFICATE_COMMIT_LATENCY, consensus::BLOCK_LATENCY];
 
 pub mod bft {
     pub const COMMIT_ROUNDS_LATENCY: &str = "amareleo_bft_commit_rounds_latency_secs"; // <-- This one doesn't even make sense.
@@ -81,15 +75,13 @@ pub mod blocks {
 }
 
 pub mod consensus {
-    pub const CERTIFICATE_COMMIT_LATENCY: &str =
-        "amareleo_consensus_certificate_commit_latency_secs";
+    pub const CERTIFICATE_COMMIT_LATENCY: &str = "amareleo_consensus_certificate_commit_latency_secs";
     pub const COMMITTED_CERTIFICATES: &str = "amareleo_consensus_committed_certificates_total";
     pub const BLOCK_LATENCY: &str = "amareleo_consensus_block_latency_secs";
     pub const UNCONFIRMED_TRANSACTIONS: &str = "amareleo_consensus_unconfirmed_transactions_total";
     pub const UNCONFIRMED_SOLUTIONS: &str = "amareleo_consensus_unconfirmed_solutions_total";
     pub const TRANSMISSION_LATENCY: &str = "amareleo_consensus_transmission_latency";
-    pub const STALE_UNCONFIRMED_TRANSMISSIONS: &str =
-        "amareleo_consensus_stale_unconfirmed_transmissions";
+    pub const STALE_UNCONFIRMED_TRANSMISSIONS: &str = "amareleo_consensus_stale_unconfirmed_transmissions";
 }
 
 pub mod router {

@@ -38,9 +38,7 @@ impl Update {
         match self.list {
             true => match Updater::show_available_releases() {
                 Ok(output) => Ok(output),
-                Err(error) => Ok(format!(
-                    "Failed to list the available versions of amareleo-chain\n{error}\n"
-                )),
+                Err(error) => Ok(format!("Failed to list the available versions of amareleo-chain\n{error}\n")),
             },
             false => {
                 let result = Updater::update_to_release(!self.quiet, self.version);
@@ -50,17 +48,12 @@ impl Update {
                             if status.uptodate() {
                                 Ok("\namareleo-chain is already on the latest version".to_string())
                             } else if status.updated() {
-                                Ok(format!(
-                                    "\namareleo-chain has updated to version {}",
-                                    status.version()
-                                ))
+                                Ok(format!("\namareleo-chain has updated to version {}", status.version()))
                             } else {
                                 Ok(String::new())
                             }
                         }
-                        Err(e) => Ok(format!(
-                            "\nFailed to update amareleo-chain to the latest version\n{e}\n"
-                        )),
+                        Err(e) => Ok(format!("\nFailed to update amareleo-chain to the latest version\n{e}\n")),
                     }
                 } else {
                     Ok(String::new())

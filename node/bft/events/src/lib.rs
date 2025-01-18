@@ -68,7 +68,7 @@ pub use worker_ping::WorkerPing;
 
 use snarkos_lite_node_sync_locators::BlockLocators;
 use snarkvm::{
-    console::prelude::{error, FromBytes, Network, Read, ToBytes, Write},
+    console::prelude::{FromBytes, Network, Read, ToBytes, Write, error},
     ledger::{
         block::Block,
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
@@ -76,7 +76,7 @@ use snarkvm::{
     prelude::{Address, Field, Signature},
 };
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 pub use std::io::{self, Result as IoResult};
@@ -240,9 +240,7 @@ mod tests {
         let invalid_id = u16::MAX;
         invalid_id.write_le(&mut buf.clone().writer()).unwrap();
         assert_eq!(
-            Event::<CurrentNetwork>::read_le(buf.reader())
-                .unwrap_err()
-                .to_string(),
+            Event::<CurrentNetwork>::read_le(buf.reader()).unwrap_err().to_string(),
             format!("Unknown event ID")
         );
     }
@@ -251,6 +249,9 @@ mod tests {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
+        Disconnect,
+        DisconnectReason,
+        Event,
         batch_certified::prop_tests::any_batch_certified,
         batch_propose::prop_tests::any_batch_propose,
         batch_signature::prop_tests::any_batch_signature,
@@ -260,7 +261,7 @@ pub mod prop_tests {
         challenge_response::prop_tests::any_challenge_response,
         transmission_request::prop_tests::any_transmission_request,
         transmission_response::prop_tests::any_transmission_response,
-        worker_ping::prop_tests::any_worker_ping, Disconnect, DisconnectReason, Event,
+        worker_ping::prop_tests::any_worker_ping,
     };
     use snarkvm::{
         console::{network::Network, types::Field},
@@ -269,7 +270,7 @@ pub mod prop_tests {
     };
 
     use proptest::{
-        prelude::{any, BoxedStrategy, Just, Strategy},
+        prelude::{BoxedStrategy, Just, Strategy, any},
         prop_oneof,
         sample::Selector,
     };
@@ -283,34 +284,24 @@ pub mod prop_tests {
     }
 
     pub fn any_solution_id() -> BoxedStrategy<SolutionID<CurrentNetwork>> {
-        Just(0)
-            .prop_perturb(|_, mut rng| rng.gen::<u64>().into())
-            .boxed()
+        Just(0).prop_perturb(|_, mut rng| rng.gen::<u64>().into()).boxed()
     }
 
     pub fn any_transaction_id() -> BoxedStrategy<<CurrentNetwork as Network>::TransactionID> {
         Just(0)
-            .prop_perturb(|_, mut rng| {
-                <CurrentNetwork as Network>::TransactionID::from(Field::rand(&mut rng))
-            })
+            .prop_perturb(|_, mut rng| <CurrentNetwork as Network>::TransactionID::from(Field::rand(&mut rng)))
             .boxed()
     }
 
-    pub fn any_transmission_checksum(
-    ) -> BoxedStrategy<<CurrentNetwork as Network>::TransmissionChecksum> {
-        Just(0)
-            .prop_perturb(|_, mut rng| {
-                rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>()
-            })
-            .boxed()
+    pub fn any_transmission_checksum() -> BoxedStrategy<<CurrentNetwork as Network>::TransmissionChecksum> {
+        Just(0).prop_perturb(|_, mut rng| rng.gen::<<CurrentNetwork as Network>::TransmissionChecksum>()).boxed()
     }
 
     pub fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
         prop_oneof![
             (any_transaction_id(), any_transmission_checksum())
                 .prop_map(|(id, cs)| TransmissionID::Transaction(id, cs)),
-            (any_solution_id(), any_transmission_checksum())
-                .prop_map(|(id, cs)| TransmissionID::Solution(id, cs)),
+            (any_solution_id(), any_transmission_checksum()).prop_map(|(id, cs)| TransmissionID::Solution(id, cs)),
         ]
         .boxed()
     }
@@ -333,9 +324,7 @@ pub mod prop_tests {
                 ]),
                 any::<Selector>()
             )
-                .prop_map(|(reasons, selector)| Event::Disconnect(Disconnect::from(
-                    selector.select(reasons)
-                ))),
+                .prop_map(|(reasons, selector)| Event::Disconnect(Disconnect::from(selector.select(reasons)))),
             any_transmission_request().prop_map(Event::TransmissionRequest),
             any_transmission_response().prop_map(Event::TransmissionResponse),
             any_worker_ping().prop_map(Event::WorkerPing)

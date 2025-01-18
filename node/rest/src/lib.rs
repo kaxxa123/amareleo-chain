@@ -26,25 +26,25 @@ mod routes;
 use snarkos_lite_node_consensus::Consensus;
 use snarkvm::{
     console::{program::ProgramID, types::Field},
-    prelude::{cfg_into_iter, store::ConsensusStorage, Ledger, Network},
+    prelude::{Ledger, Network, cfg_into_iter, store::ConsensusStorage},
 };
 
 use anyhow::Result;
 use axum::{
+    Json,
     body::Body,
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
-    http::{header::CONTENT_TYPE, Method, Request, StatusCode},
+    http::{Method, Request, StatusCode, header::CONTENT_TYPE},
     middleware,
     middleware::Next,
     response::Response,
     routing::{get, post},
-    Json,
 };
 use axum_extra::response::ErasedJson;
 use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, task::JoinHandle};
-use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
+use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
@@ -70,11 +70,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
         ledger: Ledger<N, C>,
     ) -> Result<Self> {
         // Initialize the server.
-        let mut server = Self {
-            consensus,
-            ledger,
-            handles: Default::default(),
-        };
+        let mut server = Self { consensus, ledger, handles: Default::default() };
         // Spawn the server.
         server.spawn_server(rest_ip, rest_rps).await;
         // Return the server.
@@ -270,10 +266,8 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
 
             // If the `history` feature is enabled, enable the additional endpoint.
             #[cfg(feature = "history")]
-            let routes = routes.route(
-                &format!("/{network}/block/:blockHeight/history/:mapping"),
-                get(Self::get_history),
-            );
+            let routes =
+                routes.route(&format!("/{network}/block/:blockHeight/history/:mapping"), get(Self::get_history));
 
             routes
                 // Pass in `Rest` to make things convenient.
@@ -294,12 +288,9 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
 
         let rest_listener = TcpListener::bind(rest_ip).await.unwrap();
         self.handles.lock().push(tokio::spawn(async move {
-            axum::serve(
-                rest_listener,
-                router.into_make_service_with_connect_info::<SocketAddr>(),
-            )
-            .await
-            .expect("couldn't start rest server");
+            axum::serve(rest_listener, router.into_make_service_with_connect_info::<SocketAddr>())
+                .await
+                .expect("couldn't start rest server");
         }))
     }
 }
@@ -309,11 +300,7 @@ async fn log_middleware(
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    info!(
-        "Received '{} {}' from '{addr}'",
-        request.method(),
-        request.uri()
-    );
+    info!("Received '{} {}' from '{addr}'", request.method(), request.uri());
 
     Ok(next.run(request).await)
 }

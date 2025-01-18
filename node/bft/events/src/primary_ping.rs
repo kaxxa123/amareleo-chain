@@ -29,23 +29,13 @@ impl<N: Network> PrimaryPing<N> {
         block_locators: BlockLocators<N>,
         primary_certificate: Data<BatchCertificate<N>>,
     ) -> Self {
-        Self {
-            version,
-            block_locators,
-            primary_certificate,
-        }
+        Self { version, block_locators, primary_certificate }
     }
 }
 
 impl<N: Network> From<(u32, BlockLocators<N>, BatchCertificate<N>)> for PrimaryPing<N> {
     /// Initializes a new ping event.
-    fn from(
-        (version, block_locators, primary_certificate): (
-            u32,
-            BlockLocators<N>,
-            BatchCertificate<N>,
-        ),
-    ) -> Self {
+    fn from((version, block_locators, primary_certificate): (u32, BlockLocators<N>, BatchCertificate<N>)) -> Self {
         Self::new(version, block_locators, Data::Object(primary_certificate))
     }
 }
@@ -87,12 +77,12 @@ impl<N: Network> FromBytes for PrimaryPing<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{certificate_response::prop_tests::any_batch_certificate, PrimaryPing};
-    use snarkos_lite_node_sync_locators::{test_helpers::sample_block_locators, BlockLocators};
+    use crate::{PrimaryPing, certificate_response::prop_tests::any_batch_certificate};
+    use snarkos_lite_node_sync_locators::{BlockLocators, test_helpers::sample_block_locators};
     use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use proptest::prelude::{BoxedStrategy, Strategy, any};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
@@ -110,20 +100,14 @@ pub mod prop_tests {
     }
 
     #[proptest]
-    fn primary_ping_roundtrip(
-        #[strategy(any_primary_ping())] primary_ping: PrimaryPing<CurrentNetwork>,
-    ) {
+    fn primary_ping_roundtrip(#[strategy(any_primary_ping())] primary_ping: PrimaryPing<CurrentNetwork>) {
         let mut bytes = BytesMut::default().writer();
         primary_ping.write_le(&mut bytes).unwrap();
-        let decoded =
-            PrimaryPing::<CurrentNetwork>::read_le(&mut bytes.into_inner().reader()).unwrap();
+        let decoded = PrimaryPing::<CurrentNetwork>::read_le(&mut bytes.into_inner().reader()).unwrap();
         assert_eq!(primary_ping.version, decoded.version);
         assert_eq!(primary_ping.block_locators, decoded.block_locators);
         assert_eq!(
-            primary_ping
-                .primary_certificate
-                .deserialize_blocking()
-                .unwrap(),
+            primary_ping.primary_certificate.deserialize_blocking().unwrap(),
             decoded.primary_certificate.deserialize_blocking().unwrap(),
         );
     }

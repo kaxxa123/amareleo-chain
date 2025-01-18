@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use clap::Parser;
 use colored::Colorize;
 use core::str::FromStr;
@@ -23,10 +23,16 @@ use rand_chacha::ChaChaRng;
 
 use crate::commands::Clean;
 use snarkos_lite_account::Account;
-use snarkos_lite_node::bft::helpers::{amareleo_ledger_dir, custom_ledger_dir, amareleo_storage_mode};
-use snarkos_lite_node::Validator;
+use snarkos_lite_node::{
+    Validator,
+    bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode, custom_ledger_dir},
+};
 use snarkos_lite_resources::{
-    BLOCK0_CANARY, BLOCK0_CANARY_ID, BLOCK0_MAINNET, BLOCK0_MAINNET_ID, BLOCK0_TESTNET,
+    BLOCK0_CANARY,
+    BLOCK0_CANARY_ID,
+    BLOCK0_MAINNET,
+    BLOCK0_MAINNET_ID,
+    BLOCK0_TESTNET,
     BLOCK0_TESTNET_ID,
 };
 
@@ -39,7 +45,7 @@ use snarkvm::{
     ledger::{
         block::Block,
         committee::{Committee, MIN_VALIDATOR_STAKE},
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
     prelude::{FromBytes, ToBits, ToBytes, store::helpers::rocksdb::ConsensusDB},
     synthesizer::VM,
@@ -50,7 +56,7 @@ use std::result::Result::Ok;
 use std::{
     net::SocketAddr,
     path::PathBuf,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 use tokio::runtime::{self, Runtime};
 
@@ -112,21 +118,15 @@ impl Start {
             match cli.network {
                 MainnetV0::ID => {
                     // Parse the node from the configurations.
-                    cli.parse_node::<MainnetV0>(shutdown.clone())
-                        .await
-                        .expect("Failed to parse the node");
+                    cli.parse_node::<MainnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
                 }
                 TestnetV0::ID => {
                     // Parse the node from the configurations.
-                    cli.parse_node::<TestnetV0>(shutdown.clone())
-                        .await
-                        .expect("Failed to parse the node");
+                    cli.parse_node::<TestnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
                 }
                 CanaryV0::ID => {
                     // Parse the node from the configurations.
-                    cli.parse_node::<CanaryV0>(shutdown.clone())
-                        .await
-                        .expect("Failed to parse the node");
+                    cli.parse_node::<CanaryV0>(shutdown.clone()).await.expect("Failed to parse the node");
                 }
                 _ => panic!("Invalid network ID specified"),
             };
@@ -148,10 +148,7 @@ impl Start {
             let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
 
             let private_key = PrivateKey::<N>::new(&mut rng)?;
-            println!(
-                "🔑 Your development private key for node 0 is {}.\n",
-                private_key.to_string().bold()
-            );
+            println!("🔑 Your development private key for node 0 is {}.\n", private_key.to_string().bold());
             private_key
         })
     }
@@ -177,20 +174,15 @@ impl Start {
             .map(|_| PrivateKey::<N>::new(&mut rng))
             .collect::<Result<Vec<_>>>()?;
         // Initialize the development addresses.
-        let development_addresses = development_private_keys
-            .iter()
-            .map(Address::<N>::try_from)
-            .collect::<Result<Vec<_>>>()?;
+        let development_addresses =
+            development_private_keys.iter().map(Address::<N>::try_from).collect::<Result<Vec<_>>>()?;
 
         let (committee, bonded_balances) = {
             // Calculate the committee stake per member.
             let stake_per_member = N::STARTING_SUPPLY
                 .saturating_div(2)
                 .saturating_div(DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64);
-            ensure!(
-                stake_per_member >= MIN_VALIDATOR_STAKE,
-                "Committee stake per member is too low"
-            );
+            ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
 
             // Construct the committee members and distribute stakes evenly among committee members.
             let members = development_addresses
@@ -225,18 +217,12 @@ impl Start {
         // Construct the public balances with fairly equal distribution.
         let mut public_balances = development_private_keys
             .iter()
-            .map(|private_key| {
-                Ok((
-                    Address::try_from(private_key)?,
-                    public_balance_per_validator,
-                ))
-            })
+            .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
             .collect::<Result<indexmap::IndexMap<_, _>>>()?;
 
         // If there is some leftover balance, add it to the 0-th validator.
-        let leftover = remaining_balance.saturating_sub(
-            public_balance_per_validator * DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64,
-        );
+        let leftover = remaining_balance
+            .saturating_sub(public_balance_per_validator * DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64);
         if leftover > 0 {
             let (_, balance) = public_balances.get_index_mut(0).unwrap();
             *balance += leftover;
@@ -245,19 +231,11 @@ impl Start {
         // Check if the sum of committee stakes and public balances equals the total starting supply.
         let public_balances_sum: u64 = public_balances.values().copied().sum();
         if committee.total_stake() + public_balances_sum != N::STARTING_SUPPLY {
-            bail!(
-                "Sum of committee stakes and public balances does not equal total starting supply."
-            );
+            bail!("Sum of committee stakes and public balances does not equal total starting supply.");
         }
 
         // Construct the genesis block.
-        load_or_compute_genesis(
-            development_private_keys[0],
-            committee,
-            public_balances,
-            bonded_balances,
-            &mut rng,
-        )
+        load_or_compute_genesis(development_private_keys[0], committee, public_balances, bonded_balances, &mut rng)
     }
 
     /// Returns the node type corresponding to the given configurations.
@@ -312,11 +290,9 @@ impl Start {
 
         // Initialize the storage mode.
         let storage_mode = amareleo_storage_mode(self.network, self.keep_state, Some(ledger_path));
-
+        let validator = Validator::new(rest_ip, self.rest_rps, account, genesis, self.keep_state, storage_mode, shutdown.clone()).await?;
         // Initialize the node.
-        Ok(Arc::new(
-            Validator::new(rest_ip, self.rest_rps, account, genesis, self.keep_state, storage_mode, shutdown.clone()).await?,
-        ))      
+        Ok(Arc::new(validator))
     }
 
     /// Returns a runtime for the node.
@@ -371,40 +347,26 @@ fn load_or_compute_genesis<N: Network>(
     // Input the genesis private key, committee, and public balances.
     preimage.extend(genesis_private_key.to_bytes_le()?);
     preimage.extend(committee.to_bytes_le()?);
-    preimage.extend(&to_bytes_le![public_balances
-        .iter()
-        .collect::<Vec<(_, _)>>()]?);
-    preimage.extend(&to_bytes_le![bonded_balances
-        .iter()
-        .flat_map(|(staker, (validator, withdrawal, amount))| to_bytes_le![
-            staker, validator, withdrawal, amount
-        ])
-        .collect::<Vec<_>>()]?);
+    preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
+    preimage.extend(&to_bytes_le![
+        bonded_balances
+            .iter()
+            .flat_map(|(staker, (validator, withdrawal, amount))| to_bytes_le![staker, validator, withdrawal, amount])
+            .collect::<Vec<_>>()
+    ]?);
 
     // Input the parameters' metadata based on network
     match N::ID {
         snarkvm::console::network::MainnetV0::ID => {
-            preimage
-                .extend(snarkvm::parameters::mainnet::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::BondValidatorVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
-            preimage
-                .extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(
-                snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes(),
-            );
-            preimage.extend(
-                snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes(),
-            );
-            preimage
-                .extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
-            preimage
-                .extend(snarkvm::parameters::mainnet::TransferPublicVerifier::METADATA.as_bytes());
-            preimage.extend(
-                snarkvm::parameters::mainnet::TransferPrivateToPublicVerifier::METADATA.as_bytes(),
-            );
-            preimage.extend(
-                snarkvm::parameters::mainnet::TransferPublicToPrivateVerifier::METADATA.as_bytes(),
-            );
+            preimage.extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::mainnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::mainnet::FeePrivateVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::mainnet::FeePublicVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::mainnet::InclusionVerifier::METADATA.as_bytes());
@@ -412,27 +374,15 @@ fn load_or_compute_genesis<N: Network>(
             raw_blockid = BLOCK0_MAINNET_ID;
         }
         snarkvm::console::network::TestnetV0::ID => {
-            preimage
-                .extend(snarkvm::parameters::testnet::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::BondValidatorVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::testnet::BondPublicVerifier::METADATA.as_bytes());
-            preimage
-                .extend(snarkvm::parameters::testnet::UnbondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(
-                snarkvm::parameters::testnet::ClaimUnbondPublicVerifier::METADATA.as_bytes(),
-            );
-            preimage.extend(
-                snarkvm::parameters::testnet::SetValidatorStateVerifier::METADATA.as_bytes(),
-            );
-            preimage
-                .extend(snarkvm::parameters::testnet::TransferPrivateVerifier::METADATA.as_bytes());
-            preimage
-                .extend(snarkvm::parameters::testnet::TransferPublicVerifier::METADATA.as_bytes());
-            preimage.extend(
-                snarkvm::parameters::testnet::TransferPrivateToPublicVerifier::METADATA.as_bytes(),
-            );
-            preimage.extend(
-                snarkvm::parameters::testnet::TransferPublicToPrivateVerifier::METADATA.as_bytes(),
-            );
+            preimage.extend(snarkvm::parameters::testnet::UnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::SetValidatorStateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::testnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::testnet::FeePrivateVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::testnet::FeePublicVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::testnet::InclusionVerifier::METADATA.as_bytes());
@@ -440,26 +390,15 @@ fn load_or_compute_genesis<N: Network>(
             raw_blockid = BLOCK0_TESTNET_ID;
         }
         snarkvm::console::network::CanaryV0::ID => {
-            preimage
-                .extend(snarkvm::parameters::canary::BondValidatorVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::BondValidatorVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::canary::BondPublicVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::canary::UnbondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(
-                snarkvm::parameters::canary::ClaimUnbondPublicVerifier::METADATA.as_bytes(),
-            );
-            preimage.extend(
-                snarkvm::parameters::canary::SetValidatorStateVerifier::METADATA.as_bytes(),
-            );
-            preimage
-                .extend(snarkvm::parameters::canary::TransferPrivateVerifier::METADATA.as_bytes());
-            preimage
-                .extend(snarkvm::parameters::canary::TransferPublicVerifier::METADATA.as_bytes());
-            preimage.extend(
-                snarkvm::parameters::canary::TransferPrivateToPublicVerifier::METADATA.as_bytes(),
-            );
-            preimage.extend(
-                snarkvm::parameters::canary::TransferPublicToPrivateVerifier::METADATA.as_bytes(),
-            );
+            preimage.extend(snarkvm::parameters::canary::ClaimUnbondPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::SetValidatorStateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPrivateVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPrivateToPublicVerifier::METADATA.as_bytes());
+            preimage.extend(snarkvm::parameters::canary::TransferPublicToPrivateVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::canary::FeePrivateVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::canary::FeePublicVerifier::METADATA.as_bytes());
             preimage.extend(snarkvm::parameters::canary::InclusionVerifier::METADATA.as_bytes());
@@ -509,13 +448,7 @@ fn load_or_compute_genesis<N: Network>(
     // Initialize a new VM.
     let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(0u16)?)?;
     // Initialize the genesis block.
-    let block = vm.genesis_quorum(
-        &genesis_private_key,
-        committee,
-        public_balances,
-        bonded_balances,
-        rng,
-    )?;
+    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng)?;
     // Write the genesis block to the file.
     std::fs::write(&file_path, block.to_bytes_le()?)?;
     // Return the genesis block.

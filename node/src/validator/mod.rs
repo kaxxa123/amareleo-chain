@@ -17,7 +17,7 @@ use snarkos_lite_account::Account;
 use snarkos_lite_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use snarkos_lite_node_consensus::Consensus;
 use snarkos_lite_node_rest::Rest;
-use snarkvm::prelude::{block::Block, store::ConsensusStorage, Ledger, Network};
+use snarkvm::prelude::{Ledger, Network, block::Block, store::ConsensusStorage};
 
 use aleo_std::StorageMode;
 use anyhow::Result;
@@ -28,8 +28,8 @@ use std::{
     io,
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     time::Duration,
 };
@@ -71,12 +71,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone(), shutdown.clone()));
 
         // Initialize the consensus.
-        let mut consensus = Consensus::new(
-            account.clone(),
-            ledger_service.clone(),
-            keep_state,
-            storage_mode.clone(),
-        )?;
+        let mut consensus = Consensus::new(account.clone(), ledger_service.clone(), keep_state, storage_mode.clone())?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
@@ -93,14 +88,11 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest =
-                Some(Rest::start(rest_ip, rest_rps, Some(consensus), ledger.clone()).await?);
+            node.rest = Some(Rest::start(rest_ip, rest_rps, Some(consensus), ledger.clone()).await?);
         }
 
         // Initialize the notification message loop.
-        node.handles
-            .lock()
-            .push(crate::start_notification_message_loop());
+        node.handles.lock().push(crate::start_notification_message_loop());
 
         // Pass the node to the signal handler.
         let _ = signal_node.set(node.clone());
@@ -129,7 +121,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         #[cfg(target_family = "unix")]
         fn signal_listener() -> impl Future<Output = io::Result<()>> {
-            use tokio::signal::unix::{signal, SignalKind};
+            use tokio::signal::unix::{SignalKind, signal};
 
             // Handle SIGINT, SIGTERM, SIGQUIT, and SIGHUP.
             let mut s_int = signal(SignalKind::interrupt()).unwrap();
@@ -167,7 +159,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
                     warn!("==========================================================================================");
                     warn!("⚠️  Attention - Starting the graceful shutdown procedure (ETA: 30 seconds)...");
-                    warn!("⚠️  Attention - To avoid DATA CORRUPTION, do NOT interrupt amareleo (or press Ctrl+C again)");
+                    warn!("⚠️  Attention - Avoid DATA CORRUPTION, do NOT interrupt amareleo (or press Ctrl+C again)");
                     warn!("⚠️  Attention - Please wait until the shutdown gracefully completes (ETA: 30 seconds)");
                     warn!("==========================================================================================");
 
@@ -204,8 +196,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Shut down the node.
         trace!("Shutting down the node...");
-        self.shutdown
-            .store(true, std::sync::atomic::Ordering::Release);
+        self.shutdown.store(true, std::sync::atomic::Ordering::Release);
 
         // Abort the tasks.
         trace!("Shutting down the validator...");
@@ -223,8 +214,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 mod tests {
     use super::*;
     use snarkvm::prelude::{
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        MainnetV0, VM,
+        MainnetV0,
+        VM,
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     };
 
     use anyhow::bail;
@@ -247,10 +239,7 @@ mod tests {
         // Initialize the account.
         let account = Account::<CurrentNetwork>::new(&mut rng).unwrap();
         // Initialize a new VM.
-        let vm = VM::from(ConsensusStore::<
-            CurrentNetwork,
-            ConsensusMemory<CurrentNetwork>,
-        >::open(None)?)?;
+        let vm = VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?)?;
         // Initialize the genesis block.
         let genesis = vm.genesis_beacon(account.private_key(), &mut rng)?;
 
@@ -268,10 +257,7 @@ mod tests {
         .await
         .unwrap();
 
-        println!(
-            "Loaded validator node with {} blocks",
-            validator.ledger.latest_height(),
-        );
+        println!("Loaded validator node with {} blocks", validator.ledger.latest_height(),);
 
         bail!("\n\nRemember to #[ignore] this test!\n\n")
     }

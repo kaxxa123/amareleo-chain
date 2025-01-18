@@ -23,7 +23,7 @@ use snarkvm::{
         committee::Committee,
         narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     },
-    prelude::{bail, ensure, error, FromBytes, IoResult, Itertools, Read, Result, ToBytes, Write},
+    prelude::{FromBytes, IoResult, Itertools, Read, Result, ToBytes, Write, bail, ensure, error},
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -47,36 +47,19 @@ impl<N: Network> Proposal<N> {
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<Self> {
         // Ensure the committee is for the batch round.
-        ensure!(
-            batch_header.round() >= committee.starting_round(),
-            "Batch round must be >= the committee round"
-        );
+        ensure!(batch_header.round() >= committee.starting_round(), "Batch round must be >= the committee round");
         // Ensure the batch author is a member of the committee.
-        ensure!(
-            committee.is_committee_member(batch_header.author()),
-            "The batch author is not a committee member"
-        );
+        ensure!(committee.is_committee_member(batch_header.author()), "The batch author is not a committee member");
         // Ensure the transmission IDs match in the batch header and transmissions.
         ensure!(
             batch_header.transmission_ids().len() == transmissions.len(),
             "The transmission IDs do not match in the batch header and transmissions"
         );
-        for (a, b) in batch_header
-            .transmission_ids()
-            .iter()
-            .zip_eq(transmissions.keys())
-        {
-            ensure!(
-                a == b,
-                "The transmission IDs do not match in the batch header and transmissions"
-            );
+        for (a, b) in batch_header.transmission_ids().iter().zip_eq(transmissions.keys()) {
+            ensure!(a == b, "The transmission IDs do not match in the batch header and transmissions");
         }
         // Return the proposal.
-        Ok(Self {
-            batch_header,
-            transmissions,
-            signatures: Default::default(),
-        })
+        Ok(Self { batch_header, transmissions, signatures: Default::default() })
     }
 
     /// Returns the proposed batch header.
@@ -111,11 +94,7 @@ impl<N: Network> Proposal<N> {
 
     /// Returns the signers.
     pub fn signers(&self) -> HashSet<Address<N>> {
-        self.signatures
-            .iter()
-            .chain(Some(self.batch_header.signature()))
-            .map(Signature::to_address)
-            .collect()
+        self.signatures.iter().chain(Some(self.batch_header.signature())).map(Signature::to_address).collect()
     }
 
     /// Returns the nonsigners.
@@ -147,10 +126,7 @@ impl<N: Network> Proposal<N> {
     }
 
     /// Returns the `transmission` for the given `transmission ID`.
-    pub fn get_transmission(
-        &self,
-        transmission_id: impl Into<TransmissionID<N>>,
-    ) -> Option<&Transmission<N>> {
+    pub fn get_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<&Transmission<N>> {
         self.transmissions.get(&transmission_id.into())
     }
 
@@ -183,18 +159,11 @@ impl<N: Network> Proposal<N> {
     pub fn to_certificate(
         &self,
         committee: &Committee<N>,
-    ) -> Result<(
-        BatchCertificate<N>,
-        IndexMap<TransmissionID<N>, Transmission<N>>,
-    )> {
+    ) -> Result<(BatchCertificate<N>, IndexMap<TransmissionID<N>, Transmission<N>>)> {
         // Ensure the quorum threshold has been reached.
-        ensure!(
-            self.is_quorum_threshold_reached(committee),
-            "The quorum threshold has not been reached"
-        );
+        ensure!(self.is_quorum_threshold_reached(committee), "The quorum threshold has not been reached");
         // Create the batch certificate.
-        let certificate =
-            BatchCertificate::from(self.batch_header.clone(), self.signatures.clone())?;
+        let certificate = BatchCertificate::from(self.batch_header.clone(), self.signatures.clone())?;
         // Return the certificate and transmissions.
         Ok((certificate, self.transmissions.clone()))
     }
@@ -205,18 +174,14 @@ impl<N: Network> ToBytes for Proposal<N> {
         // Write the batch header.
         self.batch_header.write_le(&mut writer)?;
         // Write the number of transmissions.
-        u32::try_from(self.transmissions.len())
-            .map_err(error)?
-            .write_le(&mut writer)?;
+        u32::try_from(self.transmissions.len()).map_err(error)?.write_le(&mut writer)?;
         // Write the transmissions.
         for (transmission_id, transmission) in &self.transmissions {
             transmission_id.write_le(&mut writer)?;
             transmission.write_le(&mut writer)?;
         }
         // Write the number of signatures.
-        u32::try_from(self.signatures.len())
-            .map_err(error)?
-            .write_le(&mut writer)?;
+        u32::try_from(self.signatures.len()).map_err(error)?.write_le(&mut writer)?;
         // Write the signatures.
         for signature in &self.signatures {
             signature.write_le(&mut writer)?;
@@ -254,11 +219,7 @@ impl<N: Network> FromBytes for Proposal<N> {
             signatures.insert(FromBytes::read_le(&mut reader)?);
         }
 
-        Ok(Self {
-            batch_header,
-            transmissions,
-            signatures,
-        })
+        Ok(Self { batch_header, transmissions, signatures })
     }
 }
 
@@ -273,24 +234,14 @@ pub(crate) mod tests {
     const ITERATIONS: usize = 100;
 
     pub(crate) fn sample_proposal(rng: &mut TestRng) -> Proposal<CurrentNetwork> {
-        let certificate =
-            snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(
-                rng,
-            );
+        let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
         let (_, transmissions) = sample_transmissions(&certificate, rng);
 
-        let transmissions = transmissions
-            .into_iter()
-            .map(|(id, (t, _))| (id, t))
-            .collect::<IndexMap<_, _>>();
+        let transmissions = transmissions.into_iter().map(|(id, (t, _))| (id, t)).collect::<IndexMap<_, _>>();
         let batch_header = certificate.batch_header().clone();
         let signatures = certificate.signatures().copied().collect();
 
-        Proposal {
-            batch_header,
-            transmissions,
-            signatures,
-        }
+        Proposal { batch_header, transmissions, signatures }
     }
 
     #[test]
@@ -309,9 +260,9 @@ pub(crate) mod tests {
 #[cfg(test)]
 mod prop_tests {
     use crate::helpers::{
+        Proposal,
         now,
         storage::prop_tests::{AnyTransmission, AnyTransmissionID, CryptoTestRng},
-        Proposal,
     };
     use snarkvm::ledger::{
         committee::prop_tests::{CommitteeContext, ValidatorSet},
@@ -319,7 +270,7 @@ mod prop_tests {
     };
 
     use indexmap::IndexMap;
-    use proptest::sample::{size_range, Selector};
+    use proptest::sample::{Selector, size_range};
     use test_strategy::proptest;
 
     #[proptest]

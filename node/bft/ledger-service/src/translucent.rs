@@ -18,19 +18,19 @@ use async_trait::async_trait;
 use indexmap::IndexMap;
 use snarkvm::{
     ledger::{
+        Ledger,
         block::{Block, Transaction},
         committee::Committee,
         narwhal::{Data, Subdag, Transmission, TransmissionID},
         puzzle::{Solution, SolutionID},
         store::ConsensusStorage,
-        Ledger,
     },
-    prelude::{narwhal::BatchCertificate, Address, Field, Network, Result},
+    prelude::{Address, Field, Network, Result, narwhal::BatchCertificate},
 };
 use std::{
     fmt,
     ops::Range,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 
 pub struct TranslucentLedgerService<N: Network, C: ConsensusStorage<N>> {
@@ -40,18 +40,14 @@ pub struct TranslucentLedgerService<N: Network, C: ConsensusStorage<N>> {
 impl<N: Network, C: ConsensusStorage<N>> fmt::Debug for TranslucentLedgerService<N, C> {
     /// Implements a custom `fmt::Debug` for `TranslucentLedgerService`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TranslucentLedgerService")
-            .field("inner", &self.inner)
-            .finish()
+        f.debug_struct("TranslucentLedgerService").field("inner", &self.inner).finish()
     }
 }
 
 impl<N: Network, C: ConsensusStorage<N>> TranslucentLedgerService<N, C> {
     /// Initializes a new ledger service wrapper.
     pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
-        Self {
-            inner: CoreLedgerService::new(ledger, shutdown),
-        }
+        Self { inner: CoreLedgerService::new(ledger, shutdown) }
     }
 }
 
@@ -124,10 +120,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Returns the unconfirmed transaction for the given transaction ID.
-    fn get_unconfirmed_transaction(
-        &self,
-        transaction_id: N::TransactionID,
-    ) -> Result<Transaction<N>> {
+    fn get_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
         self.inner.get_unconfirmed_transaction(transaction_id)
     }
 
@@ -171,11 +164,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
     }
 
     /// Always succeeds.
-    async fn check_solution_basic(
-        &self,
-        _solution_id: SolutionID<N>,
-        _solution: Data<Solution<N>>,
-    ) -> Result<()> {
+    async fn check_solution_basic(&self, _solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
         Ok(())
     }
 
@@ -200,8 +189,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for TranslucentLedgerS
         subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<Block<N>> {
-        self.inner
-            .prepare_advance_to_next_quorum_block(subdag, transmissions)
+        self.inner.prepare_advance_to_next_quorum_block(subdag, transmissions)
     }
 
     /// Adds the given block as the next block in the ledger.

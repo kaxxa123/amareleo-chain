@@ -14,7 +14,11 @@
 // limitations under the License.
 
 use crate::events::{
-    BatchPropose, BatchSignature, CertificateRequest, CertificateResponse, TransmissionRequest,
+    BatchPropose,
+    BatchSignature,
+    CertificateRequest,
+    CertificateResponse,
+    TransmissionRequest,
     TransmissionResponse,
 };
 use snarkos_lite_node_sync::locators::BlockLocators;
@@ -36,32 +40,22 @@ const MAX_CHANNEL_SIZE: usize = 8192;
 
 #[derive(Debug)]
 pub struct ConsensusSender<N: Network> {
-    pub tx_consensus_subdag: mpsc::Sender<(
-        Subdag<N>,
-        IndexMap<TransmissionID<N>, Transmission<N>>,
-        oneshot::Sender<Result<()>>,
-    )>,
+    pub tx_consensus_subdag:
+        mpsc::Sender<(Subdag<N>, IndexMap<TransmissionID<N>, Transmission<N>>, oneshot::Sender<Result<()>>)>,
 }
 
 #[derive(Debug)]
 pub struct ConsensusReceiver<N: Network> {
-    pub rx_consensus_subdag: mpsc::Receiver<(
-        Subdag<N>,
-        IndexMap<TransmissionID<N>, Transmission<N>>,
-        oneshot::Sender<Result<()>>,
-    )>,
+    pub rx_consensus_subdag:
+        mpsc::Receiver<(Subdag<N>, IndexMap<TransmissionID<N>, Transmission<N>>, oneshot::Sender<Result<()>>)>,
 }
 
 /// Initializes the consensus channels.
 pub fn init_consensus_channels<N: Network>() -> (ConsensusSender<N>, ConsensusReceiver<N>) {
     let (tx_consensus_subdag, rx_consensus_subdag) = mpsc::channel(MAX_CHANNEL_SIZE);
 
-    let sender = ConsensusSender {
-        tx_consensus_subdag,
-    };
-    let receiver = ConsensusReceiver {
-        rx_consensus_subdag,
-    };
+    let sender = ConsensusSender { tx_consensus_subdag };
+    let receiver = ConsensusReceiver { rx_consensus_subdag };
 
     (sender, receiver)
 }
@@ -80,24 +74,17 @@ impl<N: Network> BFTSender<N> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the current round to the BFT.
-        self.tx_primary_round
-            .send((current_round, callback_sender))
-            .await?;
+        self.tx_primary_round.send((current_round, callback_sender)).await?;
         // Await the callback to continue.
         Ok(callback_receiver.await?)
     }
 
     /// Sends the batch certificate to the BFT.
-    pub async fn send_primary_certificate_to_bft(
-        &self,
-        certificate: BatchCertificate<N>,
-    ) -> Result<()> {
+    pub async fn send_primary_certificate_to_bft(&self, certificate: BatchCertificate<N>) -> Result<()> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the certificate to the BFT.
-        self.tx_primary_certificate
-            .send((certificate, callback_sender))
-            .await?;
+        self.tx_primary_certificate.send((certificate, callback_sender)).await?;
         // Await the callback to continue.
         callback_receiver.await?
     }
@@ -107,9 +94,7 @@ impl<N: Network> BFTSender<N> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the certificate to the BFT for syncing.
-        self.tx_sync_bft
-            .send((certificate, callback_sender))
-            .await?;
+        self.tx_sync_bft.send((certificate, callback_sender)).await?;
         // Await the callback to continue.
         callback_receiver.await?
     }
@@ -130,18 +115,8 @@ pub fn init_bft_channels<N: Network>() -> (BFTSender<N>, BFTReceiver<N>) {
     let (tx_sync_bft_dag_at_bootup, rx_sync_bft_dag_at_bootup) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_sync_bft, rx_sync_bft) = mpsc::channel(MAX_CHANNEL_SIZE);
 
-    let sender = BFTSender {
-        tx_primary_round,
-        tx_primary_certificate,
-        tx_sync_bft_dag_at_bootup,
-        tx_sync_bft,
-    };
-    let receiver = BFTReceiver {
-        rx_primary_round,
-        rx_primary_certificate,
-        rx_sync_bft_dag_at_bootup,
-        rx_sync_bft,
-    };
+    let sender = BFTSender { tx_primary_round, tx_primary_certificate, tx_sync_bft_dag_at_bootup, tx_sync_bft };
+    let receiver = BFTReceiver { rx_primary_round, rx_primary_certificate, rx_sync_bft_dag_at_bootup, rx_sync_bft };
 
     (sender, receiver)
 }
@@ -152,16 +127,8 @@ pub struct PrimarySender<N: Network> {
     pub tx_batch_signature: mpsc::Sender<(SocketAddr, BatchSignature<N>)>,
     pub tx_batch_certified: mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>,
     pub tx_primary_ping: mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>,
-    pub tx_unconfirmed_solution: mpsc::Sender<(
-        SolutionID<N>,
-        Data<Solution<N>>,
-        oneshot::Sender<Result<()>>,
-    )>,
-    pub tx_unconfirmed_transaction: mpsc::Sender<(
-        N::TransactionID,
-        Data<Transaction<N>>,
-        oneshot::Sender<Result<()>>,
-    )>,
+    pub tx_unconfirmed_solution: mpsc::Sender<(SolutionID<N>, Data<Solution<N>>, oneshot::Sender<Result<()>>)>,
+    pub tx_unconfirmed_transaction: mpsc::Sender<(N::TransactionID, Data<Transaction<N>>, oneshot::Sender<Result<()>>)>,
 }
 
 impl<N: Network> PrimarySender<N> {
@@ -174,9 +141,7 @@ impl<N: Network> PrimarySender<N> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the unconfirmed solution to the primary.
-        self.tx_unconfirmed_solution
-            .send((solution_id, solution, callback_sender))
-            .await?;
+        self.tx_unconfirmed_solution.send((solution_id, solution, callback_sender)).await?;
         // Await the callback to continue.
         callback_receiver.await?
     }
@@ -190,9 +155,7 @@ impl<N: Network> PrimarySender<N> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the unconfirmed transaction to the primary.
-        self.tx_unconfirmed_transaction
-            .send((transaction_id, transaction, callback_sender))
-            .await?;
+        self.tx_unconfirmed_transaction.send((transaction_id, transaction, callback_sender)).await?;
         // Await the callback to continue.
         callback_receiver.await?
     }
@@ -204,16 +167,9 @@ pub struct PrimaryReceiver<N: Network> {
     pub rx_batch_signature: mpsc::Receiver<(SocketAddr, BatchSignature<N>)>,
     pub rx_batch_certified: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>)>,
     pub rx_primary_ping: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>)>,
-    pub rx_unconfirmed_solution: mpsc::Receiver<(
-        SolutionID<N>,
-        Data<Solution<N>>,
-        oneshot::Sender<Result<()>>,
-    )>,
-    pub rx_unconfirmed_transaction: mpsc::Receiver<(
-        N::TransactionID,
-        Data<Transaction<N>>,
-        oneshot::Sender<Result<()>>,
-    )>,
+    pub rx_unconfirmed_solution: mpsc::Receiver<(SolutionID<N>, Data<Solution<N>>, oneshot::Sender<Result<()>>)>,
+    pub rx_unconfirmed_transaction:
+        mpsc::Receiver<(N::TransactionID, Data<Transaction<N>>, oneshot::Sender<Result<()>>)>,
 }
 
 /// Initializes the primary channels.
@@ -265,60 +221,38 @@ pub fn init_worker_channels<N: Network>() -> (WorkerSender<N>, WorkerReceiver<N>
     let (tx_transmission_request, rx_transmission_request) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_transmission_response, rx_transmission_response) = mpsc::channel(MAX_CHANNEL_SIZE);
 
-    let sender = WorkerSender {
-        tx_worker_ping,
-        tx_transmission_request,
-        tx_transmission_response,
-    };
-    let receiver = WorkerReceiver {
-        rx_worker_ping,
-        rx_transmission_request,
-        rx_transmission_response,
-    };
+    let sender = WorkerSender { tx_worker_ping, tx_transmission_request, tx_transmission_response };
+    let receiver = WorkerReceiver { rx_worker_ping, rx_transmission_request, rx_transmission_response };
 
     (sender, receiver)
 }
 
 #[derive(Debug)]
 pub struct SyncSender<N: Network> {
-    pub tx_block_sync_advance_with_sync_blocks:
-        mpsc::Sender<(SocketAddr, Vec<Block<N>>, oneshot::Sender<Result<()>>)>,
+    pub tx_block_sync_advance_with_sync_blocks: mpsc::Sender<(SocketAddr, Vec<Block<N>>, oneshot::Sender<Result<()>>)>,
     pub tx_block_sync_remove_peer: mpsc::Sender<SocketAddr>,
-    pub tx_block_sync_update_peer_locators:
-        mpsc::Sender<(SocketAddr, BlockLocators<N>, oneshot::Sender<Result<()>>)>,
+    pub tx_block_sync_update_peer_locators: mpsc::Sender<(SocketAddr, BlockLocators<N>, oneshot::Sender<Result<()>>)>,
     pub tx_certificate_request: mpsc::Sender<(SocketAddr, CertificateRequest<N>)>,
     pub tx_certificate_response: mpsc::Sender<(SocketAddr, CertificateResponse<N>)>,
 }
 
 impl<N: Network> SyncSender<N> {
     /// Sends the request to update the peer locators.
-    pub async fn update_peer_locators(
-        &self,
-        peer_ip: SocketAddr,
-        block_locators: BlockLocators<N>,
-    ) -> Result<()> {
+    pub async fn update_peer_locators(&self, peer_ip: SocketAddr, block_locators: BlockLocators<N>) -> Result<()> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the request to update the peer locators.
-        self.tx_block_sync_update_peer_locators
-            .send((peer_ip, block_locators, callback_sender))
-            .await?;
+        self.tx_block_sync_update_peer_locators.send((peer_ip, block_locators, callback_sender)).await?;
         // Await the callback to continue.
         callback_receiver.await?
     }
 
     /// Sends the request to advance with sync blocks.
-    pub async fn advance_with_sync_blocks(
-        &self,
-        peer_ip: SocketAddr,
-        blocks: Vec<Block<N>>,
-    ) -> Result<()> {
+    pub async fn advance_with_sync_blocks(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> Result<()> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the request to advance with sync blocks.
-        self.tx_block_sync_advance_with_sync_blocks
-            .send((peer_ip, blocks, callback_sender))
-            .await?;
+        self.tx_block_sync_advance_with_sync_blocks.send((peer_ip, blocks, callback_sender)).await?;
         // Await the callback to continue.
         callback_receiver.await?
     }
@@ -329,8 +263,7 @@ pub struct SyncReceiver<N: Network> {
     pub rx_block_sync_advance_with_sync_blocks:
         mpsc::Receiver<(SocketAddr, Vec<Block<N>>, oneshot::Sender<Result<()>>)>,
     pub rx_block_sync_remove_peer: mpsc::Receiver<SocketAddr>,
-    pub rx_block_sync_update_peer_locators:
-        mpsc::Receiver<(SocketAddr, BlockLocators<N>, oneshot::Sender<Result<()>>)>,
+    pub rx_block_sync_update_peer_locators: mpsc::Receiver<(SocketAddr, BlockLocators<N>, oneshot::Sender<Result<()>>)>,
     pub rx_certificate_request: mpsc::Receiver<(SocketAddr, CertificateRequest<N>)>,
     pub rx_certificate_response: mpsc::Receiver<(SocketAddr, CertificateResponse<N>)>,
 }
@@ -340,8 +273,7 @@ pub fn init_sync_channels<N: Network>() -> (SyncSender<N>, SyncReceiver<N>) {
     let (tx_block_sync_advance_with_sync_blocks, rx_block_sync_advance_with_sync_blocks) =
         mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_block_sync_remove_peer, rx_block_sync_remove_peer) = mpsc::channel(MAX_CHANNEL_SIZE);
-    let (tx_block_sync_update_peer_locators, rx_block_sync_update_peer_locators) =
-        mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_block_sync_update_peer_locators, rx_block_sync_update_peer_locators) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_certificate_request, rx_certificate_request) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_certificate_response, rx_certificate_response) = mpsc::channel(MAX_CHANNEL_SIZE);
 

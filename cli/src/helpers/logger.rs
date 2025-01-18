@@ -20,13 +20,13 @@ use std::{
     fs::File,
     io,
     path::Path,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 use tokio::sync::mpsc;
 use tracing_subscriber::{
+    EnvFilter,
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
-    EnvFilter,
 };
 
 /// Initializes the logger.
@@ -72,21 +72,14 @@ pub fn initialize_logger<P: AsRef<Path>>(
     });
 
     // Create the directories tree for a logfile if it doesn't exist.
-    let logfile_dir = logfile
-        .as_ref()
-        .parent()
-        .expect("Root directory passed as a logfile");
+    let logfile_dir = logfile.as_ref().parent().expect("Root directory passed as a logfile");
     if !logfile_dir.exists() {
-        std::fs::create_dir_all(logfile_dir).expect(
-            "Failed to create a directories: '{logfile_dir}', please check if user has permissions",
-        );
+        std::fs::create_dir_all(logfile_dir)
+            .expect("Failed to create a directories: '{logfile_dir}', please check if user has permissions");
     }
     // Create a file to write logs to.
-    let logfile = File::options()
-        .append(true)
-        .create(true)
-        .open(logfile)
-        .expect("Failed to open the file for writing logs");
+    let logfile =
+        File::options().append(true).create(true).open(logfile).expect("Failed to open the file for writing logs");
 
     // Initialize the log channel.
     let (_, log_receiver) = mpsc::channel(1024);
@@ -142,7 +135,6 @@ pub fn welcome_message() -> String {
 "#
     .white()
     .bold();
-    output +=
-        &"👋 Welcome to Aleo! We thank you for running a node and supporting privacy.\n".bold();
+    output += &"👋 Welcome to Aleo! We thank you for running a node and supporting privacy.\n".bold();
     output
 }

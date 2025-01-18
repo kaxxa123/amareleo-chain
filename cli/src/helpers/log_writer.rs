@@ -26,11 +26,7 @@ pub enum LogWriter {
 impl LogWriter {
     /// Initialize a new log writer.
     pub fn new(log_sender: &Option<mpsc::Sender<Vec<u8>>>) -> Self {
-        if let Some(sender) = log_sender {
-            Self::Sender(sender.clone())
-        } else {
-            Self::Stdout(io::stdout())
-        }
+        if let Some(sender) = log_sender { Self::Sender(sender.clone()) } else { Self::Stdout(io::stdout()) }
     }
 }
 

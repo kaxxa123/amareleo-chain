@@ -22,7 +22,7 @@ use snarkvm::{
     prelude::{cfg_into_iter, cfg_iter},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use indexmap::IndexMap;
 use rayon::prelude::*;
 use std::{collections::HashMap, sync::Arc};
@@ -46,21 +46,14 @@ impl<N: Network> Sync<N> {
     /// Initializes a new sync instance.
     pub fn new(storage: Storage<N>, ledger: Arc<dyn LedgerService<N>>) -> Self {
         // Return the sync instance.
-        Self {
-            storage,
-            ledger,
-            bft_sender: Default::default(),
-            is_block_synced: Default::default(),
-        }
+        Self { storage, ledger, bft_sender: Default::default(), is_block_synced: Default::default() }
     }
 
     /// Initializes the sync module and sync the storage with the ledger at bootup.
     pub async fn initialize(&self, bft_sender: Option<BFTSender<N>>) -> Result<()> {
         // If a BFT sender was provided, set it.
         if let Some(bft_sender) = bft_sender {
-            self.bft_sender
-                .set(bft_sender)
-                .expect("BFT sender already set in gateway");
+            self.bft_sender.set(bft_sender).expect("BFT sender already set in gateway");
         }
 
         info!("Syncing storage with the ledger...");
@@ -99,15 +92,9 @@ impl<N: Network> Sync<N> {
         // By virtue of the BFT protocol, we can guarantee that all GC range blocks will be loaded.
         let gc_height = block_height.saturating_sub(max_gc_blocks);
         // Retrieve the blocks.
-        let blocks = self
-            .ledger
-            .get_blocks(gc_height..block_height.saturating_add(1))?;
+        let blocks = self.ledger.get_blocks(gc_height..block_height.saturating_add(1))?;
 
-        debug!(
-            "Syncing storage with the ledger from block {} to {}...",
-            gc_height,
-            block_height.saturating_add(1)
-        );
+        debug!("Syncing storage with the ledger from block {} to {}...", gc_height, block_height.saturating_add(1));
 
         /* Sync storage */
 
@@ -116,8 +103,7 @@ impl<N: Network> Sync<N> {
         // Sync the round with the block.
         self.storage.sync_round_with_block(latest_block.round());
         // Perform GC on the latest block round.
-        self.storage
-            .garbage_collect_certificates(latest_block.round());
+        self.storage.garbage_collect_certificates(latest_block.round());
         // Iterate over the blocks.
         for block in &blocks {
             // If the block authority is a subdag, then sync the batch certificates with the block.
@@ -125,20 +111,14 @@ impl<N: Network> Sync<N> {
                 // Reconstruct the unconfirmed transactions.
                 let unconfirmed_transactions = cfg_iter!(block.transactions())
                     .filter_map(|tx| {
-                        tx.to_unconfirmed_transaction()
-                            .map(|unconfirmed| (unconfirmed.id(), unconfirmed))
-                            .ok()
+                        tx.to_unconfirmed_transaction().map(|unconfirmed| (unconfirmed.id(), unconfirmed)).ok()
                     })
                     .collect::<HashMap<_, _>>();
 
                 // Iterate over the certificates.
                 for certificates in subdag.values().cloned() {
                     cfg_into_iter!(certificates).for_each(|certificate| {
-                        self.storage.sync_certificate_with_block(
-                            block,
-                            certificate,
-                            &unconfirmed_transactions,
-                        );
+                        self.storage.sync_certificate_with_block(block, certificate, &unconfirmed_transactions);
                     });
                 }
             }
@@ -154,9 +134,7 @@ impl<N: Network> Sync<N> {
                     // If the block authority is a beacon, then skip the block.
                     Authority::Beacon(_) => None,
                     // If the block authority is a subdag, then retrieve the certificates.
-                    Authority::Quorum(subdag) => {
-                        Some(subdag.values().flatten().cloned().collect::<Vec<_>>())
-                    }
+                    Authority::Quorum(subdag) => Some(subdag.values().flatten().cloned().collect::<Vec<_>>()),
                 }
             })
             .flatten()
@@ -165,11 +143,7 @@ impl<N: Network> Sync<N> {
         // If a BFT sender was provided, send the certificates to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
             // Await the callback to continue.
-            if let Err(e) = bft_sender
-                .tx_sync_bft_dag_at_bootup
-                .send(certificates)
-                .await
-            {
+            if let Err(e) = bft_sender.tx_sync_bft_dag_at_bootup.send(certificates).await {
                 bail!("Failed to update the BFT DAG from sync: {e}");
             }
         }
@@ -208,8 +182,7 @@ impl<N: Network> Sync<N> {
         }
 
         // Initialize the checkpoints map.
-        let mut checkpoints =
-            IndexMap::with_capacity((latest_height / CHECKPOINT_INTERVAL + 1).try_into()?);
+        let mut checkpoints = IndexMap::with_capacity((latest_height / CHECKPOINT_INTERVAL + 1).try_into()?);
         // Retrieve the checkpoint block hashes.
         for height in (0..=latest_height).step_by(CHECKPOINT_INTERVAL as usize) {
             checkpoints.insert(height, self.ledger.get_block_hash(height)?);

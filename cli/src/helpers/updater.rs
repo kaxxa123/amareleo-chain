@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use colored::Colorize;
-use self_update::{backends::github, version::bump_is_greater, Status};
+use self_update::{Status, backends::github, version::bump_is_greater};
 use std::fmt::Write;
 
 pub struct Updater;
@@ -40,10 +40,7 @@ impl Updater {
     }
 
     /// Update `amareleo-chain` to the specified release.
-    pub fn update_to_release(
-        show_output: bool,
-        version: Option<String>,
-    ) -> Result<Status, UpdaterError> {
+    pub fn update_to_release(show_output: bool, version: Option<String>) -> Result<Status, UpdaterError> {
         let mut update_builder = github::Update::configure();
 
         update_builder
@@ -78,20 +75,14 @@ impl Updater {
         if bump_is_greater(&current_version, &latest_release.version)? {
             Ok(latest_release.version)
         } else {
-            Err(UpdaterError::OldReleaseVersion(
-                current_version,
-                latest_release.version,
-            ))
+            Err(UpdaterError::OldReleaseVersion(current_version, latest_release.version))
         }
     }
 
     /// Display the CLI message.
     pub fn print_cli() -> String {
         if let Ok(latest_version) = Self::update_available() {
-            let mut output = "🟢 A new version is available! Run"
-                .bold()
-                .green()
-                .to_string();
+            let mut output = "🟢 A new version is available! Run".bold().green().to_string();
             output += &" `amareleo-chain update` ".bold().white();
             output += &format!("to update to v{latest_version}.").bold().green();
             output
@@ -106,11 +97,7 @@ pub enum UpdaterError {
     #[error("{}: {}", _0, _1)]
     Crate(&'static str, String),
 
-    #[error(
-        "The current version {} is more recent than the release version {}",
-        _0,
-        _1
-    )]
+    #[error("The current version {} is more recent than the release version {}", _0, _1)]
     OldReleaseVersion(String, String),
 }
 
