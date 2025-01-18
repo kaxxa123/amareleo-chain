@@ -1,16 +1,16 @@
 # Code Migration Notes
 
-As we migrate snarkos code into amareleo-chain, we keep notes on key changes. We also create basic code documentation that might help future restructuring. 
+As we migrate `snarkos` code into `amareleo-chain`, we keep notes on key changes. We also create basic code documentation that might help future restructuring. 
 
-* When it comes to describing code, we are not interested in details. The goal is to sumarize the purpose and identify logically related code.
+* When it comes to describing code, we are not interested in detail. The goal is to sumarize the purpose and identify logically related code.
 
 * Documented code blocks may cover an entire sub-crate or indvidual modules. Hence we refer to the code using relative paths rather than crate names.
 
-* __No cross-dependencies__ - This label highlights how the sub-crate/module does not depend on other sub-crates/modules within snarkos (except for the `snarkos-lite-node-metrics` sub-crate).
+* __No cross-dependencies__ - This label highlights how the sub-crate/module does not depend on other sub-crates/modules (except for the `snarkos-lite-node-metrics` sub-crate).
 
 * The main executable is renamed from `snarkos` to `amareleo-chain`.
 
-* All snarkos sub-crates are renamed from `snarkos-*` to `snarkos-lite-*` even if the code is otherwise identical. 
+* All `snarkos` sub-crates are renamed from `snarkos-*` to `snarkos-lite-*` even when the code is otherwise identical. 
 
 * The `amareleo-chain` ledger files/folders where renamed as follows:
     | snarkos                    | amareleo-chain              |
@@ -19,9 +19,18 @@ As we migrate snarkos code into amareleo-chain, we keep notes on key changes. We
     | `.ledger-*`                | `.amareleo-ledger-*`        |
     | `/tmp/snakros.log`         | `/tmp/amareleo-chain.log`   |
 
-* Just like snarkos, amareleo-chain relies on caching to disk the genesis block. Both use the same filename. The first time a node is run this will do extra work that will speed up launching other node instances. The name is deterministic and is currently: <BR />
-`/tmp/15983110333109949993277199043008208330432506493933185651419933655310578437field`
 
+* `snarkos` relies on caching the genesis block to disk. The first time a node is run, this will do extra work that speeds-up launching other node instances. The block for testnet is currently stored here: <BR />
+    `/tmp/15983110333109949993277199043008208330432506493933185651419933655310578437field`
+
+    `amareleo-chain` speeds up node startup by including a copy of the genesis block for the different network types as resources. This allows it to quickly load the genesis block from memory as from the first run.
+
+    To appreciate the speed gain make sure to clear any cached blocks and then start `snakros` and `amareleo-chain` in any order:
+    ```BASH
+    rm /tmp/*field
+    ```
+
+* `amareleo-chain` uses the `--keep-state` flag to speed up shutdown. When this flag is not specified, amareleo-chain doesn't perform a clean shutdown, terminating immidiately.
 
 <BR />
 
@@ -33,10 +42,9 @@ There are some code encapsulation issues within `snarkos` and `snarkvm`. Specifi
 For this reason, at this stage we mock having 4 committee members in a single node. 
 An alternative approach would be to remove/replace the consensus altogether.
 
-* The ledger directory path is returned by [aleo-std](https://github.com/ProvableHQ/aleo-std) | `aleo_ledger_dir()`.
-This is invoked directly both from `snarkos` and `snarkvm`. <BR />
-`amareleo-chain` aims to rename the ledger folder. We achive this by setting `StorageMode::Custom` with our custom 
-ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custom path.
+* The ledger directory path is returned by [aleo-std](https://github.com/ProvableHQ/aleo-std) | `aleo_ledger_dir()`. This is invoked directly both from `snarkos` and `snarkvm`. <BR />
+
+`amareleo-chain` aims to rename the ledger folder. We achive this by setting `StorageMode::Custom` with our custom ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custom path.
 
 
 <BR />
@@ -107,12 +115,12 @@ ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custo
 
 * `/node/bft/src/worker.rs` - Implements the Worker object responsible for processing transmissions. 
 
-    In snarkos this would send out requests/responses for transmissions to peers. In snarkos the receiving side would be the `Sync` object. The amareleo-chain Worker is stripped down from the network communcation (gateway) component.
+    In snarkos this would send out requests/responses for transmissions to peers. In snarkos the receiving side would be the `Sync` object. The `amareleo-chain` Worker is stripped down from the network communcation (gateway) component.
 
     __Dependent__ on `LedgerService`, `StorageService`, `Ready`, `Proposal`
 
 
-* `/node/bft/src/sync/mod.rs` - Implements the `Sync` module which is resposnbile to sync the ledger from storage and keeping the ledger in a synced state. In snarkos, `Sync` receives messages from other peer `Worker` instances. However in amareleo-chain all that communication was removed. In snarkos, `Sync` employes `BlockSync` for exchanging blocks with peers. In amareleo-chain this `BlockSync` dependency was removed with some of its functianality merged into `Sync`.
+* `/node/bft/src/sync/mod.rs` - Implements the `Sync` module which is resposnbile to sync the ledger from storage and keeping the ledger in a synced state. In snarkos, `Sync` receives messages from other peer `Worker` instances. However in `amareleo-chain` all that communication was removed. In snarkos, `Sync` employes `BlockSync` for exchanging blocks with peers. In `amareleo-chain` this `BlockSync` dependency was removed with some of its functianality merged into `Sync`.
 
     __Dependent__ on `Storage`, `LedgerService`, `BlockLocators`
 
