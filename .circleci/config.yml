@@ -325,27 +325,41 @@ jobs:
       - check_windows:
           workspace_member: << parameters.workspace_member >>
 
+staging_only: &main_only
+  filters:
+    branches:
+      only: main
+
 workflows:
   version: 2
 
   main-workflow:
-    when:
-      condition:
-        branches:
-          only:
-            - main
     jobs:
       - amareleo-chain
+        <<: *main_only
       - account
+        <<: *main_only
       - cli
+        <<: *main_only
       - node
+        <<: *main_only
       - node-bft
+        <<: *main_only
       - node-bft-events
+        <<: *main_only
       - node-bft-ledger-service
+        <<: *main_only
       - node-bft-storage-service
+        <<: *main_only
       - node-consensus
+        <<: *main_only
       - node-rest
+        <<: *main_only
       - node-sync
+        <<: *main_only
       - node-sync-locators
+        <<: *main_only
       - check-fmt
+        <<: *main_only
       - check-clippy
+        <<: *main_only
