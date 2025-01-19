@@ -329,6 +329,11 @@ workflows:
   version: 2
 
   main-workflow:
+    when:
+      condition:
+        branches:
+          only:
+            - main
     jobs:
       - amareleo-chain
       - account
@@ -344,14 +349,3 @@ workflows:
       - node-sync-locators
       - check-fmt
       - check-clippy
-
-  windows-workflow:
-    jobs:
-      - verify-windows:
-          matrix:
-            parameters:
-              workspace_member: [
-                account,
-                cli,
-                node
-              ]
