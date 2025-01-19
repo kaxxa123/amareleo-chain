@@ -325,41 +325,36 @@ jobs:
       - check_windows:
           workspace_member: << parameters.workspace_member >>
 
-main_only: &main_only
-  filters:
-    branches:
-      only: main
-
 workflows:
   version: 2
 
   main-workflow:
     jobs:
-      - amareleo-chain
-        <<: *main_only
-      - account
-        <<: *main_only
-      - cli
-        <<: *main_only
-      - node
-        <<: *main_only
-      - node-bft
-        <<: *main_only
-      - node-bft-events
-        <<: *main_only
-      - node-bft-ledger-service
-        <<: *main_only
-      - node-bft-storage-service
-        <<: *main_only
-      - node-consensus
-        <<: *main_only
-      - node-rest
-        <<: *main_only
-      - node-sync
-        <<: *main_only
-      - node-sync-locators
-        <<: *main_only
-      - check-fmt
-        <<: *main_only
-      - check-clippy
-        <<: *main_only
+      - amareleo-chain:
+          filters: pipeline.git.branch == "main" 
+      - account:
+          filters: pipeline.git.branch == "main"
+      - cli:
+          filters: pipeline.git.branch == "main"
+      - node:
+          filters: pipeline.git.branch == "main"
+      - node-bft:
+          filters: pipeline.git.branch == "main"
+      - node-bft-events:
+          filters: pipeline.git.branch == "main"
+      - node-bft-ledger-service:
+          filters: pipeline.git.branch == "main"
+      - node-bft-storage-service:
+          filters: pipeline.git.branch == "main"
+      - node-consensus:
+          filters: pipeline.git.branch == "main"
+      - node-rest:
+          filters: pipeline.git.branch == "main"
+      - node-sync:
+          filters: pipeline.git.branch == "main"
+      - node-sync-locators:
+          filters: pipeline.git.branch == "main"
+      - check-fmt:
+          filters: pipeline.git.branch == "main"
+      - check-clippy:
+          filters: pipeline.git.branch == "main"
