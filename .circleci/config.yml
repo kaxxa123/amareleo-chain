@@ -325,7 +325,7 @@ jobs:
       - check_windows:
           workspace_member: << parameters.workspace_member >>
 
-staging_only: &main_only
+main_only: &main_only
   filters:
     branches:
       only: main
