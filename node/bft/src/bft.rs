@@ -895,7 +895,12 @@ impl<N: Network> BFT<N> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{BFT, MAX_LEADER_CERTIFICATE_DELAY_IN_SECS, helpers::Storage};
+    use crate::{
+        BFT,
+        MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
+        helpers::{Storage, amareleo_storage_mode},
+    };
+
     use snarkos_lite_account::Account;
     use snarkos_lite_node_bft_ledger_service::MockLedgerService;
     use snarkos_lite_node_bft_storage_service::BFTMemoryService;
@@ -911,6 +916,8 @@ mod tests {
     use aleo_std::StorageMode;
     use anyhow::Result;
     use indexmap::{IndexMap, IndexSet};
+    use rand::SeedableRng;
+    use rand_chacha::ChaChaRng;
     use std::sync::Arc;
 
     type CurrentNetwork = snarkvm::console::network::MainnetV0;
@@ -1174,7 +1181,7 @@ mod tests {
         assert_eq!(storage.current_round(), 2);
 
         // Retrieve the leader certificate.
-        let leader = committee.get_leader(2).unwrap();
+        let leader = certificates[0].author(); // committee.get_leader(2).unwrap();
         let leader_certificate = storage.get_certificate_for_round_with_author(2, leader).unwrap();
 
         // Initialize the BFT.
@@ -1361,7 +1368,7 @@ mod tests {
         }
 
         // Get the leader certificate.
-        let leader = committee.get_leader(commit_round).unwrap();
+        let leader = certificates[0].author(); // committee.get_leader(commit_round).unwrap();
         let leader_certificate = storage.get_certificate_for_round_with_author(commit_round, leader).unwrap();
 
         // Initialize the BFT.
@@ -1427,7 +1434,7 @@ mod tests {
         }
 
         // Get the leader certificate.
-        let leader = committee.get_leader(commit_round).unwrap();
+        let leader = certificates[0].author(); // committee.get_leader(commit_round).unwrap();
         let leader_certificate = storage.get_certificate_for_round_with_author(commit_round, leader).unwrap();
 
         // Initialize the BFT.
@@ -1486,6 +1493,15 @@ mod tests {
         */
 
         let rng = &mut TestRng::default();
+        let rng_pks = &mut ChaChaRng::seed_from_u64(1234567890u64);
+
+        let private_keys = vec![
+            PrivateKey::new(rng_pks).unwrap(),
+            PrivateKey::new(rng_pks).unwrap(),
+            PrivateKey::new(rng_pks).unwrap(),
+            PrivateKey::new(rng_pks).unwrap(),
+        ];
+        let address0 = Address::try_from(private_keys[0])?;
 
         // Initialize the round parameters.
         let max_gc_rounds = snarkvm::ledger::narwhal::BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64;
@@ -1496,12 +1512,6 @@ mod tests {
 
         // Sample 5 rounds of batch certificates starting at the genesis round from a static set of 4 authors.
         let (round_to_certificates_map, committee) = {
-            let private_keys = vec![
-                PrivateKey::new(rng).unwrap(),
-                PrivateKey::new(rng).unwrap(),
-                PrivateKey::new(rng).unwrap(),
-                PrivateKey::new(rng).unwrap(),
-            ];
             let addresses = vec![
                 Address::try_from(private_keys[0])?,
                 Address::try_from(private_keys[1])?,
@@ -1569,8 +1579,8 @@ mod tests {
         // Initialize the storage.
         let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
         // Get the leaders for the next 2 commit rounds.
-        let leader = committee.get_leader(commit_round).unwrap();
-        let next_leader = committee.get_leader(next_round).unwrap();
+        let leader = address0; // committee.get_leader(commit_round).unwrap();
+        let next_leader = address0; // committee.get_leader(next_round).unwrap();
         // Insert the pre shutdown certificates into the storage.
         let mut pre_shutdown_certificates: Vec<snarkvm::ledger::narwhal::BatchCertificate<CurrentNetwork>> = Vec::new();
         for i in 1..=commit_round {
@@ -1603,8 +1613,8 @@ mod tests {
         let next_leader_certificate = storage.get_certificate_for_round_with_author(next_round, next_leader).unwrap();
 
         // Initialize the BFT without bootup.
-        let account = Account::new(rng)?;
-        let bft = BFT::new(account.clone(), storage, false, StorageMode::Development(0), ledger.clone())?;
+        let account = Account::try_from(private_keys[0])?;
+        let bft = BFT::new(account.clone(), storage, true, amareleo_storage_mode(1, true, None), ledger.clone())?;
 
         // Insert a mock DAG in the BFT without bootup.
         *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(0);
@@ -1629,7 +1639,8 @@ mod tests {
         let bootup_storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
 
         // Initialize a new instance of BFT with bootup.
-        let bootup_bft = BFT::new(account, bootup_storage.clone(), false, StorageMode::Development(0), ledger.clone())?;
+        let bootup_bft =
+            BFT::new(account, bootup_storage.clone(), true, amareleo_storage_mode(1, true, None), ledger.clone())?;
 
         // Sync the BFT DAG at bootup.
         bootup_bft.sync_bft_dag_at_bootup(pre_shutdown_certificates.clone()).await;
@@ -1703,6 +1714,15 @@ mod tests {
         */
 
         let rng = &mut TestRng::default();
+        let rng_pks = &mut ChaChaRng::seed_from_u64(1234567890u64);
+
+        let private_keys = vec![
+            PrivateKey::new(rng_pks).unwrap(),
+            PrivateKey::new(rng_pks).unwrap(),
+            PrivateKey::new(rng_pks).unwrap(),
+            PrivateKey::new(rng_pks).unwrap(),
+        ];
+        let address0 = Address::try_from(private_keys[0])?;
 
         // Initialize the round parameters.
         let max_gc_rounds = snarkvm::ledger::narwhal::BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64;
@@ -1713,12 +1733,6 @@ mod tests {
 
         // Sample 5 rounds of batch certificates starting at the genesis round from a static set of 4 authors.
         let (round_to_certificates_map, committee) = {
-            let private_keys = vec![
-                PrivateKey::new(rng).unwrap(),
-                PrivateKey::new(rng).unwrap(),
-                PrivateKey::new(rng).unwrap(),
-                PrivateKey::new(rng).unwrap(),
-            ];
             let addresses = vec![
                 Address::try_from(private_keys[0])?,
                 Address::try_from(private_keys[1])?,
@@ -1786,8 +1800,8 @@ mod tests {
         // Initialize the storage.
         let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
         // Get the leaders for the next 2 commit rounds.
-        let leader = committee.get_leader(commit_round).unwrap();
-        let next_leader = committee.get_leader(next_round).unwrap();
+        let leader = address0; // committee.get_leader(commit_round).unwrap();
+        let next_leader = address0; // committee.get_leader(next_round).unwrap();
         // Insert the pre shutdown certificates into the storage.
         let mut pre_shutdown_certificates: Vec<snarkvm::ledger::narwhal::BatchCertificate<CurrentNetwork>> = Vec::new();
         for i in 1..=commit_round {
@@ -1806,7 +1820,7 @@ mod tests {
             storage.testing_only_insert_certificate_testing_only(certificate.clone());
         }
         // Initialize the bootup BFT.
-        let account = Account::new(rng)?;
+        let account = Account::try_from(private_keys[0])?;
         let bootup_bft =
             BFT::new(account.clone(), storage.clone(), false, StorageMode::Development(0), ledger.clone())?;
         // Insert a mock DAG in the BFT without bootup.
