@@ -34,7 +34,7 @@ const STYLES: Styles = Styles::plain()
     .literal(Style::new().bold().fg_color(LITERAL_COLOR));
 
 #[derive(Debug, Parser)]
-#[clap(name = "amareleo-chain", styles = STYLES)]
+#[clap(name = "amareleo-chain", styles = STYLES, version)]
 pub struct CLI {
     /// Specify the verbosity [options: 0, 1, 2, 3]
     #[clap(default_value = "2", short, long)]
