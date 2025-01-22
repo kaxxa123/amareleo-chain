@@ -68,7 +68,7 @@ features = ["archive-zip", "compression-zip-deflate"]
 
 [dependencies.snarkos-lite-resources]
 path = "../resources"
-version = "=2.0.0"
+version = "=2.0.1"
 
 [dependencies.snarkos-lite-account]
 path = "../account"

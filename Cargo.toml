@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain"
-version = "2.0.0"
+version = "2.0.1"
 authors = [
     "The Aleo Team <hello@aleo.org>",
     "The Amareleo Team <support@windeveloper.com>",
@@ -57,9 +57,9 @@ default-features = false
 
 [workspace.dependencies.snarkvm] # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
 #path = "../snarkVM"
-#git = "https://github.com/AleoNet/snarkVM.git"
-#rev = "6322baf"
-version = "=1.1.0"
+#git = "https://github.com/ProvableHQ/snarkVM.git"
+#rev = "59b109c"
+version = "=1.2.1"
 features = [ "circuit", "console", "rocks" ]
 
 [dependencies.anyhow]
