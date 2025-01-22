@@ -22,4 +22,4 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 pub const DUMMY_SELF_IP: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
 
 // pub use snarkos_node_sync_communication_service as communication_service;
-pub use snarkos_lite_node_sync_locators as locators;
+pub use amareleo_node_sync_locators as locators;

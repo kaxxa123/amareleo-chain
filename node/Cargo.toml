@@ -1,6 +1,6 @@
 [package]
-name = "snarkos-lite-node"
-version = "3.1.0"
+name = "amareleo-node"
+version = "2.0.1"
 authors = [
     "The Aleo Team <hello@aleo.org>",
     "The Amareleo Team <support@windeveloper.com>",
@@ -25,10 +25,10 @@ parallel = ["rayon"]
 timer = ["aleo-std/timer"]
 metrics = [
     "dep:metrics",
-    "snarkos-lite-node-bft/metrics",
-    "snarkos-lite-node-consensus/metrics",
+    "amareleo-node-bft/metrics",
+    "amareleo-node-consensus/metrics",
 ]
-history = ["snarkos-lite-node-rest/history"]
+history = ["amareleo-node-rest/history"]
 test_targets = ["snarkvm/test_targets"]
 
 [dependencies.aleo-std]
@@ -38,9 +38,9 @@ workspace = true
 version = "1.0.79"
 
 [dependencies.metrics]
-package = "snarkos-lite-node-metrics"
+package = "amareleo-node-metrics"
 path = "./metrics"
-version = "=3.1.0"
+version = "=2.0.1"
 optional = true
 
 [dependencies.once_cell]
@@ -57,25 +57,25 @@ default-features = false
 version = "1"
 optional = true
 
-[dependencies.snarkos-lite-account]
+[dependencies.amareleo-chain-account]
 path = "../account"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-bft]
+[dependencies.amareleo-node-bft]
 path = "./bft"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-consensus]
+[dependencies.amareleo-node-consensus]
 path = "./consensus"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-rest]
+[dependencies.amareleo-node-rest]
 path = "./rest"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-sync]
+[dependencies.amareleo-node-sync]
 path = "./sync"
-version = "=3.1.0"
+version = "=2.0.1"
 
 [dependencies.snarkvm]
 workspace = true

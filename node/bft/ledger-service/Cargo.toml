@@ -1,6 +1,6 @@
 [package]
-name = "snarkos-lite-node-bft-ledger-service"
-version = "3.1.0"
+name = "amareleo-node-bft-ledger-service"
+version = "2.0.1"
 authors = [
   "The Aleo Team <hello@aleo.org>",
   "The Amareleo Team <support@windeveloper.com>",
@@ -42,9 +42,9 @@ version = "0.12"
 optional = true
 
 [dependencies.metrics]
-package = "snarkos-lite-node-metrics"
+package = "amareleo-node-metrics"
 path = "../../metrics"
-version = "=3.1.0"
+version = "=2.0.1"
 optional = true
 
 [dependencies.parking_lot]

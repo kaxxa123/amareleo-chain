@@ -1,6 +1,6 @@
 [package]
-name = "snarkos-lite-node-bft"
-version = "3.1.0"
+name = "amareleo-node-bft"
+version = "2.0.1"
 authors = [
   "The Aleo Team <hello@aleo.org>",
   "The Amareleo Team <support@windeveloper.com>",
@@ -23,8 +23,8 @@ edition = "2021"
 default = []
 metrics = [
   "dep:metrics",
-  "snarkos-lite-node-bft-events/metrics",
-  "snarkos-lite-node-bft-ledger-service/metrics",
+  "amareleo-node-bft-events/metrics",
+  "amareleo-node-bft-ledger-service/metrics",
 ]
 test_targets = ["snarkvm/test_targets"]
 
@@ -55,9 +55,9 @@ version = "2.1"
 features = ["serde", "rayon"]
 
 [dependencies.metrics]
-package = "snarkos-lite-node-metrics"
+package = "amareleo-node-metrics"
 path = "../metrics"
-version = "=3.1.0"
+version = "=2.0.1"
 optional = true
 
 [dependencies.parking_lot]
@@ -73,31 +73,27 @@ version = "1"
 version = "0.10"
 default-features = false
 
-[dependencies.snarkos-lite-account]
+[dependencies.amareleo-chain-account]
 path = "../../account"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-bft-events]
+[dependencies.amareleo-node-bft-events]
 path = "./events"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-bft-ledger-service]
+[dependencies.amareleo-node-bft-ledger-service]
 path = "./ledger-service"
-version = "=3.1.0"
+version = "=2.0.1"
 features = ["ledger", "prover"]
 
-[dependencies.snarkos-lite-node-bft-storage-service]
+[dependencies.amareleo-node-bft-storage-service]
 path = "./storage-service"
-version = "=3.1.0"
+version = "=2.0.1"
 features = ["memory"]
 
-[dependencies.snarkos-lite-node-sync]
+[dependencies.amareleo-node-sync]
 path = "../sync"
-version = "=3.1.0"
-
-# [dependencies.snarkos-node-tcp]
-# path = "../tcp"
-# version = "=3.1.0"
+version = "=2.0.1"
 
 [dependencies.snarkvm]
 workspace = true
@@ -154,12 +150,12 @@ version = "0.4"
 [dev-dependencies.rayon]
 version = "1"
 
-[dev-dependencies.snarkos-lite-node-bft-ledger-service]
+[dev-dependencies.amareleo-node-bft-ledger-service]
 path = "./ledger-service"
 default-features = false
 features = ["test", "ledger-write"]
 
-[dev-dependencies.snarkos-lite-node-bft-storage-service]
+[dev-dependencies.amareleo-node-bft-storage-service]
 path = "./storage-service"
 features = ["test"]
 

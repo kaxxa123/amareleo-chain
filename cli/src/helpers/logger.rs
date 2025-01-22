@@ -34,8 +34,8 @@ use tracing_subscriber::{
 /// ```ignore
 /// 0 => info
 /// 1 => info, debug
-/// 2 => info, debug, trace, snarkos_lite_node_sync=trace
-/// 3 => info, debug, trace, snarkos_lite_node_bft=trace
+/// 2 => info, debug, trace, amareleo_node_sync=trace
+/// 3 => info, debug, trace, amareleo_node_bft=trace
 /// ```
 pub fn initialize_logger<P: AsRef<Path>>(
     verbosity: u8,
@@ -59,15 +59,15 @@ pub fn initialize_logger<P: AsRef<Path>>(
             .add_directive("warp=off".parse().unwrap());
 
         let filter = if verbosity >= 2 {
-            filter.add_directive("snarkos_lite_node_sync=trace".parse().unwrap())
+            filter.add_directive("amareleo_node_sync=trace".parse().unwrap())
         } else {
-            filter.add_directive("snarkos_lite_node_sync=debug".parse().unwrap())
+            filter.add_directive("amareleo_node_sync=debug".parse().unwrap())
         };
 
         if verbosity >= 3 {
-            filter.add_directive("snarkos_lite_node_bft=trace".parse().unwrap())
+            filter.add_directive("amareleo_node_bft=trace".parse().unwrap())
         } else {
-            filter.add_directive("snarkos_lite_node_bft=debug".parse().unwrap())
+            filter.add_directive("amareleo_node_bft=debug".parse().unwrap())
         }
     });
 

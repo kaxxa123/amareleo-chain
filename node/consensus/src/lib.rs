@@ -18,8 +18,8 @@
 #[macro_use]
 extern crate tracing;
 
-use snarkos_lite_account::Account;
-use snarkos_lite_node_bft::{
+use amareleo_chain_account::Account;
+use amareleo_node_bft::{
     BFT,
     MAX_BATCH_DELAY_IN_MS,
     Primary,
@@ -33,8 +33,8 @@ use snarkos_lite_node_bft::{
     },
     spawn_blocking,
 };
-use snarkos_lite_node_bft_ledger_service::LedgerService;
-use snarkos_lite_node_bft_storage_service::BFTPersistentStorage;
+use amareleo_node_bft_ledger_service::LedgerService;
+use amareleo_node_bft_storage_service::BFTPersistentStorage;
 use snarkvm::{
     ledger::{
         block::Transaction,
@@ -286,7 +286,7 @@ impl<N: Network> Consensus<N> {
         #[cfg(feature = "metrics")]
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
-            let timestamp = snarkos_lite_node_bft::helpers::now();
+            let timestamp = amareleo_node_bft::helpers::now();
             self.transmissions_queue_timestamps
                 .lock()
                 .insert(TransmissionID::Solution(solution.id(), checksum), timestamp);
@@ -361,7 +361,7 @@ impl<N: Network> Consensus<N> {
         #[cfg(feature = "metrics")]
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
-            let timestamp = snarkos_lite_node_bft::helpers::now();
+            let timestamp = amareleo_node_bft::helpers::now();
             self.transmissions_queue_timestamps
                 .lock()
                 .insert(TransmissionID::Transaction(transaction.id(), checksum), timestamp);
@@ -539,7 +539,7 @@ impl<N: Network> Consensus<N> {
 
         #[cfg(feature = "metrics")]
         {
-            let elapsed = std::time::Duration::from_secs((snarkos_lite_node_bft::helpers::now() - start) as u64);
+            let elapsed = std::time::Duration::from_secs((amareleo_node_bft::helpers::now() - start) as u64);
             let next_block_timestamp = next_block.header().metadata().timestamp();
             let block_latency = next_block_timestamp - current_block_timestamp;
             let proof_target = next_block.header().proof_target();

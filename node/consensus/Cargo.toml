@@ -1,6 +1,6 @@
 [package]
-name = "snarkos-lite-node-consensus"
-version = "3.1.0"
+name = "amareleo-node-consensus"
+version = "2.0.1"
 authors = [
   "The Aleo Team <hello@aleo.org>",
   "The Amareleo Team <support@windeveloper.com>",
@@ -41,31 +41,31 @@ features = ["serde", "rayon"]
 version = "0.12.1"
 
 [dependencies.metrics]
-package = "snarkos-lite-node-metrics"
+package = "amareleo-node-metrics"
 path = "../metrics"
-version = "=3.1.0"
+version = "=2.0.1"
 optional = true
 
 [dependencies.parking_lot]
 version = "0.12"
 
-[dependencies.snarkos-lite-account]
+[dependencies.amareleo-chain-account]
 path = "../../account"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-bft]
+[dependencies.amareleo-node-bft]
 path = "../bft"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-bft-ledger-service]
+[dependencies.amareleo-node-bft-ledger-service]
 path = "../bft/ledger-service"
-version = "=3.1.0"
+version = "=2.0.1"
 default-features = false
 features = ["ledger", "ledger-write"]
 
-[dependencies.snarkos-lite-node-bft-storage-service]
+[dependencies.amareleo-node-bft-storage-service]
 path = "../bft/storage-service"
-version = "=3.1.0"
+version = "=2.0.1"
 default-features = false
 features = ["persistent"]
 

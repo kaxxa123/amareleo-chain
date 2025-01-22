@@ -1,6 +1,6 @@
 [package]
-name = "snarkos-lite-cli"
-version = "3.1.0"
+name = "amareleo-chain-cli"
+version = "2.0.1"
 authors = [
     "The Aleo Team <hello@aleo.org>",
     "The Amareleo Team <support@windeveloper.com>",
@@ -20,7 +20,7 @@ license = "Apache-2.0"
 edition = "2021"
 
 [features]
-default = ["snarkos-lite-node/metrics"]
+default = ["amareleo-node/metrics"]
 test_targets = ["snarkvm/test_targets"]
 
 [dependencies.anstyle]
@@ -44,9 +44,9 @@ version = "2.1"
 features = ["serde", "rayon"]
 
 [dependencies.metrics]
-package = "snarkos-lite-node-metrics"
+package = "amareleo-node-metrics"
 path = "../node/metrics"
-version = "=3.1.0"
+version = "=2.0.1"
 
 [dependencies.num_cpus]
 version = "1"
@@ -66,21 +66,21 @@ version = "1"
 version = "0.41"
 features = ["archive-zip", "compression-zip-deflate"]
 
-[dependencies.snarkos-lite-resources]
+[dependencies.amareleo-chain-resources]
 path = "../resources"
-version = "=2.0.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-account]
+[dependencies.amareleo-chain-account]
 path = "../account"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node]
+[dependencies.amareleo-node]
 path = "../node"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-rest]
+[dependencies.amareleo-node-rest]
 path = "../node/rest"
-version = "=3.1.0"
+version = "=2.0.1"
 
 [dependencies.snarkvm]
 workspace = true

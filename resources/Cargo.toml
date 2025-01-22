@@ -1,6 +1,6 @@
 [package]
-name = "snarkos-lite-resources"
-version = "2.0.0"
+name = "amareleo-chain-resources"
+version = "2.0.1"
 authors = ["The Amareleo Team <support@windeveloper.com>"]
 homepage = "https://amareleo.com"
 repository = "https://github.com/kaxxa123/amareleo-chain"

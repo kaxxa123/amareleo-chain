@@ -1,6 +1,6 @@
-# snarkos-lite-node-metrics
+# amareleo-node-metrics
 
-The `snarkos-lite-node-metrics` crate provides access to metrics for the `amareleo-chain` node.
+The `amareleo-node-metrics` crate provides access to metrics for the `amareleo-chain` node.
 
 ## Instructions
 

@@ -1,6 +1,6 @@
 [package]
-name = "snarkos-lite-node-sync"
-version = "3.1.0"
+name = "amareleo-node-sync"
+version = "2.0.1"
 authors = [
   "The Aleo Team <hello@aleo.org>",
   "The Amareleo Team <support@windeveloper.com>",
@@ -22,20 +22,20 @@ edition = "2021"
 [features]
 default = []
 metrics = ["dep:metrics"]
-test = ["snarkos-lite-node-sync-locators/test"]
+test = ["amareleo-node-sync-locators/test"]
 test_targets = ["snarkvm/test_targets"]
 
 [dependencies.metrics]
-package = "snarkos-lite-node-metrics"
+package = "amareleo-node-metrics"
 path = "../metrics"
-version = "=3.1.0"
+version = "=2.0.1"
 optional = true
 
-[dependencies.snarkos-lite-node-sync-locators]
+[dependencies.amareleo-node-sync-locators]
 path = "locators"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dev-dependencies.snarkos-lite-node-sync-locators]
+[dev-dependencies.amareleo-node-sync-locators]
 path = "locators"
 features = ["test"]
 

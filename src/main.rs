@@ -13,10 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_lite_cli::{commands::CLI, helpers::Updater};
+use amareleo_chain_cli::{commands::CLI, helpers::Updater};
 
 use clap::Parser;
-use std::process::exit;
+use std::{env, process::exit};
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 use tikv_jemallocator::Jemalloc;
@@ -25,7 +25,13 @@ use tikv_jemallocator::Jemalloc;
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
+// Obtain information on the build.
+include!(concat!(env!("OUT_DIR"), "/built.rs"));
+
 fn main() -> anyhow::Result<()> {
+    // A hack to avoid having to go through clap to display advanced version information.
+    check_for_version();
+
     // Parse the given arguments.
     let cli = CLI::parse();
     // Run the updater.
@@ -39,4 +45,21 @@ fn main() -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+/// Checks whether the version information was requested and - if so - display it and exit.
+fn check_for_version() {
+    if let Some(first_arg) = env::args().nth(1) {
+        if ["--version", "-V"].contains(&&*first_arg) {
+            let version = PKG_VERSION;
+            let branch = GIT_HEAD_REF.unwrap_or("unknown_branch");
+            let commit = GIT_COMMIT_HASH.unwrap_or("unknown_commit");
+            let mut features = FEATURES_LOWERCASE_STR.to_owned();
+            features.retain(|c| c != ' ');
+
+            println!("amareleo-chain {version} {branch} {commit} features=[{features}]");
+
+            exit(0);
+        }
+    }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain"
-version = "2.0.0"
+version = "2.0.1"
 authors = [
     "The Aleo Team <hello@aleo.org>",
     "The Amareleo Team <support@windeveloper.com>",
@@ -43,11 +43,11 @@ path = "src/main.rs"
 
 [features]
 metrics = [ 
-  "snarkos-lite-node-metrics", 
-  "snarkos-lite-node/metrics" 
+  "amareleo-node-metrics", 
+  "amareleo-node/metrics" 
   ]
-history = [ "snarkos-lite-node/history" ]
-test_targets = [ "snarkos-lite-cli/test_targets" ]
+history = [ "amareleo-node/history" ]
+test_targets = [ "amareleo-chain-cli/test_targets" ]
 
 [dependencies]
 
@@ -57,9 +57,9 @@ default-features = false
 
 [workspace.dependencies.snarkvm] # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
 #path = "../snarkVM"
-#git = "https://github.com/AleoNet/snarkVM.git"
-#rev = "6322baf"
-version = "=1.1.0"
+#git = "https://github.com/ProvableHQ/snarkVM.git"
+#rev = "59b109c"
+version = "=1.2.1"
 features = [ "circuit", "console", "rocks" ]
 
 [dependencies.anyhow]
@@ -69,44 +69,48 @@ version = "1.0.79"
 version = "4.4"
 features = [ "derive" ]
 
-[dependencies.snarkos-lite-account]
+[dependencies.amareleo-chain-account]
 path = "./account"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-cli]
+[dependencies.amareleo-chain-cli]
 path = "./cli"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node]
+[dependencies.amareleo-node]
 path = "./node"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-bft]
+[dependencies.amareleo-node-bft]
 path = "./node/bft"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-consensus]
+[dependencies.amareleo-node-consensus]
 path = "./node/consensus"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-metrics]
+[dependencies.amareleo-node-metrics]
 path = "./node/metrics"
-version = "=3.1.0"
+version = "=2.0.1"
 optional = true
 
-[dependencies.snarkos-lite-node-rest]
+[dependencies.amareleo-node-rest]
 path = "./node/rest"
-version = "=3.1.0"
+version = "=2.0.1"
 
-[dependencies.snarkos-lite-node-sync]
+[dependencies.amareleo-node-sync]
 path = "./node/sync"
-version = "=3.1.0"
+version = "=2.0.1"
 
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 tikv-jemallocator = "0.5"
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"
+
+[build-dependencies.built]
+version = "0.7"
+features = [ "git2" ]
 
 [build-dependencies.walkdir]
 version = "2"

@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use crate::helpers::{BFTSender, Storage};
-use snarkos_lite_node_bft_ledger_service::LedgerService;
-use snarkos_lite_node_sync::locators::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
+use amareleo_node_bft_ledger_service::LedgerService;
+use amareleo_node_sync::locators::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::{
     console::network::Network,
     ledger::authority::Authority,

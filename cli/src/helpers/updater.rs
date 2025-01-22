@@ -20,15 +20,15 @@ use std::fmt::Write;
 pub struct Updater;
 
 impl Updater {
-    const SNARKOSLITE_BIN_NAME: &'static str = "amareleo-chain";
-    const SNARKOSLITE_REPO_NAME: &'static str = "amareleo-chain";
-    const SNARKOSLITE_REPO_OWNER: &'static str = "kaxxa123";
+    const AMARELEOCHAIN_BIN_NAME: &'static str = "amareleo-chain";
+    const AMARELEOCHAIN_REPO_NAME: &'static str = "amareleo-chain";
+    const AMARELEOCHAIN_REPO_OWNER: &'static str = "kaxxa123";
 
     /// Show all available releases for `amareleo-chain`.
     pub fn show_available_releases() -> Result<String, UpdaterError> {
         let releases = github::ReleaseList::configure()
-            .repo_owner(Self::SNARKOSLITE_REPO_OWNER)
-            .repo_name(Self::SNARKOSLITE_REPO_NAME)
+            .repo_owner(Self::AMARELEOCHAIN_REPO_OWNER)
+            .repo_name(Self::AMARELEOCHAIN_REPO_NAME)
             .build()?
             .fetch()?;
 
@@ -44,9 +44,9 @@ impl Updater {
         let mut update_builder = github::Update::configure();
 
         update_builder
-            .repo_owner(Self::SNARKOSLITE_REPO_OWNER)
-            .repo_name(Self::SNARKOSLITE_REPO_NAME)
-            .bin_name(Self::SNARKOSLITE_BIN_NAME)
+            .repo_owner(Self::AMARELEOCHAIN_REPO_OWNER)
+            .repo_name(Self::AMARELEOCHAIN_REPO_NAME)
+            .bin_name(Self::AMARELEOCHAIN_BIN_NAME)
             .current_version(env!("CARGO_PKG_VERSION"))
             .show_download_progress(show_output)
             .no_confirm(true)
@@ -63,9 +63,9 @@ impl Updater {
     /// Check if there is an available update for `amareleo-chain` and return the newest release.
     pub fn update_available() -> Result<String, UpdaterError> {
         let updater = github::Update::configure()
-            .repo_owner(Self::SNARKOSLITE_REPO_OWNER)
-            .repo_name(Self::SNARKOSLITE_REPO_NAME)
-            .bin_name(Self::SNARKOSLITE_BIN_NAME)
+            .repo_owner(Self::AMARELEOCHAIN_REPO_OWNER)
+            .repo_name(Self::AMARELEOCHAIN_REPO_NAME)
+            .bin_name(Self::AMARELEOCHAIN_BIN_NAME)
             .current_version(env!("CARGO_PKG_VERSION"))
             .build()?;
 
