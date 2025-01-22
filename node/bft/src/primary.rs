@@ -34,9 +34,9 @@ use crate::{
     },
     spawn_blocking,
 };
-use snarkos_lite_account::Account;
-use snarkos_lite_node_bft_ledger_service::LedgerService;
-use snarkos_lite_node_sync::DUMMY_SELF_IP;
+use amareleo_chain_account::Account;
+use amareleo_node_bft_ledger_service::LedgerService;
+use amareleo_node_sync::DUMMY_SELF_IP;
 use snarkvm::{
     console::{prelude::*, types::Address},
     ledger::{

@@ -22,18 +22,18 @@ use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
 use crate::commands::Clean;
-use snarkos_lite_account::Account;
-use snarkos_lite_node::{
-    Validator,
-    bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode, custom_ledger_dir},
-};
-use snarkos_lite_resources::{
+use amareleo_chain_account::Account;
+use amareleo_chain_resources::{
     BLOCK0_CANARY,
     BLOCK0_CANARY_ID,
     BLOCK0_MAINNET,
     BLOCK0_MAINNET_ID,
     BLOCK0_TESTNET,
     BLOCK0_TESTNET_ID,
+};
+use amareleo_node::{
+    Validator,
+    bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode, custom_ledger_dir},
 };
 
 use snarkvm::{
@@ -265,7 +265,7 @@ impl Start {
         if let Some(rest_ip) = rest_ip {
             println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
 
-            if let Ok(jwt_token) = snarkos_lite_node_rest::Claims::new(account.address()).to_jwt_string() {
+            if let Ok(jwt_token) = amareleo_node_rest::Claims::new(account.address()).to_jwt_string() {
                 println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
             }
         }

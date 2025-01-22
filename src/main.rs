@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_lite_cli::{commands::CLI, helpers::Updater};
+use amareleo_chain_cli::{commands::CLI, helpers::Updater};
 
 use clap::Parser;
 use std::{env, process::exit};

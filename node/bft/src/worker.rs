@@ -18,7 +18,7 @@ use crate::{
     ProposedBatch,
     helpers::{Ready, Storage, fmt_id},
 };
-use snarkos_lite_node_bft_ledger_service::LedgerService;
+use amareleo_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
     ledger::{
@@ -254,8 +254,8 @@ impl<N: Network> Worker<N> {
 mod tests {
     use super::*;
 
-    use snarkos_lite_node_bft_ledger_service::LedgerService;
-    use snarkos_lite_node_bft_storage_service::BFTMemoryService;
+    use amareleo_node_bft_ledger_service::LedgerService;
+    use amareleo_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         console::{network::Network, types::Field},
         ledger::{
@@ -465,7 +465,7 @@ mod tests {
 #[cfg(test)]
 mod prop_tests {
     use super::*;
-    use snarkos_lite_node_bft_ledger_service::MockLedgerService;
+    use amareleo_node_bft_ledger_service::MockLedgerService;
     use snarkvm::{
         console::account::Address,
         ledger::committee::{Committee, MIN_VALIDATOR_STAKE},

@@ -114,20 +114,255 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 name = "amareleo-chain"
 version = "2.0.1"
 dependencies = [
+ "amareleo-chain-account",
+ "amareleo-chain-cli",
+ "amareleo-node",
+ "amareleo-node-bft",
+ "amareleo-node-consensus",
+ "amareleo-node-metrics",
+ "amareleo-node-rest",
+ "amareleo-node-sync",
  "anyhow",
  "built",
  "clap",
  "rusty-hook",
- "snarkos-lite-account",
- "snarkos-lite-cli",
- "snarkos-lite-node",
- "snarkos-lite-node-bft",
- "snarkos-lite-node-consensus",
- "snarkos-lite-node-metrics",
- "snarkos-lite-node-rest",
- "snarkos-lite-node-sync",
  "tikv-jemallocator",
  "walkdir",
+]
+
+[[package]]
+name = "amareleo-chain-account"
+version = "2.0.1"
+dependencies = [
+ "colored",
+ "snarkvm",
+]
+
+[[package]]
+name = "amareleo-chain-cli"
+version = "2.0.1"
+dependencies = [
+ "amareleo-chain-account",
+ "amareleo-chain-resources",
+ "amareleo-node",
+ "amareleo-node-metrics",
+ "amareleo-node-rest",
+ "anstyle",
+ "anyhow",
+ "clap",
+ "colored",
+ "crossterm",
+ "indexmap 2.7.0",
+ "nix",
+ "num_cpus",
+ "rand",
+ "rand_chacha",
+ "rayon",
+ "self_update 0.41.0",
+ "snarkvm",
+ "thiserror 1.0.69",
+ "time",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.19",
+]
+
+[[package]]
+name = "amareleo-chain-resources"
+version = "2.0.1"
+
+[[package]]
+name = "amareleo-node"
+version = "2.0.1"
+dependencies = [
+ "aleo-std",
+ "amareleo-chain-account",
+ "amareleo-node-bft",
+ "amareleo-node-consensus",
+ "amareleo-node-metrics",
+ "amareleo-node-rest",
+ "amareleo-node-sync",
+ "anyhow",
+ "once_cell",
+ "parking_lot",
+ "rand",
+ "rand_chacha",
+ "rayon",
+ "snarkvm",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.19",
+]
+
+[[package]]
+name = "amareleo-node-bft"
+version = "2.0.1"
+dependencies = [
+ "aleo-std",
+ "amareleo-chain-account",
+ "amareleo-node-bft-events",
+ "amareleo-node-bft-ledger-service",
+ "amareleo-node-bft-storage-service",
+ "amareleo-node-metrics",
+ "amareleo-node-sync",
+ "anyhow",
+ "async-recursion",
+ "async-trait",
+ "axum",
+ "axum-extra",
+ "bytes",
+ "clap",
+ "colored",
+ "deadline",
+ "futures",
+ "indexmap 2.7.0",
+ "itertools 0.12.1",
+ "mockall",
+ "open",
+ "parking_lot",
+ "paste",
+ "pea2pea",
+ "proptest",
+ "rand",
+ "rand_chacha",
+ "rand_distr",
+ "rayon",
+ "sha2",
+ "snarkvm",
+ "test-strategy",
+ "time",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber 0.3.19",
+ "tracing-test 0.1.0",
+]
+
+[[package]]
+name = "amareleo-node-bft-events"
+version = "2.0.1"
+dependencies = [
+ "amareleo-node-metrics",
+ "amareleo-node-sync-locators",
+ "anyhow",
+ "bytes",
+ "indexmap 2.7.0",
+ "proptest",
+ "rayon",
+ "serde",
+ "snarkvm",
+ "test-strategy",
+ "time",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "amareleo-node-bft-ledger-service"
+version = "2.0.1"
+dependencies = [
+ "amareleo-node-metrics",
+ "async-trait",
+ "indexmap 2.7.0",
+ "lru",
+ "parking_lot",
+ "rand",
+ "snarkvm",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "amareleo-node-bft-storage-service"
+version = "2.0.1"
+dependencies = [
+ "aleo-std",
+ "anyhow",
+ "indexmap 2.7.0",
+ "lru",
+ "parking_lot",
+ "snarkvm",
+ "tracing",
+]
+
+[[package]]
+name = "amareleo-node-consensus"
+version = "2.0.1"
+dependencies = [
+ "aleo-std",
+ "amareleo-chain-account",
+ "amareleo-node-bft",
+ "amareleo-node-bft-ledger-service",
+ "amareleo-node-bft-storage-service",
+ "amareleo-node-metrics",
+ "anyhow",
+ "colored",
+ "indexmap 2.7.0",
+ "itertools 0.12.1",
+ "lru",
+ "once_cell",
+ "parking_lot",
+ "snarkvm",
+ "tokio",
+ "tracing",
+ "tracing-test 0.2.5",
+]
+
+[[package]]
+name = "amareleo-node-metrics"
+version = "2.0.1"
+dependencies = [
+ "metrics-exporter-prometheus",
+ "parking_lot",
+ "rayon",
+ "snarkvm",
+ "time",
+]
+
+[[package]]
+name = "amareleo-node-rest"
+version = "2.0.1"
+dependencies = [
+ "amareleo-node-consensus",
+ "anyhow",
+ "axum",
+ "axum-extra",
+ "http 1.2.0",
+ "indexmap 2.7.0",
+ "jsonwebtoken",
+ "once_cell",
+ "parking_lot",
+ "rand",
+ "rayon",
+ "serde",
+ "serde_json",
+ "snarkvm",
+ "snarkvm-synthesizer",
+ "time",
+ "tokio",
+ "tower-http",
+ "tower_governor",
+ "tracing",
+]
+
+[[package]]
+name = "amareleo-node-sync"
+version = "2.0.1"
+dependencies = [
+ "amareleo-node-metrics",
+ "amareleo-node-sync-locators",
+ "snarkvm",
+]
+
+[[package]]
+name = "amareleo-node-sync-locators"
+version = "2.0.1"
+dependencies = [
+ "anyhow",
+ "indexmap 2.7.0",
+ "serde",
+ "snarkvm",
+ "tracing",
 ]
 
 [[package]]
@@ -3262,241 +3497,6 @@ checksum = "dd538fb6910ac1099850255cf94a94df6551fbdd602454387d0adb2d1ca6dead"
 dependencies = [
  "serde",
 ]
-
-[[package]]
-name = "snarkos-lite-account"
-version = "3.1.0"
-dependencies = [
- "colored",
- "snarkvm",
-]
-
-[[package]]
-name = "snarkos-lite-cli"
-version = "3.1.0"
-dependencies = [
- "anstyle",
- "anyhow",
- "clap",
- "colored",
- "crossterm",
- "indexmap 2.7.0",
- "nix",
- "num_cpus",
- "rand",
- "rand_chacha",
- "rayon",
- "self_update 0.41.0",
- "snarkos-lite-account",
- "snarkos-lite-node",
- "snarkos-lite-node-metrics",
- "snarkos-lite-node-rest",
- "snarkos-lite-resources",
- "snarkvm",
- "thiserror 1.0.69",
- "time",
- "tokio",
- "tracing",
- "tracing-subscriber 0.3.19",
-]
-
-[[package]]
-name = "snarkos-lite-node"
-version = "3.1.0"
-dependencies = [
- "aleo-std",
- "anyhow",
- "once_cell",
- "parking_lot",
- "rand",
- "rand_chacha",
- "rayon",
- "snarkos-lite-account",
- "snarkos-lite-node-bft",
- "snarkos-lite-node-consensus",
- "snarkos-lite-node-metrics",
- "snarkos-lite-node-rest",
- "snarkos-lite-node-sync",
- "snarkvm",
- "tokio",
- "tracing",
- "tracing-subscriber 0.3.19",
-]
-
-[[package]]
-name = "snarkos-lite-node-bft"
-version = "3.1.0"
-dependencies = [
- "aleo-std",
- "anyhow",
- "async-recursion",
- "async-trait",
- "axum",
- "axum-extra",
- "bytes",
- "clap",
- "colored",
- "deadline",
- "futures",
- "indexmap 2.7.0",
- "itertools 0.12.1",
- "mockall",
- "open",
- "parking_lot",
- "paste",
- "pea2pea",
- "proptest",
- "rand",
- "rand_chacha",
- "rand_distr",
- "rayon",
- "sha2",
- "snarkos-lite-account",
- "snarkos-lite-node-bft-events",
- "snarkos-lite-node-bft-ledger-service",
- "snarkos-lite-node-bft-storage-service",
- "snarkos-lite-node-metrics",
- "snarkos-lite-node-sync",
- "snarkvm",
- "test-strategy",
- "time",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-subscriber 0.3.19",
- "tracing-test 0.1.0",
-]
-
-[[package]]
-name = "snarkos-lite-node-bft-events"
-version = "3.1.0"
-dependencies = [
- "anyhow",
- "bytes",
- "indexmap 2.7.0",
- "proptest",
- "rayon",
- "serde",
- "snarkos-lite-node-metrics",
- "snarkos-lite-node-sync-locators",
- "snarkvm",
- "test-strategy",
- "time",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-lite-node-bft-ledger-service"
-version = "3.1.0"
-dependencies = [
- "async-trait",
- "indexmap 2.7.0",
- "lru",
- "parking_lot",
- "rand",
- "snarkos-lite-node-metrics",
- "snarkvm",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-lite-node-bft-storage-service"
-version = "3.1.0"
-dependencies = [
- "aleo-std",
- "anyhow",
- "indexmap 2.7.0",
- "lru",
- "parking_lot",
- "snarkvm",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-lite-node-consensus"
-version = "3.1.0"
-dependencies = [
- "aleo-std",
- "anyhow",
- "colored",
- "indexmap 2.7.0",
- "itertools 0.12.1",
- "lru",
- "once_cell",
- "parking_lot",
- "snarkos-lite-account",
- "snarkos-lite-node-bft",
- "snarkos-lite-node-bft-ledger-service",
- "snarkos-lite-node-bft-storage-service",
- "snarkos-lite-node-metrics",
- "snarkvm",
- "tokio",
- "tracing",
- "tracing-test 0.2.5",
-]
-
-[[package]]
-name = "snarkos-lite-node-metrics"
-version = "3.1.0"
-dependencies = [
- "metrics-exporter-prometheus",
- "parking_lot",
- "rayon",
- "snarkvm",
- "time",
-]
-
-[[package]]
-name = "snarkos-lite-node-rest"
-version = "3.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "axum-extra",
- "http 1.2.0",
- "indexmap 2.7.0",
- "jsonwebtoken",
- "once_cell",
- "parking_lot",
- "rand",
- "rayon",
- "serde",
- "serde_json",
- "snarkos-lite-node-consensus",
- "snarkvm",
- "snarkvm-synthesizer",
- "time",
- "tokio",
- "tower-http",
- "tower_governor",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-lite-node-sync"
-version = "3.1.0"
-dependencies = [
- "snarkos-lite-node-metrics",
- "snarkos-lite-node-sync-locators",
- "snarkvm",
-]
-
-[[package]]
-name = "snarkos-lite-node-sync-locators"
-version = "3.1.0"
-dependencies = [
- "anyhow",
- "indexmap 2.7.0",
- "serde",
- "snarkvm",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-lite-resources"
-version = "2.0.1"
 
 [[package]]
 name = "snarkvm"

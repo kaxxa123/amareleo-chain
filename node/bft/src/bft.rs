@@ -29,8 +29,8 @@ use crate::{
     },
 };
 use aleo_std::StorageMode;
-use snarkos_lite_account::Account;
-use snarkos_lite_node_bft_ledger_service::LedgerService;
+use amareleo_chain_account::Account;
+use amareleo_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::account::Address,
     ledger::{
@@ -901,9 +901,9 @@ mod tests {
         helpers::{Storage, amareleo_storage_mode},
     };
 
-    use snarkos_lite_account::Account;
-    use snarkos_lite_node_bft_ledger_service::MockLedgerService;
-    use snarkos_lite_node_bft_storage_service::BFTMemoryService;
+    use amareleo_chain_account::Account;
+    use amareleo_node_bft_ledger_service::MockLedgerService;
+    use amareleo_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         console::account::{Address, PrivateKey},
         ledger::{

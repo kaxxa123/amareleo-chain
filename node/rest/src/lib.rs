@@ -23,7 +23,7 @@ pub use helpers::*;
 
 mod routes;
 
-use snarkos_lite_node_consensus::Consensus;
+use amareleo_node_consensus::Consensus;
 use snarkvm::{
     console::{program::ProgramID, types::Field},
     prelude::{Ledger, Network, cfg_into_iter, store::ConsensusStorage},

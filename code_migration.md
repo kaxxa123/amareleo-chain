@@ -6,11 +6,11 @@ As we migrate `snarkos` code into `amareleo-chain`, we keep notes on key changes
 
 * Documented code blocks may cover an entire sub-crate or indvidual modules. Hence we refer to the code using relative paths rather than crate names.
 
-* __No cross-dependencies__ - This label highlights how the sub-crate/module does not depend on other sub-crates/modules (except for the `snarkos-lite-node-metrics` sub-crate).
+* __No cross-dependencies__ - This label highlights how the sub-crate/module does not depend on other sub-crates/modules (except for the `amareleo-node-metrics` sub-crate).
 
 * The main executable is renamed from `snarkos` to `amareleo-chain`.
 
-* All `snarkos` sub-crates are renamed from `snarkos-*` to `snarkos-lite-*` even when the code is otherwise identical. 
+* All `snarkos` sub-crates are renamed from `snarkos-*` to `amareleo-chain-*`/`amareleo-node-*` even when the code is otherwise identical. 
 
 * The `amareleo-chain` ledger files/folders where renamed as follows:
     | snarkos                    | amareleo-chain              |

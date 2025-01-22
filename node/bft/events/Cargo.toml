@@ -1,6 +1,6 @@
 [package]
-name = "snarkos-lite-node-bft-events"
-version = "3.1.0"
+name = "amareleo-node-bft-events"
+version = "2.0.1"
 authors = [
   "The Aleo Team <hello@aleo.org>",
   "The Amareleo Team <support@windeveloper.com>",
@@ -35,9 +35,9 @@ version = "2.1"
 features = ["serde", "rayon"]
 
 [dependencies.metrics]
-package = "snarkos-lite-node-metrics"
+package = "amareleo-node-metrics"
 path = "../../metrics"
-version = "=3.1.0"
+version = "=2.0.1"
 optional = true
 
 [dependencies.rayon]
@@ -46,9 +46,9 @@ version = "1"
 [dependencies.serde]
 version = "1"
 
-[dependencies.snarkos-lite-node-sync-locators]
+[dependencies.amareleo-node-sync-locators]
 path = "../../sync/locators"
-version = "=3.1.0"
+version = "=2.0.1"
 
 [dependencies.snarkvm]
 workspace = true
@@ -73,6 +73,6 @@ version = "0.3.1"
 [dev-dependencies.time]
 version = "0.3"
 
-[dev-dependencies.snarkos-lite-node-sync-locators]
+[dev-dependencies.amareleo-node-sync-locators]
 path = "../../sync/locators"
 features = ["test"]

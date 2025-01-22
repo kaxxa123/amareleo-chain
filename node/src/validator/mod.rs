@@ -13,10 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_lite_account::Account;
-use snarkos_lite_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
-use snarkos_lite_node_consensus::Consensus;
-use snarkos_lite_node_rest::Rest;
+use amareleo_chain_account::Account;
+use amareleo_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
+use amareleo_node_consensus::Consensus;
+use amareleo_node_rest::Rest;
 use snarkvm::prelude::{Ledger, Network, block::Block, store::ConsensusStorage};
 
 use aleo_std::StorageMode;

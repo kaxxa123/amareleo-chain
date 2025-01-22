@@ -13,12 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_lite_node::bft::helpers::{
-    amareleo_ledger_dir,
-    amareleo_storage_mode,
-    custom_ledger_dir,
-    proposal_cache_path,
-};
+use amareleo_node::bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode, custom_ledger_dir, proposal_cache_path};
 
 use anyhow::{Result, bail};
 use clap::Parser;

@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use crate::helpers::{check_timestamp_for_liveness, fmt_id};
-use snarkos_lite_node_bft_ledger_service::LedgerService;
-use snarkos_lite_node_bft_storage_service::StorageService;
+use amareleo_node_bft_ledger_service::LedgerService;
+use amareleo_node_bft_storage_service::StorageService;
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
@@ -830,8 +830,8 @@ impl<N: Network> Storage<N> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use snarkos_lite_node_bft_ledger_service::MockLedgerService;
-    use snarkos_lite_node_bft_storage_service::BFTMemoryService;
+    use amareleo_node_bft_ledger_service::MockLedgerService;
+    use amareleo_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         ledger::narwhal::Data,
         prelude::{Rng, TestRng},
@@ -1030,8 +1030,8 @@ pub(crate) mod tests {
 pub mod prop_tests {
     use super::*;
     use crate::helpers::{now, storage::tests::assert_storage};
-    use snarkos_lite_node_bft_ledger_service::MockLedgerService;
-    use snarkos_lite_node_bft_storage_service::BFTMemoryService;
+    use amareleo_node_bft_ledger_service::MockLedgerService;
+    use amareleo_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         ledger::{
             committee::prop_tests::{CommitteeContext, ValidatorSet},

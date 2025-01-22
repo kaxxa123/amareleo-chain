@@ -1,6 +1,6 @@
 [package]
-name = "snarkos-lite-node-rest"
-version = "3.1.0"
+name = "amareleo-node-rest"
+version = "2.0.1"
 authors = [
   "The Aleo Team <hello@aleo.org>",
   "The Amareleo Team <support@windeveloper.com>",
@@ -60,9 +60,9 @@ features = ["derive"]
 version = "1"
 features = ["preserve_order"]
 
-[dependencies.snarkos-lite-node-consensus]
+[dependencies.amareleo-node-consensus]
 path = "../consensus"
-version = "=3.1.0"
+version = "=2.0.1"
 
 [dependencies.snarkvm-synthesizer]
 #path = "../../../snarkVM/synthesizer"
