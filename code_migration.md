@@ -46,7 +46,6 @@ An alternative approach would be to remove/replace the consensus altogether.
 
 `amareleo-chain` aims to rename the ledger folder. We achive this by setting `StorageMode::Custom` with our custom ledger folder. This `StorageMode` instructs `aleo_ledger_dir()` to use our custom path.
 
-
 <BR />
 
 ## Notes
