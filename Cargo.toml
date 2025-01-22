@@ -108,6 +108,10 @@ tikv-jemallocator = "0.5"
 [dev-dependencies.rusty-hook]
 version = "0.11.2"
 
+[build-dependencies.built]
+version = "0.7"
+features = [ "git2" ]
+
 [build-dependencies.walkdir]
 version = "2"
 
