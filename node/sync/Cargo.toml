@@ -1,16 +1,13 @@
 [package]
 name = "amareleo-node-sync"
 version = "2.0.1"
-authors = [
-  "The Aleo Team <hello@aleo.org>",
-  "The Amareleo Team <support@windeveloper.com>",
-]
-description = "A synchronization module for a decentralized operating system"
+authors = ["The Amareleo Team <support@windeveloper.com>"]
+description = "A synchronization module for a lite Aleo development node"
 homepage = "https://amareleo.com"
 repository = "https://github.com/kaxxa123/amareleo-chain"
 keywords = [
   "aleo",
-  "cryptography",
+  "amareleo",
   "blockchain",
   "decentralized",
   "zero-knowledge",
