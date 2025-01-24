@@ -1,5 +1,10 @@
 # Amareleo-Chain - disposable, developer-friendly, Aleo chain instances
 
+[![Crates.io](https://img.shields.io/crates/v/amareleo-chain.svg?color=neon)](https://crates.io/crates/amareleo-chain)
+[![Authors](https://img.shields.io/badge/authors-Amareleo-orange.svg)](https://amareleo.com)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE.md)
+
+
 * [1. Overview](#1-overview)
 * [2. Build Guide](#2-build-guide)
     * [2.1 Requirements](#21-Requirements)
