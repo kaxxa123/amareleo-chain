@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain"
-version = "2.0.1"
+version = "2.0.2"
 authors = ["The Amareleo Team <support@windeveloper.com>"]
 description = "A lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -54,9 +54,9 @@ default-features = false
 
 [workspace.dependencies.snarkvm] # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
 #path = "../snarkVM"
-#git = "https://github.com/ProvableHQ/snarkVM.git"
-#rev = "59b109c"
-version = "=1.2.1"
+git = "https://github.com/ProvableHQ/snarkVM.git"
+rev = "8038932"
+#version = "=1.2.1"
 features = [ "circuit", "console", "rocks" ]
 
 [dependencies.anyhow]
@@ -72,19 +72,19 @@ version = "=2.0.1"
 
 [dependencies.amareleo-chain-cli]
 path = "./cli"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node]
 path = "./node"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node-bft]
 path = "./node/bft"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node-consensus]
 path = "./node/consensus"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node-metrics]
 path = "./node/metrics"
@@ -93,7 +93,7 @@ optional = true
 
 [dependencies.amareleo-node-rest]
 path = "./node/rest"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node-sync]
 path = "./node/sync"
