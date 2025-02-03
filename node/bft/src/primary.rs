@@ -772,17 +772,16 @@ impl<N: Network> Primary<N> {
                 let next_round = self_.current_round().saturating_add(1);
                 // Determine if the quorum threshold is reached for the current round.
                 let is_quorum_threshold_reached = {
-                    // Retrieve the certificates for the next round.
-                    let certificates = self_.storage.get_certificates_for_round(next_round);
+                    // Retrieve the certificate authors for the next round.
+                    let authors = self_.storage.get_certificate_authors_for_round(next_round);
                     // If there are no certificates, then skip this check.
-                    if certificates.is_empty() {
+                    if authors.is_empty() {
                         continue;
                     }
                     let Ok(committee_lookback) = self_.ledger.get_committee_lookback_for_round(next_round) else {
                         warn!("Failed to retrieve the committee lookback for round {next_round}");
                         continue;
                     };
-                    let authors = certificates.iter().map(BatchCertificate::author).collect();
                     committee_lookback.is_quorum_threshold_reached(&authors)
                 };
                 // Attempt to increment to the next round if the quorum threshold is reached.
@@ -1095,8 +1094,7 @@ impl<N: Network> Primary<N> {
 
         // Determine if quorum threshold is reached on the batch round.
         let is_quorum_threshold_reached = {
-            let certificates = self.storage.get_certificates_for_round(batch_round);
-            let authors = certificates.iter().map(BatchCertificate::author).collect();
+            let authors = self.storage.get_certificate_authors_for_round(batch_round);
             let committee_lookback = self.ledger.get_committee_lookback_for_round(batch_round)?;
             committee_lookback.is_quorum_threshold_reached(&authors)
         };

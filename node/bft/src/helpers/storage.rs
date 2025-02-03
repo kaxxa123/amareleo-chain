@@ -219,9 +219,9 @@ impl<N: Network> Storage<N> {
             // Remove the GC round(s) from storage.
             for gc_round in current_gc_round..=next_gc_round {
                 // Iterate over the certificates for the GC round.
-                for certificate in self.get_certificates_for_round(gc_round).iter() {
+                for id in self.get_certificate_ids_for_round(gc_round).into_iter() {
                     // Remove the certificate from storage.
-                    self.remove_certificate(certificate.id());
+                    self.remove_certificate(id);
                 }
             }
             // Update the GC round.
@@ -321,6 +321,36 @@ impl<N: Network> Storage<N> {
         if let Some(entries) = self.rounds.read().get(&round) {
             let certificates = self.certificates.read();
             entries.iter().flat_map(|(certificate_id, _, _)| certificates.get(certificate_id).cloned()).collect()
+        } else {
+            Default::default()
+        }
+    }
+
+    /// Returns the certificate IDs for the given `round`.
+    /// If the round does not exist in storage, `None` is returned.
+    pub fn get_certificate_ids_for_round(&self, round: u64) -> IndexSet<Field<N>> {
+        // The genesis round does not have batch certificates.
+        if round == 0 {
+            return Default::default();
+        }
+        // Retrieve the certificates.
+        if let Some(entries) = self.rounds.read().get(&round) {
+            entries.iter().map(|(certificate_id, _, _)| *certificate_id).collect()
+        } else {
+            Default::default()
+        }
+    }
+
+    /// Returns the certificate authors for the given `round`.
+    /// If the round does not exist in storage, `None` is returned.
+    pub fn get_certificate_authors_for_round(&self, round: u64) -> HashSet<Address<N>> {
+        // The genesis round does not have batch certificates.
+        if round == 0 {
+            return Default::default();
+        }
+        // Retrieve the certificates.
+        if let Some(entries) = self.rounds.read().get(&round) {
+            entries.iter().map(|(_, _, author)| *author).collect()
         } else {
             Default::default()
         }
