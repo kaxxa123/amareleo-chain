@@ -35,7 +35,7 @@ optional = true
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "../../metrics"
-version = "=2.0.1"
+version = "=2.0.2"
 optional = true
 
 [dependencies.parking_lot]
