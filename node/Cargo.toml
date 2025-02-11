@@ -31,7 +31,7 @@ version = "1.0.79"
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "./metrics"
-version = "=2.0.1"
+version = "=2.0.2"
 optional = true
 
 [dependencies.once_cell]
@@ -50,7 +50,7 @@ optional = true
 
 [dependencies.amareleo-chain-account]
 path = "../account"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node-bft]
 path = "./bft"
@@ -66,7 +66,7 @@ version = "=2.0.2"
 
 [dependencies.amareleo-node-sync]
 path = "./sync"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.snarkvm]
 workspace = true

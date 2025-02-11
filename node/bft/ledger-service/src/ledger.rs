@@ -233,7 +233,9 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         transmission: &mut Transmission<N>,
     ) -> Result<()> {
         match (transmission_id, transmission) {
-            (TransmissionID::Ratification, Transmission::Ratification) => {}
+            (TransmissionID::Ratification, Transmission::Ratification) => {
+                bail!("Ratification transmissions are currently not supported.")
+            }
             (
                 TransmissionID::Transaction(expected_transaction_id, expected_checksum),
                 Transmission::Transaction(transaction_data),
