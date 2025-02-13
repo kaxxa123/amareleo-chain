@@ -1,7 +1,7 @@
 [package]
 name = "amareleo-node-consensus"
 version = "2.0.2"
-authors = ["The Amareleo Team <support@windeveloper.com>"]
+authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A node consensus for a lite Aleo development node"
 homepage = "https://amareleo.com"
 repository = "https://github.com/kaxxa123/amareleo-chain"
@@ -34,7 +34,7 @@ version = "0.12.1"
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "../metrics"
-version = "=2.0.1"
+version = "=2.0.2"
 optional = true
 
 [dependencies.parking_lot]
@@ -42,7 +42,7 @@ version = "0.12"
 
 [dependencies.amareleo-chain-account]
 path = "../../account"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node-bft]
 path = "../bft"
@@ -56,7 +56,7 @@ features = ["ledger", "ledger-write"]
 
 [dependencies.amareleo-node-bft-storage-service]
 path = "../bft/storage-service"
-version = "=2.0.1"
+version = "=2.0.2"
 default-features = false
 features = ["persistent"]
 

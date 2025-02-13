@@ -1,7 +1,7 @@
 [package]
 name = "amareleo-chain-cli"
 version = "2.0.2"
-authors = ["The Amareleo Team <support@windeveloper.com>"]
+authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A CLI for a lite Aleo development node"
 homepage = "https://amareleo.com"
 repository = "https://github.com/kaxxa123/amareleo-chain"
@@ -37,7 +37,7 @@ features = ["serde", "rayon"]
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "../node/metrics"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.num_cpus]
 version = "1"
@@ -59,11 +59,11 @@ features = ["archive-zip", "compression-zip-deflate"]
 
 [dependencies.amareleo-chain-resources]
 path = "../resources"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-chain-account]
 path = "../account"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node]
 path = "../node"
