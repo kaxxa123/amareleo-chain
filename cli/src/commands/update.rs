@@ -18,10 +18,10 @@ use crate::helpers::Updater;
 use anyhow::Result;
 use clap::Parser;
 
-/// Update amareleo-chain.
+/// Updates the node.
 #[derive(Debug, Parser)]
 pub struct Update {
-    /// Lists all available versions of amareleo-chain
+    /// Lists all available versions
     #[clap(short = 'l', long)]
     list: bool,
     /// Suppress outputs to terminal
@@ -33,27 +33,27 @@ pub struct Update {
 }
 
 impl Update {
-    /// Update amareleo-chain.
-    pub fn parse(self) -> Result<String> {
+    /// Updates the node.
+    pub fn parse(self, bin_name: &str) -> Result<String> {
         match self.list {
             true => match Updater::show_available_releases() {
                 Ok(output) => Ok(output),
-                Err(error) => Ok(format!("Failed to list the available versions of amareleo-chain\n{error}\n")),
+                Err(error) => Ok(format!("Failed to list the available versions\n{error}\n")),
             },
             false => {
-                let result = Updater::update_to_release(!self.quiet, self.version);
+                let result = Updater::update_to_release(!self.quiet, bin_name, self.version);
                 if !self.quiet {
                     match result {
                         Ok(status) => {
                             if status.uptodate() {
-                                Ok("\namareleo-chain is already on the latest version".to_string())
+                                Ok("\nThe latest version is already installed.".to_string())
                             } else if status.updated() {
-                                Ok(format!("\namareleo-chain has updated to version {}", status.version()))
+                                Ok(format!("\nSuccessfully updated to version {}", status.version()))
                             } else {
                                 Ok(String::new())
                             }
                         }
-                        Err(e) => Ok(format!("\nFailed to update amareleo-chain to the latest version\n{e}\n")),
+                        Err(e) => Ok(format!("\nFailed to update to the latest version\n{e}\n")),
                     }
                 } else {
                     Ok(String::new())

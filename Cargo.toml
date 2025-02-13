@@ -19,6 +19,7 @@ rust-version = "1.81.0" # Attention - Change the MSRV in rust-toolchain and in .
 
 [workspace]
 members = [
+  "amareleo",
   "resources",
   "account",
   "cli", 

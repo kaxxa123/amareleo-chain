@@ -20,11 +20,10 @@ use std::fmt::Write;
 pub struct Updater;
 
 impl Updater {
-    const AMARELEOCHAIN_BIN_NAME: &'static str = "amareleo-chain";
     const AMARELEOCHAIN_REPO_NAME: &'static str = "amareleo-chain";
     const AMARELEOCHAIN_REPO_OWNER: &'static str = "kaxxa123";
 
-    /// Show all available releases for `amareleo-chain`.
+    /// Show all available releases.
     pub fn show_available_releases() -> Result<String, UpdaterError> {
         let releases = github::ReleaseList::configure()
             .repo_owner(Self::AMARELEOCHAIN_REPO_OWNER)
@@ -39,14 +38,18 @@ impl Updater {
         Ok(output)
     }
 
-    /// Update `amareleo-chain` to the specified release.
-    pub fn update_to_release(show_output: bool, version: Option<String>) -> Result<Status, UpdaterError> {
+    /// Update to the specified release.
+    pub fn update_to_release(
+        show_output: bool,
+        bin_name: &str,
+        version: Option<String>,
+    ) -> Result<Status, UpdaterError> {
         let mut update_builder = github::Update::configure();
 
         update_builder
             .repo_owner(Self::AMARELEOCHAIN_REPO_OWNER)
             .repo_name(Self::AMARELEOCHAIN_REPO_NAME)
-            .bin_name(Self::AMARELEOCHAIN_BIN_NAME)
+            .bin_name(bin_name)
             .current_version(env!("CARGO_PKG_VERSION"))
             .show_download_progress(show_output)
             .no_confirm(true)
@@ -60,12 +63,12 @@ impl Updater {
         Ok(status)
     }
 
-    /// Check if there is an available update for `amareleo-chain` and return the newest release.
-    pub fn update_available() -> Result<String, UpdaterError> {
+    /// Check if there is an available update and return the newest release.
+    pub fn update_available(bin_name: &str) -> Result<String, UpdaterError> {
         let updater = github::Update::configure()
             .repo_owner(Self::AMARELEOCHAIN_REPO_OWNER)
             .repo_name(Self::AMARELEOCHAIN_REPO_NAME)
-            .bin_name(Self::AMARELEOCHAIN_BIN_NAME)
+            .bin_name(bin_name)
             .current_version(env!("CARGO_PKG_VERSION"))
             .build()?;
 
@@ -80,10 +83,10 @@ impl Updater {
     }
 
     /// Display the CLI message.
-    pub fn print_cli() -> String {
-        if let Ok(latest_version) = Self::update_available() {
+    pub fn print_cli(bin_name: &str) -> String {
+        if let Ok(latest_version) = Self::update_available(bin_name) {
             let mut output = "🟢 A new version is available! Run".bold().green().to_string();
-            output += &" `amareleo-chain update` ".bold().white();
+            output += &format!(" `{bin_name} update` ").bold().white();
             output += &format!("to update to v{latest_version}.").bold().green();
             output
         } else {
