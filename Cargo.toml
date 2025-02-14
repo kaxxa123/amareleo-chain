@@ -34,9 +34,14 @@ members = [
   "node/sync/locators"
   ]
 
+[lib]
+path = "src/lib.rs"
+test = false
+
 [[bin]]
 name = "amareleo-chain"
 path = "src/main.rs"
+test = false
 
 [features]
 metrics = [ 
