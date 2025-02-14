@@ -1,3 +1,4 @@
 fn main() -> anyhow::Result<()> {
-    amareleo_chain::main_core(env!("CARGO_PKG_NAME"))
+    let pkg_name = env!("CARGO_PKG_NAME");
+    amareleo_chain::main_core(pkg_name, pkg_name)
 }

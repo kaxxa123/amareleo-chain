@@ -56,11 +56,11 @@ pub enum Command {
 
 impl Command {
     /// Parses the command.
-    pub fn parse(self, bin_name: &str) -> Result<String> {
+    pub fn parse(self, repo_name: &str, bin_name: &str) -> Result<String> {
         match self {
             Self::Clean(command) => command.parse(),
             Self::Start(command) => command.parse(),
-            Self::Update(command) => command.parse(bin_name),
+            Self::Update(command) => command.parse(repo_name, bin_name),
         }
     }
 }

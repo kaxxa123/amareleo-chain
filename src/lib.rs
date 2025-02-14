@@ -28,16 +28,16 @@ static GLOBAL: Jemalloc = Jemalloc;
 // Obtain information on the build.
 include!(concat!(env!("OUT_DIR"), "/built.rs"));
 
-pub fn main_core(bin_name: &str) -> anyhow::Result<()> {
+pub fn main_core(repo_name: &str, bin_name: &str) -> anyhow::Result<()> {
     // A hack to avoid having to go through clap to display advanced version information.
     check_for_version(bin_name);
 
     // Parse the given arguments.
     let cli = CLI::parse();
     // Run the updater.
-    println!("{}", Updater::print_cli(bin_name));
+    println!("{}", Updater::print_cli(repo_name, bin_name));
     // Run the CLI.
-    match cli.command.parse(bin_name) {
+    match cli.command.parse(repo_name, bin_name) {
         Ok(output) => println!("{output}\n"),
         Err(error) => {
             println!("⚠️  {error}\n");

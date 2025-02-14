@@ -34,14 +34,14 @@ pub struct Update {
 
 impl Update {
     /// Updates the node.
-    pub fn parse(self, bin_name: &str) -> Result<String> {
+    pub fn parse(self, repo_name: &str, bin_name: &str) -> Result<String> {
         match self.list {
-            true => match Updater::show_available_releases() {
+            true => match Updater::show_available_releases(repo_name) {
                 Ok(output) => Ok(output),
                 Err(error) => Ok(format!("Failed to list the available versions\n{error}\n")),
             },
             false => {
-                let result = Updater::update_to_release(!self.quiet, bin_name, self.version);
+                let result = Updater::update_to_release(!self.quiet, repo_name, bin_name, self.version);
                 if !self.quiet {
                     match result {
                         Ok(status) => {
