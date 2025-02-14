@@ -57,7 +57,16 @@ impl Updater {
 
         let status = match version {
             None => update_builder.build()?.update()?,
-            Some(v) => update_builder.target_version_tag(&v).build()?.update()?,
+            Some(new_version) => {
+                // Normalize version to have a leading 'v'
+                let new_version = if new_version.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                    format!("v{new_version}")
+                } else {
+                    new_version
+                };
+
+                update_builder.target_version_tag(&new_version).build()?.update()?
+            }
         };
 
         Ok(status)
