@@ -331,30 +331,58 @@ workflows:
   main-workflow:
     jobs:
       - amareleo-chain:
-          filters: pipeline.git.branch == "main" 
+          filters: 
+            branches:
+              only: [main, develop]
       - account:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - cli:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - node:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - node-bft:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - node-bft-events:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - node-bft-ledger-service:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - node-bft-storage-service:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - node-consensus:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - node-rest:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - node-sync:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - node-sync-locators:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - check-fmt:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]
       - check-clippy:
-          filters: pipeline.git.branch == "main"
+          filters: 
+            branches:
+              only: [main, develop]

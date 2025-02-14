@@ -1,7 +1,7 @@
 [package]
 name = "amareleo-chain"
-version = "2.0.1"
-authors = ["The Amareleo Team <support@windeveloper.com>"]
+version = "2.0.2"
+authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A lite Aleo development node"
 homepage = "https://amareleo.com"
 repository = "https://github.com/kaxxa123/amareleo-chain"
@@ -34,9 +34,14 @@ members = [
   "node/sync/locators"
   ]
 
+[lib]
+path = "src/lib.rs"
+test = false
+
 [[bin]]
 name = "amareleo-chain"
 path = "src/main.rs"
+test = false
 
 [features]
 metrics = [ 
@@ -55,8 +60,8 @@ default-features = false
 [workspace.dependencies.snarkvm] # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
 #path = "../snarkVM"
 #git = "https://github.com/ProvableHQ/snarkVM.git"
-#rev = "59b109c"
-version = "=1.2.1"
+#rev = "32bf9ab"
+version = "=1.3.0"
 features = [ "circuit", "console", "rocks" ]
 
 [dependencies.anyhow]
@@ -68,36 +73,36 @@ features = [ "derive" ]
 
 [dependencies.amareleo-chain-account]
 path = "./account"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-chain-cli]
 path = "./cli"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node]
 path = "./node"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node-bft]
 path = "./node/bft"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node-consensus]
 path = "./node/consensus"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node-metrics]
 path = "./node/metrics"
-version = "=2.0.1"
+version = "=2.0.2"
 optional = true
 
 [dependencies.amareleo-node-rest]
 path = "./node/rest"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [dependencies.amareleo-node-sync]
 path = "./node/sync"
-version = "=2.0.1"
+version = "=2.0.2"
 
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 tikv-jemallocator = "0.5"

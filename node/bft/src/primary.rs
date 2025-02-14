@@ -772,17 +772,16 @@ impl<N: Network> Primary<N> {
                 let next_round = self_.current_round().saturating_add(1);
                 // Determine if the quorum threshold is reached for the current round.
                 let is_quorum_threshold_reached = {
-                    // Retrieve the certificates for the next round.
-                    let certificates = self_.storage.get_certificates_for_round(next_round);
+                    // Retrieve the certificate authors for the next round.
+                    let authors = self_.storage.get_certificate_authors_for_round(next_round);
                     // If there are no certificates, then skip this check.
-                    if certificates.is_empty() {
+                    if authors.is_empty() {
                         continue;
                     }
                     let Ok(committee_lookback) = self_.ledger.get_committee_lookback_for_round(next_round) else {
                         warn!("Failed to retrieve the committee lookback for round {next_round}");
                         continue;
                     };
-                    let authors = certificates.iter().map(BatchCertificate::author).collect();
                     committee_lookback.is_quorum_threshold_reached(&authors)
                 };
                 // Attempt to increment to the next round if the quorum threshold is reached.
@@ -1095,8 +1094,7 @@ impl<N: Network> Primary<N> {
 
         // Determine if quorum threshold is reached on the batch round.
         let is_quorum_threshold_reached = {
-            let certificates = self.storage.get_certificates_for_round(batch_round);
-            let authors = certificates.iter().map(BatchCertificate::author).collect();
+            let authors = self.storage.get_certificate_authors_for_round(batch_round);
             let committee_lookback = self.ledger.get_committee_lookback_for_round(batch_round)?;
             committee_lookback.is_quorum_threshold_reached(&authors)
         };
@@ -1202,5 +1200,355 @@ impl<N: Network> Primary<N> {
                 error!("Failed to store the current proposal cache: {err}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use amareleo_node_bft_ledger_service::MockLedgerService;
+    use amareleo_node_bft_storage_service::BFTMemoryService;
+    use snarkvm::{
+        console::types::Field,
+        ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
+        prelude::{Address, Signature},
+    };
+
+    use bytes::Bytes;
+    use indexmap::IndexSet;
+    use rand::RngCore;
+
+    type CurrentNetwork = snarkvm::prelude::MainnetV0;
+
+    // Returns a primary and a list of accounts in the configured committee.
+    async fn primary_without_handlers(
+        rng: &mut TestRng,
+    ) -> (Primary<CurrentNetwork>, Vec<(SocketAddr, Account<CurrentNetwork>)>) {
+        // Create a committee containing the primary's account.
+        let (accounts, committee) = {
+            const COMMITTEE_SIZE: usize = 4;
+            let mut accounts = Vec::with_capacity(COMMITTEE_SIZE);
+            let mut members = IndexMap::new();
+
+            for i in 0..COMMITTEE_SIZE {
+                let socket_addr = format!("127.0.0.1:{}", 5000 + i).parse().unwrap();
+                let account = Account::new(rng).unwrap();
+                members.insert(account.address(), (MIN_VALIDATOR_STAKE, true, rng.gen_range(0..100)));
+                accounts.push((socket_addr, account));
+            }
+
+            (accounts, Committee::<CurrentNetwork>::new(1, members).unwrap())
+        };
+
+        let account = accounts.first().unwrap().1.clone();
+        let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10);
+
+        // Initialize the primary.
+        let mut primary = Primary::new(account, storage, false, StorageMode::Development(0), ledger).unwrap();
+
+        // Construct a worker instance.
+        primary.workers = Arc::from([Worker::new(
+            0, // id
+            primary.storage.clone(),
+            primary.ledger.clone(),
+            primary.proposed_batch.clone(),
+        )
+        .unwrap()]);
+
+        (primary, accounts)
+    }
+
+    // Creates a mock solution.
+    fn sample_unconfirmed_solution(rng: &mut TestRng) -> (SolutionID<CurrentNetwork>, Data<Solution<CurrentNetwork>>) {
+        // Sample a random fake solution ID.
+        let solution_id = rng.gen::<u64>().into();
+        // Vary the size of the solutions.
+        let size = rng.gen_range(1024..10 * 1024);
+        // Sample random fake solution bytes.
+        let mut vec = vec![0u8; size];
+        rng.fill_bytes(&mut vec);
+        let solution = Data::Buffer(Bytes::from(vec));
+        // Return the solution ID and solution.
+        (solution_id, solution)
+    }
+
+    // Creates a mock transaction.
+    fn sample_unconfirmed_transaction(
+        rng: &mut TestRng,
+    ) -> (<CurrentNetwork as Network>::TransactionID, Data<Transaction<CurrentNetwork>>) {
+        // Sample a random fake transaction ID.
+        let id = Field::<CurrentNetwork>::rand(rng).into();
+        // Vary the size of the transactions.
+        let size = rng.gen_range(1024..10 * 1024);
+        // Sample random fake transaction bytes.
+        let mut vec = vec![0u8; size];
+        rng.fill_bytes(&mut vec);
+        let transaction = Data::Buffer(Bytes::from(vec));
+        // Return the ID and transaction.
+        (id, transaction)
+    }
+
+    // Creates a batch proposal with one solution and one transaction.
+    fn create_test_proposal(
+        author: &Account<CurrentNetwork>,
+        committee: Committee<CurrentNetwork>,
+        round: u64,
+        previous_certificate_ids: IndexSet<Field<CurrentNetwork>>,
+        timestamp: i64,
+        rng: &mut TestRng,
+    ) -> Proposal<CurrentNetwork> {
+        let (solution_id, solution) = sample_unconfirmed_solution(rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(rng);
+        let solution_checksum = solution.to_checksum::<CurrentNetwork>().unwrap();
+        let transaction_checksum = transaction.to_checksum::<CurrentNetwork>().unwrap();
+
+        let solution_transmission_id = (solution_id, solution_checksum).into();
+        let transaction_transmission_id = (&transaction_id, &transaction_checksum).into();
+
+        // Retrieve the private key.
+        let private_key = author.private_key();
+        // Prepare the transmission IDs.
+        let transmission_ids = [solution_transmission_id, transaction_transmission_id].into();
+        let transmissions = [
+            (solution_transmission_id, Transmission::Solution(solution)),
+            (transaction_transmission_id, Transmission::Transaction(transaction)),
+        ]
+        .into();
+        // Sign the batch header.
+        let batch_header = BatchHeader::new(
+            private_key,
+            round,
+            timestamp,
+            committee.id(),
+            transmission_ids,
+            previous_certificate_ids,
+            rng,
+        )
+        .unwrap();
+        // Construct the proposal.
+        Proposal::new(committee, batch_header, transmissions).unwrap()
+    }
+
+    /// Creates a signature of the batch ID for each committee member (excluding the primary).
+    fn peer_signatures_for_batch(
+        primary_address: Address<CurrentNetwork>,
+        accounts: &[(SocketAddr, Account<CurrentNetwork>)],
+        batch_id: Field<CurrentNetwork>,
+        rng: &mut TestRng,
+    ) -> IndexSet<Signature<CurrentNetwork>> {
+        let mut signatures = IndexSet::new();
+        for (_, account) in accounts {
+            if account.address() == primary_address {
+                continue;
+            }
+            let signature = account.sign(&[batch_id], rng).unwrap();
+            signatures.insert(signature);
+        }
+        signatures
+    }
+
+    // Creates a batch certificate.
+    fn create_batch_certificate(
+        primary_address: Address<CurrentNetwork>,
+        accounts: &[(SocketAddr, Account<CurrentNetwork>)],
+        round: u64,
+        previous_certificate_ids: IndexSet<Field<CurrentNetwork>>,
+        rng: &mut TestRng,
+    ) -> (BatchCertificate<CurrentNetwork>, HashMap<TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>>) {
+        let timestamp = now();
+
+        let author =
+            accounts.iter().find(|&(_, acct)| acct.address() == primary_address).map(|(_, acct)| acct.clone()).unwrap();
+        let private_key = author.private_key();
+
+        let committee_id = Field::rand(rng);
+        let (solution_id, solution) = sample_unconfirmed_solution(rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(rng);
+        let solution_checksum = solution.to_checksum::<CurrentNetwork>().unwrap();
+        let transaction_checksum = transaction.to_checksum::<CurrentNetwork>().unwrap();
+
+        let solution_transmission_id = (solution_id, solution_checksum).into();
+        let transaction_transmission_id = (&transaction_id, &transaction_checksum).into();
+
+        let transmission_ids = [solution_transmission_id, transaction_transmission_id].into();
+        let transmissions = [
+            (solution_transmission_id, Transmission::Solution(solution)),
+            (transaction_transmission_id, Transmission::Transaction(transaction)),
+        ]
+        .into();
+
+        let batch_header = BatchHeader::new(
+            private_key,
+            round,
+            timestamp,
+            committee_id,
+            transmission_ids,
+            previous_certificate_ids,
+            rng,
+        )
+        .unwrap();
+        let signatures = peer_signatures_for_batch(primary_address, accounts, batch_header.batch_id(), rng);
+        let certificate = BatchCertificate::<CurrentNetwork>::from(batch_header, signatures).unwrap();
+        (certificate, transmissions)
+    }
+
+    // Create a certificate chain up to round in primary storage.
+    fn store_certificate_chain(
+        primary: &Primary<CurrentNetwork>,
+        accounts: &[(SocketAddr, Account<CurrentNetwork>)],
+        round: u64,
+        rng: &mut TestRng,
+    ) -> IndexSet<Field<CurrentNetwork>> {
+        let mut previous_certificates = IndexSet::<Field<CurrentNetwork>>::new();
+        let mut next_certificates = IndexSet::<Field<CurrentNetwork>>::new();
+        for cur_round in 1..round {
+            for (_, account) in accounts.iter() {
+                let (certificate, transmissions) = create_batch_certificate(
+                    account.address(),
+                    accounts,
+                    cur_round,
+                    previous_certificates.clone(),
+                    rng,
+                );
+                next_certificates.insert(certificate.id());
+                assert!(primary.storage.insert_certificate(certificate, transmissions, Default::default()).is_ok());
+            }
+
+            assert!(primary.storage.increment_to_next_round(cur_round).is_ok());
+            previous_certificates = next_certificates;
+            next_certificates = IndexSet::<Field<CurrentNetwork>>::new();
+        }
+
+        previous_certificates
+    }
+
+    #[tokio::test]
+    async fn test_propose_batch() {
+        let mut rng = TestRng::default();
+        let (primary, _) = primary_without_handlers(&mut rng).await;
+
+        // Check there is no batch currently proposed.
+        assert!(primary.proposed_batch.read().is_none());
+
+        // Generate a solution and a transaction.
+        let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+
+        // Store it on one of the workers.
+        primary.workers[0].process_unconfirmed_solution(solution_id, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
+
+        // Try to propose a batch again. This time, it should succeed.
+        assert!(primary.propose_batch().await.is_ok());
+
+        // AlexZ: proposed_batch is no longer written to when processing new batches...
+        // assert!(primary.proposed_batch.read().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_propose_batch_with_no_transmissions() {
+        let mut rng = TestRng::default();
+        let (primary, _) = primary_without_handlers(&mut rng).await;
+
+        // Check there is no batch currently proposed.
+        assert!(primary.proposed_batch.read().is_none());
+
+        // Try to propose a batch with no transmissions.
+        assert!(primary.propose_batch().await.is_ok());
+
+        // AlexZ: proposed_batch is no longer written to when processing new batches...
+        // assert!(primary.proposed_batch.read().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_propose_batch_in_round() {
+        let round = 3;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Fill primary storage.
+        store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Sleep for a while to ensure the primary is ready to propose the next round.
+        tokio::time::sleep(Duration::from_secs(MIN_BATCH_DELAY_IN_SECS)).await;
+
+        // Generate a solution and a transaction.
+        let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+
+        // Store it on one of the workers.
+        primary.workers[0].process_unconfirmed_solution(solution_id, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
+
+        // Propose a batch again. This time, it should succeed.
+        assert!(primary.propose_batch().await.is_ok());
+
+        // AlexZ: proposed_batch is no longer written to when processing new batches...
+        // assert!(primary.proposed_batch.read().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_propose_batch_with_storage_round_behind_proposal_lock() {
+        let round = 3;
+        let mut rng = TestRng::default();
+        let (primary, _) = primary_without_handlers(&mut rng).await;
+
+        // Check there is no batch currently proposed.
+        assert!(primary.proposed_batch.read().is_none());
+
+        // Generate a solution and a transaction.
+        let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+
+        // Store it on one of the workers.
+        primary.workers[0].process_unconfirmed_solution(solution_id, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
+
+        // Set the proposal lock to a round ahead of the storage.
+        let old_proposal_lock_round = *primary.propose_lock.lock().await;
+        *primary.propose_lock.lock().await = round + 1;
+
+        // Propose a batch and enforce that it fails.
+        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.proposed_batch.read().is_none());
+
+        // Set the proposal lock back to the old round.
+        *primary.propose_lock.lock().await = old_proposal_lock_round;
+
+        // Try to propose a batch again. This time, it should succeed.
+        assert!(primary.propose_batch().await.is_ok());
+
+        // AlexZ: proposed_batch is no longer written to when processing new batches...
+        // assert!(primary.proposed_batch.read().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_propose_batch_with_storage_round_behind_proposal() {
+        let round = 5;
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Generate previous certificates.
+        let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
+
+        // Create a valid proposal.
+        let timestamp = now();
+        let proposal = create_test_proposal(
+            &primary.account,
+            primary.ledger.current_committee().unwrap(),
+            round + 1,
+            previous_certificates,
+            timestamp,
+            &mut rng,
+        );
+
+        // Store the proposal on the primary.
+        *primary.proposed_batch.write() = Some(proposal);
+
+        // Try to propose a batch will terminate early because the storage is behind the proposal.
+        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.proposed_batch.read().is_some());
+        assert!(primary.proposed_batch.read().as_ref().unwrap().round() > primary.current_round());
     }
 }
