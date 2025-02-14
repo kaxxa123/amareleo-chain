@@ -34,7 +34,7 @@ const STYLES: Styles = Styles::plain()
     .literal(Style::new().bold().fg_color(LITERAL_COLOR));
 
 #[derive(Debug, Parser)]
-#[clap(name = "amareleo-chain", styles = STYLES, version)]
+#[clap(styles = STYLES, version)]
 pub struct CLI {
     /// Specify the verbosity [options: 0, 1, 2, 3]
     #[clap(default_value = "2", short, long)]
@@ -56,11 +56,11 @@ pub enum Command {
 
 impl Command {
     /// Parses the command.
-    pub fn parse(self) -> Result<String> {
+    pub fn parse(self, repo_name: &str, bin_name: &str) -> Result<String> {
         match self {
             Self::Clean(command) => command.parse(),
             Self::Start(command) => command.parse(),
-            Self::Update(command) => command.parse(),
+            Self::Update(command) => command.parse(repo_name, bin_name),
         }
     }
 }

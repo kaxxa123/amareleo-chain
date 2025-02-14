@@ -20,15 +20,13 @@ use std::fmt::Write;
 pub struct Updater;
 
 impl Updater {
-    const AMARELEOCHAIN_BIN_NAME: &'static str = "amareleo-chain";
-    const AMARELEOCHAIN_REPO_NAME: &'static str = "amareleo-chain";
     const AMARELEOCHAIN_REPO_OWNER: &'static str = "kaxxa123";
 
-    /// Show all available releases for `amareleo-chain`.
-    pub fn show_available_releases() -> Result<String, UpdaterError> {
+    /// Show all available releases.
+    pub fn show_available_releases(repo_name: &str) -> Result<String, UpdaterError> {
         let releases = github::ReleaseList::configure()
             .repo_owner(Self::AMARELEOCHAIN_REPO_OWNER)
-            .repo_name(Self::AMARELEOCHAIN_REPO_NAME)
+            .repo_name(repo_name)
             .build()?
             .fetch()?;
 
@@ -39,14 +37,19 @@ impl Updater {
         Ok(output)
     }
 
-    /// Update `amareleo-chain` to the specified release.
-    pub fn update_to_release(show_output: bool, version: Option<String>) -> Result<Status, UpdaterError> {
+    /// Update to the specified release.
+    pub fn update_to_release(
+        show_output: bool,
+        repo_name: &str,
+        bin_name: &str,
+        version: Option<String>,
+    ) -> Result<Status, UpdaterError> {
         let mut update_builder = github::Update::configure();
 
         update_builder
             .repo_owner(Self::AMARELEOCHAIN_REPO_OWNER)
-            .repo_name(Self::AMARELEOCHAIN_REPO_NAME)
-            .bin_name(Self::AMARELEOCHAIN_BIN_NAME)
+            .repo_name(repo_name)
+            .bin_name(bin_name)
             .current_version(env!("CARGO_PKG_VERSION"))
             .show_download_progress(show_output)
             .no_confirm(true)
@@ -54,18 +57,27 @@ impl Updater {
 
         let status = match version {
             None => update_builder.build()?.update()?,
-            Some(v) => update_builder.target_version_tag(&v).build()?.update()?,
+            Some(new_version) => {
+                // Normalize version to have a leading 'v'
+                let new_version = if new_version.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                    format!("v{new_version}")
+                } else {
+                    new_version
+                };
+
+                update_builder.target_version_tag(&new_version).build()?.update()?
+            }
         };
 
         Ok(status)
     }
 
-    /// Check if there is an available update for `amareleo-chain` and return the newest release.
-    pub fn update_available() -> Result<String, UpdaterError> {
+    /// Check if there is an available update and return the newest release.
+    pub fn update_available(repo_name: &str, bin_name: &str) -> Result<String, UpdaterError> {
         let updater = github::Update::configure()
             .repo_owner(Self::AMARELEOCHAIN_REPO_OWNER)
-            .repo_name(Self::AMARELEOCHAIN_REPO_NAME)
-            .bin_name(Self::AMARELEOCHAIN_BIN_NAME)
+            .repo_name(repo_name)
+            .bin_name(bin_name)
             .current_version(env!("CARGO_PKG_VERSION"))
             .build()?;
 
@@ -80,10 +92,10 @@ impl Updater {
     }
 
     /// Display the CLI message.
-    pub fn print_cli() -> String {
-        if let Ok(latest_version) = Self::update_available() {
+    pub fn print_cli(repo_name: &str, bin_name: &str) -> String {
+        if let Ok(latest_version) = Self::update_available(repo_name, bin_name) {
             let mut output = "🟢 A new version is available! Run".bold().green().to_string();
-            output += &" `amareleo-chain update` ".bold().white();
+            output += &format!(" `{bin_name} update` ").bold().white();
             output += &format!("to update to v{latest_version}.").bold().green();
             output
         } else {

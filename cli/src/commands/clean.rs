@@ -20,7 +20,7 @@ use clap::Parser;
 use colored::Colorize;
 use std::path::PathBuf;
 
-/// Cleans the amareleo-chain node storage.
+/// Cleans the node storage.
 #[derive(Debug, Parser)]
 pub struct Clean {
     /// Specify the network ID to remove from storage
@@ -32,7 +32,7 @@ pub struct Clean {
 }
 
 impl Clean {
-    /// Cleans the amareleo-chain node storage.
+    /// Cleans the node storage.
     pub fn parse(&self) -> Result<String> {
         let mut res = self.remove_all(false);
 

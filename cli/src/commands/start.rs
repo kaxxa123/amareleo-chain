@@ -65,7 +65,7 @@ const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
 /// The development mode number of genesis committee members.
 const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
 
-/// Starts the amareleo-chain node.
+/// Starts the node.
 #[derive(Clone, Debug, Parser)]
 pub struct Start {
     /// Specify the network ID of this node
@@ -103,7 +103,7 @@ pub struct Start {
 }
 
 impl Start {
-    /// Starts the amareleo-chain node.
+    /// Starts the node.
     pub fn parse(self) -> Result<String> {
         // Prepare the shutdown flag.
         let shutdown: Arc<AtomicBool> = Default::default();
