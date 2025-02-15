@@ -4,6 +4,8 @@
 [![Authors](https://img.shields.io/badge/authors-Amareleo-orange.svg)](https://amareleo.com)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE.md)
 
+![Amareleo](docs/amareleo.svg)
+
 
 * [1. Overview](#1-overview)
 * [2. Build Guide](#2-build-guide)
