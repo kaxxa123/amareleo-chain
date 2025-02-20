@@ -4,6 +4,8 @@
 [![Authors](https://img.shields.io/badge/authors-Amareleo-orange.svg)](https://amareleo.com)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE.md)
 
+![Amareleo](docs/amareleo.svg)
+
 
 * [1. Overview](#1-overview)
 * [2. Build Guide](#2-build-guide)
@@ -19,23 +21,26 @@
 A lite [Aleo](https://aleo.org/) development node. Starting from the [SnarkOS](https://github.com/ProvableHQ/snarkOS) codebase, `amareleo-chain` delivers a minimal validator node for testing the deployment and execution of aleo programs.
 
 Key benefits:
-1.	__Ease of Use__ – Starting a development testnet simply involves running `amareleo-chain start`. No extra scripts, no multiple processes, all default parameters set for quick-fire aleo program testing.
+1.	__Ease of Use__ – Starting a development testnet is as simple as running `amareleo-chain start`. No extra scripts, no multiple processes, all default parameters set for quick aleo program testing.
  
-1.	__Lite__ – Just one process, with minimal memory consumption and processing resources.
+1.	__Lite__ – Just one process, with minimal memory and CPU usage.
 
 1.	__Fast Startup/Shutdown__ – Drastically reduced node startup and shutdown times. 
 
-1.	__Fresh Chain-State__ – Start testing programs with a fresh chain state (default) or retain the chain-state across tests.
+1.	__Fresh Chain State__ – Start testing programs with a fresh chain state (default) or retain the chain state across tests.
 
-1.	__Compatibility__ – Compatible with other Aleo tools including `snarkos` and `leo`.
+1.	__Compatibility__ – Compatible with other Aleo tools including `snarkOS` and `leo`.
 
 <BR />
 
 ## 2. Build Guide
 
+Amareleo-Chain may be installed from source or from [crates.io](https://crates.io/) using cargo. 
+On a fresh machine, installing from source is recommanded as this will also help getting all dependencies installed.
+
 ### 2.1 Requirements
 
-`amareleo-chain` was developed and tested with minimal requriements:
+`amareleo-chain` was tested on machines with low end specs.
 
 * Ubuntu 22.04 (LTS)
 * 11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz
@@ -43,7 +48,7 @@ Key benefits:
 * 512 GB SSD
 
 
-### 2.2 Installation
+### 2.2 Install from source
 
 If you already installed `snarkos` on this machine, all dependencies should be satisfied and you can clone and install `amareleo-chain` as follows:
 
