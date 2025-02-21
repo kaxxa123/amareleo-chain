@@ -22,7 +22,6 @@ use std::{
     path::Path,
     sync::{Arc, atomic::AtomicBool},
 };
-use tokio::sync::mpsc;
 use tracing_subscriber::{
     EnvFilter,
     layer::{Layer, SubscriberExt},
@@ -37,11 +36,7 @@ use tracing_subscriber::{
 /// 2 => info, debug, trace, amareleo_node_sync=trace
 /// 3 => info, debug, trace, amareleo_node_bft=trace
 /// ```
-pub fn initialize_logger<P: AsRef<Path>>(
-    verbosity: u8,
-    logfile: P,
-    shutdown: Arc<AtomicBool>,
-) -> mpsc::Receiver<Vec<u8>> {
+pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, logfile: P, stdout_dump: bool, shutdown: Arc<AtomicBool>) {
     match verbosity {
         0 => std::env::set_var("RUST_LOG", "info"),
         1 => std::env::set_var("RUST_LOG", "debug"),
@@ -81,36 +76,36 @@ pub fn initialize_logger<P: AsRef<Path>>(
     let logfile =
         File::options().append(true).create(true).open(logfile).expect("Failed to open the file for writing logs");
 
-    // Initialize the log channel.
-    let (_, log_receiver) = mpsc::channel(1024);
-
     // Initialize the log sender.
     // Hardcoding to None as a result of
     // snarkos start --nodisplay being always true.
     let log_sender = None;
 
     // Initialize tracing.
-    let _ = tracing_subscriber::registry()
-        .with(
-            // Add layer using LogWriter for stdout / terminal
-            tracing_subscriber::fmt::Layer::default()
-                .with_ansi(log_sender.is_none() && io::stdout().is_tty())
-                .with_writer(move || LogWriter::new(&log_sender))
-                .with_target(verbosity > 2)
-                .event_format(DynamicFormatter::new(shutdown))
-                .with_filter(filter),
-        )
-        .with(
-            // Add layer redirecting logs to the file
-            tracing_subscriber::fmt::Layer::default()
-                .with_ansi(false)
-                .with_writer(logfile)
-                .with_target(verbosity > 2)
-                .with_filter(filter2),
-        )
-        .try_init();
+    let tracing = tracing_subscriber::registry().with(
+        // Add layer redirecting logs to the file
+        tracing_subscriber::fmt::Layer::default()
+            .with_ansi(false)
+            .with_writer(logfile)
+            .with_target(verbosity > 2)
+            .with_filter(filter2),
+    );
 
-    log_receiver
+    let _ = if stdout_dump {
+        tracing
+            .with(
+                // Add layer using LogWriter for stdout / terminal
+                tracing_subscriber::fmt::Layer::default()
+                    .with_ansi(io::stdout().is_tty())
+                    .with_writer(move || LogWriter::new(&log_sender))
+                    .with_target(verbosity > 2)
+                    .event_format(DynamicFormatter::new(shutdown))
+                    .with_filter(filter),
+            )
+            .try_init()
+    } else {
+        tracing.try_init()
+    };
 }
 
 /// Returns the welcome message as a string.
