@@ -63,11 +63,8 @@ pub fn custom_ledger_dir(network: u16, keep_state: bool, base: PathBuf) -> PathB
     path
 }
 
-pub fn amareleo_storage_mode(network: u16, keep_state: bool, ledger_path: Option<PathBuf>) -> StorageMode {
-    match ledger_path {
-        Some(path) => StorageMode::Custom(path),
-        None => StorageMode::Custom(amareleo_ledger_dir(network, keep_state)),
-    }
+pub fn amareleo_storage_mode(ledger_path: PathBuf) -> StorageMode {
+    StorageMode::Custom(ledger_path)
 }
 
 /// A helper type for the cache of proposal and signed proposals.

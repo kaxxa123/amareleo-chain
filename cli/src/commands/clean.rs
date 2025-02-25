@@ -59,7 +59,7 @@ impl Clean {
 
     /// Removes the specified ledger from storage.
     pub(crate) fn remove_proposal_cache(network: u16, keep_state: bool, path: PathBuf) -> Result<()> {
-        let storage_mode = amareleo_storage_mode(network, keep_state, Some(path));
+        let storage_mode = amareleo_storage_mode(path);
 
         // Remove the current proposal cache file, if it exists.
         let proposal_cache_path = proposal_cache_path(network, keep_state, &storage_mode);

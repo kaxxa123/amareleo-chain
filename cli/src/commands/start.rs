@@ -289,7 +289,7 @@ impl Start {
         }
 
         // Initialize the storage mode.
-        let storage_mode = amareleo_storage_mode(self.network, self.keep_state, Some(ledger_path));
+        let storage_mode = amareleo_storage_mode(ledger_path);
         let validator = Validator::new(rest_ip, self.rest_rps, account, genesis, self.keep_state, storage_mode, shutdown.clone()).await?;
         // Initialize the node.
         Ok(Arc::new(validator))
