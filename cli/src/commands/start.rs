@@ -283,8 +283,8 @@ impl Start {
 
         if !self.keep_state {
             // Remove old ledger state
-            Clean::remove_proposal_cache(self.network, self.keep_state, ledger_path.clone())?;
-            let res_text = Clean::remove_ledger(self.keep_state, ledger_path.clone())?;
+            Clean::remove_proposal_cache(ledger_path.clone())?;
+            let res_text = Clean::remove_ledger(ledger_path.clone())?;
             println!("{res_text}\n");
         }
 
