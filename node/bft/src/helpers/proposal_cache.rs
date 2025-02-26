@@ -29,6 +29,8 @@ const LEDGER_STD_DIR: &str = "amareleo-ledger";
 const LEDGER_TMP_DIR: &str = "amareleo-tmp-ledger";
 const LEDGER_DIR_TAG: &str = "-ledger-";
 const PROPOSAL_CACHE_TAG: &str = "-proposal-cache-";
+const LOG_STD_FILE: &str = "amareleo-chain";
+const LOG_TMP_FILE: &str = "amareleo-chain-tmp";
 
 /// A string derived from the hash of the REST endpoint, giving us a unique filename per endpoint.
 pub fn endpoint_file_tag<N: Network>(endpoint: &Option<SocketAddr>) -> Result<String> {
@@ -71,6 +73,12 @@ pub fn amareleo_ledger_dir(network: u16, keep_state: bool, end_point_tag: &str) 
 /// Wraps ledger dir in a StorageMode type
 pub fn amareleo_storage_mode(ledger_path: PathBuf) -> StorageMode {
     StorageMode::Custom(ledger_path)
+}
+
+pub fn amareleo_log_file(network: u16, keep_state: bool, end_point_tag: &str) -> PathBuf {
+    let mut path = std::env::temp_dir();
+    path.push(format!("{}-{network}-{end_point_tag}.log", if keep_state { LOG_STD_FILE } else { LOG_TMP_FILE }));
+    path
 }
 
 /// Returns the path where a proposal cache file may be stored.

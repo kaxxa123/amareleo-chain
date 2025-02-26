@@ -33,7 +33,13 @@ use amareleo_chain_resources::{
 };
 use amareleo_node::{
     Validator,
-    bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode, custom_ledger_dir, endpoint_file_tag},
+    bft::helpers::{
+        amareleo_ledger_dir,
+        amareleo_log_file,
+        amareleo_storage_mode,
+        custom_ledger_dir,
+        endpoint_file_tag,
+    },
 };
 
 use snarkvm::{
@@ -83,8 +89,8 @@ pub struct Start {
     #[clap(default_value = "1", long = "verbosity")]
     pub verbosity: u8,
     /// Specify the path to the log file
-    #[clap(default_value_os_t = std::env::temp_dir().join("amareleo-chain.log"), long = "logfile")]
-    pub logfile: PathBuf,
+    #[clap(long = "logfile")]
+    pub logfile: Option<PathBuf>,
 
     /// Enables the metrics exporter
     #[clap(default_value = "false", long = "metrics")]
@@ -109,7 +115,8 @@ impl Start {
         let shutdown: Arc<AtomicBool> = Default::default();
 
         // Initialize the logger.
-        crate::helpers::initialize_logger(self.verbosity, self.logfile.clone(), true, shutdown.clone());
+        self.start_logger(shutdown.clone())?;
+
         // Initialize the runtime.
         Self::runtime().block_on(async move {
             // Clone the configurations.
@@ -140,6 +147,31 @@ impl Start {
 }
 
 impl Start {
+    /// Initialze logging
+    fn start_logger(&self, shutdown: Arc<AtomicBool>) -> Result<()> {
+        let log_path = match self.logfile.clone() {
+            Some(path) => path,
+            None => {
+                // Get a unique tag for this endpoint
+                let rest_ip = self.rest.or_else(|| Some("0.0.0.0:3030".parse().unwrap()));
+                let tag = match self.network {
+                    MainnetV0::ID => endpoint_file_tag::<MainnetV0>(&rest_ip)?,
+                    TestnetV0::ID => endpoint_file_tag::<TestnetV0>(&rest_ip)?,
+                    CanaryV0::ID => endpoint_file_tag::<CanaryV0>(&rest_ip)?,
+                    _ => panic!("Invalid network ID specified"),
+                };
+
+                amareleo_log_file(self.network, self.keep_state, &tag)
+            }
+        };
+
+        // Initialize the logger.
+        crate::helpers::initialize_logger(self.verbosity, log_path.clone(), true, shutdown);
+
+        println!("📝 Log file path: {}", log_path.display());
+        Ok(())
+    }
+
     /// Compute fixed development node private key.
     fn parse_private_key<N: Network>(&self) -> Result<Account<N>> {
         // Sample the private key of this node.
