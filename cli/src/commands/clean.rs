@@ -46,8 +46,8 @@ impl Clean {
     pub fn remove_all(&self, keep_state: bool) -> Result<String> {
         // Determine the ledger path
         let ledger_path = match &self.path {
-            Some(path) => custom_ledger_dir(self.network, keep_state, path.clone()),
-            None => amareleo_ledger_dir(self.network, keep_state),
+            Some(path) => custom_ledger_dir(self.network, keep_state, "0", path.clone()),
+            None => amareleo_ledger_dir(self.network, keep_state, "0"),
         };
 
         // Remove the current proposal cache file, if it exists.

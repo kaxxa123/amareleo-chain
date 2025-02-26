@@ -33,7 +33,7 @@ use amareleo_chain_resources::{
 };
 use amareleo_node::{
     Validator,
-    bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode, custom_ledger_dir},
+    bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode, custom_ledger_dir, endpoint_file_tag},
 };
 
 use snarkvm::{
@@ -157,7 +157,7 @@ impl Start {
     fn parse_development(&mut self) -> Result<()> {
         // If the REST IP is not already specified set the REST IP to `3030`.
         if self.rest.is_none() {
-            self.rest = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 3030)).unwrap());
+            self.rest = Some(SocketAddr::from_str("0.0.0.0:3030").unwrap());
         }
 
         Ok(())
@@ -275,10 +275,13 @@ impl Start {
             metrics::initialize_metrics(self.metrics_ip);
         }
 
+        // Get a unique tag for this endpoint
+        let tag = endpoint_file_tag::<N>(&rest_ip)?;
+
         // Determine the ledger path
         let ledger_path = match &self.storage {
-            Some(path) => custom_ledger_dir(self.network, self.keep_state, path.clone()),
-            None => amareleo_ledger_dir(self.network, self.keep_state),
+            Some(path) => custom_ledger_dir(self.network, self.keep_state, &tag,path.clone()),
+            None => amareleo_ledger_dir(self.network, self.keep_state, &tag),
         };
 
         if !self.keep_state {

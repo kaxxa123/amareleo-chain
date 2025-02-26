@@ -16,34 +16,56 @@
 use crate::helpers::{Proposal, SignedProposals};
 
 use snarkvm::{
-    console::{account::Address, network::Network, program::SUBDAG_CERTIFICATES_DEPTH},
+    console::{account::Address, algorithms::Hash, network::Network, program::SUBDAG_CERTIFICATES_DEPTH},
     ledger::narwhal::BatchCertificate,
-    prelude::{FromBytes, IoResult, Read, Result, ToBytes, Write, anyhow, bail, error},
+    prelude::{FromBytes, IoResult, Read, Result, ToBits, ToBytes, Write, anyhow, bail, error},
 };
 
 use aleo_std::StorageMode;
 use indexmap::IndexSet;
-use std::{fs, path::PathBuf};
+use std::{fs, net::SocketAddr, path::PathBuf};
 
 const LEDGER_STD_DIR: &str = "amareleo-ledger";
 const LEDGER_TMP_DIR: &str = "amareleo-tmp-ledger";
 const LEDGER_DIR_TAG: &str = "-ledger-";
 const PROPOSAL_CACHE_TAG: &str = "-proposal-cache-";
 
+/// A string derived from the hash of the REST endpoint, giving us a unique filename per endpoint.
+pub fn endpoint_file_tag<N: Network>(endpoint: &Option<SocketAddr>) -> Result<String> {
+    let default: SocketAddr = "0.0.0.0:3030".parse().unwrap();
+
+    // Initialize the hasher.
+    if let Some(socket) = endpoint {
+        if *socket == default {
+            return Ok("0".to_string());
+        }
+
+        let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
+        let endpoint_str = socket.to_string();
+        let bits = endpoint_str.to_bits_le();
+        let hash = hasher.hash(&bits)?; //.to_bytes_le()?;
+        let hash_str = hash.to_string(); //hex::encode(hash);
+
+        return Ok(hash_str[..hash_str.len().min(8)].to_string());
+    }
+
+    Ok("0".to_string())
+}
+
 /// Returns the ledger dir for the given base path
-pub fn custom_ledger_dir(network: u16, keep_state: bool, base: PathBuf) -> PathBuf {
+pub fn custom_ledger_dir(network: u16, keep_state: bool, end_point_tag: &str, base: PathBuf) -> PathBuf {
     let mut path = base.clone();
-    path.push(format!(".{}-{network}-0", if keep_state { LEDGER_STD_DIR } else { LEDGER_TMP_DIR }));
+    path.push(format!(".{}-{network}-{end_point_tag}", if keep_state { LEDGER_STD_DIR } else { LEDGER_TMP_DIR }));
     path
 }
 
 /// Returns default ledger dir path
-pub fn amareleo_ledger_dir(network: u16, keep_state: bool) -> PathBuf {
+pub fn amareleo_ledger_dir(network: u16, keep_state: bool, end_point_tag: &str) -> PathBuf {
     let path = match std::env::current_dir() {
         Ok(current_dir) => current_dir,
         _ => PathBuf::from(env!("CARGO_MANIFEST_DIR")),
     };
-    custom_ledger_dir(network, keep_state, path)
+    custom_ledger_dir(network, keep_state, end_point_tag, path)
 }
 
 /// Wraps ledger dir in a StorageMode type
