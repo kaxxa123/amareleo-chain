@@ -43,8 +43,8 @@ pub fn endpoint_file_tag<N: Network>(endpoint: &Option<SocketAddr>) -> Result<St
         let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
         let endpoint_str = socket.to_string();
         let bits = endpoint_str.to_bits_le();
-        let hash = hasher.hash(&bits)?; //.to_bytes_le()?;
-        let hash_str = hash.to_string(); //hex::encode(hash);
+        let hash = hasher.hash(&bits)?.to_bytes_le()?;
+        let hash_str = hex::encode(hash);
 
         return Ok(hash_str[..hash_str.len().min(8)].to_string());
     }

@@ -215,6 +215,7 @@ dependencies = [
  "colored",
  "deadline",
  "futures",
+ "hex",
  "indexmap 2.7.0",
  "itertools 0.12.1",
  "mockall",
