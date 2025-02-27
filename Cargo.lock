@@ -152,6 +152,7 @@ dependencies = [
  "clap",
  "colored",
  "crossterm",
+ "glob",
  "indexmap 2.7.0",
  "nix",
  "num_cpus",

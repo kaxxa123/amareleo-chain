@@ -34,27 +34,49 @@ pub struct Clean {
 impl Clean {
     /// Cleans the node storage.
     pub fn parse(&self) -> Result<String> {
-        let mut res = self.remove_all(false);
+        self.remove_all(false)?;
+        self.remove_all(true)?;
 
-        if let Ok(msg) = res {
-            println!("{msg}\n");
-            res = self.remove_all(true);
-        }
-        res
+        Ok(String::from("✅ Clean Completed"))
     }
 
-    pub fn remove_all(&self, keep_state: bool) -> Result<String> {
+    fn get_file_list(pattern: &str) -> Vec<PathBuf> {
+        let mut paths: Vec<PathBuf> = Vec::new();
+
+        match glob::glob(pattern) {
+            Ok(entries) => {
+                for entry in entries {
+                    match entry {
+                        Ok(path) => paths.push(path),
+                        Err(e) => println!("⚠️  Glob entry error: {}", e),
+                    }
+                }
+            }
+            Err(e) => println!("⚠️  Glob pattern error: {}", e),
+        }
+        paths
+    }
+
+    pub fn remove_all(&self, keep_state: bool) -> Result<()> {
         // Determine the ledger path
-        let ledger_path = match &self.path {
-            Some(path) => custom_ledger_dir(self.network, keep_state, "0", path.clone()),
-            None => amareleo_ledger_dir(self.network, keep_state, "0"),
+        let pattern = match &self.path {
+            Some(path) => custom_ledger_dir(self.network, keep_state, "*", path.clone()),
+            None => amareleo_ledger_dir(self.network, keep_state, "*"),
         };
 
-        // Remove the current proposal cache file, if it exists.
-        Self::remove_proposal_cache(ledger_path.clone())?;
+        if let Some(pattern_str) = pattern.to_str() {
+            let paths = Self::get_file_list(pattern_str);
+            for path in paths {
+                // Remove proposal cache file, and ledger
+                Self::remove_proposal_cache(path.clone())?;
+                let msg = Self::remove_ledger(path)?;
+                println!("{msg}");
+            }
+        } else {
+            bail!("Cannot read file pattern!");
+        }
 
-        // Remove the specified ledger from storage.
-        Self::remove_ledger(ledger_path)
+        Ok(())
     }
 
     /// Removes the specified ledger from storage.
