@@ -13,101 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::{Proposal, SignedProposals};
+use crate::helpers::{Proposal, SignedProposals, ledger_files::proposal_cache_path};
 
 use snarkvm::{
-    console::{account::Address, algorithms::Hash, network::Network, program::SUBDAG_CERTIFICATES_DEPTH},
+    console::{account::Address, network::Network, program::SUBDAG_CERTIFICATES_DEPTH},
     ledger::narwhal::BatchCertificate,
-    prelude::{FromBytes, IoResult, Read, Result, ToBits, ToBytes, Write, anyhow, bail, error},
+    prelude::{FromBytes, IoResult, Read, Result, ToBytes, Write, anyhow, bail, error},
 };
 
 use aleo_std::StorageMode;
 use indexmap::IndexSet;
-use std::{fs, net::SocketAddr, path::PathBuf};
-
-const LEDGER_STD_DIR: &str = "amareleo-ledger";
-const LEDGER_TMP_DIR: &str = "amareleo-tmp-ledger";
-const LEDGER_DIR_TAG: &str = "-ledger-";
-const PROPOSAL_CACHE_TAG: &str = "-proposal-cache-";
-const LOG_STD_FILE: &str = "amareleo-chain";
-const LOG_TMP_FILE: &str = "amareleo-chain-tmp";
-
-/// A string derived from the hash of the REST endpoint, giving us a unique filename per endpoint.
-pub fn endpoint_file_tag<N: Network>(endpoint: &Option<SocketAddr>) -> Result<String> {
-    let default: SocketAddr = "0.0.0.0:3030".parse().unwrap();
-
-    // Initialize the hasher.
-    if let Some(socket) = endpoint {
-        if *socket == default {
-            return Ok("0".to_string());
-        }
-
-        let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
-        let endpoint_str = socket.to_string();
-        let bits = endpoint_str.to_bits_le();
-        let hash = hasher.hash(&bits)?.to_bytes_le()?;
-        let hash_str = hex::encode(hash);
-
-        return Ok(hash_str[..hash_str.len().min(8)].to_string());
-    }
-
-    Ok("0".to_string())
-}
-
-/// Returns the ledger dir for the given base path
-pub fn custom_ledger_dir(network: u16, keep_state: bool, end_point_tag: &str, base: PathBuf) -> PathBuf {
-    let mut path = base.clone();
-    path.push(format!(".{}-{network}-{end_point_tag}", if keep_state { LEDGER_STD_DIR } else { LEDGER_TMP_DIR }));
-    path
-}
-
-/// Returns default ledger dir path
-pub fn amareleo_ledger_dir(network: u16, keep_state: bool, end_point_tag: &str) -> PathBuf {
-    let path = match std::env::current_dir() {
-        Ok(current_dir) => current_dir,
-        _ => PathBuf::from(env!("CARGO_MANIFEST_DIR")),
-    };
-    custom_ledger_dir(network, keep_state, end_point_tag, path)
-}
-
-/// Wraps ledger dir in a StorageMode type
-pub fn amareleo_storage_mode(ledger_path: PathBuf) -> StorageMode {
-    StorageMode::Custom(ledger_path)
-}
-
-pub fn amareleo_log_file(network: u16, keep_state: bool, end_point_tag: &str) -> PathBuf {
-    let mut path = std::env::temp_dir();
-    path.push(format!("{}-{network}-{end_point_tag}.log", if keep_state { LOG_STD_FILE } else { LOG_TMP_FILE }));
-    path
-}
-
-/// Returns the path where a proposal cache file may be stored.
-pub fn proposal_cache_path(storage_mode: &StorageMode) -> Result<PathBuf> {
-    // Obtain the path to the ledger.
-    let mut path = match &storage_mode {
-        StorageMode::Custom(path) => path.clone(),
-        _ => bail!("Failed: Custom StorageMode expected!"),
-    };
-
-    // Get the ledger folder name
-    let filename = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .ok_or_else(|| anyhow!("Failed: Cannot extract ledger folder name"))?;
-
-    // Swap folder name with cache filename
-    let filename = if filename.contains(LEDGER_DIR_TAG) {
-        filename.replace(LEDGER_DIR_TAG, PROPOSAL_CACHE_TAG)
-    } else {
-        bail!("Failed: Unexpected ledger folder name!")
-    };
-
-    // Swap ledger folder name with cahce filename
-    path.pop();
-    path.push(filename);
-
-    Ok(path)
-}
+use std::fs;
 
 /// A helper type for the cache of proposal and signed proposals.
 #[derive(Debug, PartialEq, Eq)]
@@ -260,7 +176,6 @@ mod tests {
         ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificates,
         utilities::TestRng,
     };
-    use std::path::PathBuf;
 
     type CurrentNetwork = MainnetV0;
 
@@ -289,21 +204,5 @@ mod tests {
             let expected_bytes = expected.to_bytes_le().unwrap();
             assert_eq!(expected, ProposalCache::read_le(&expected_bytes[..]).unwrap());
         }
-    }
-
-    #[test]
-    fn test_proposal_cache_path_from_invalid_ledger() {
-        let invalid = PathBuf::from("~/invalid");
-        let store_mode = amareleo_storage_mode(invalid);
-
-        let res = proposal_cache_path(&store_mode);
-        assert!(res.is_err(), "Expected an error, but got Ok.");
-    }
-
-    #[test]
-    fn test_proposal_cache_path_from_invalid_store_mode() {
-        let store_mode = StorageMode::Development(0);
-        let res = proposal_cache_path(&store_mode);
-        assert!(res.is_err(), "Expected an error, but got Ok.");
     }
 }
