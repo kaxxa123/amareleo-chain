@@ -152,12 +152,16 @@ impl Start {
         let log_path = match self.logfile.clone() {
             Some(path) => path,
             None => {
-                // Get a unique tag for this endpoint
+                // Get a unique tag for the specified rest endpoint
+                // Even if --keep-state is set, log files will
+                // always get a unique tag since these all go to
+                // the tmp folder by default, hence causing multiple
+                // instances to write to the same file.
                 let rest_ip = self.rest.or_else(|| Some("0.0.0.0:3030".parse().unwrap()));
                 let tag = match self.network {
-                    MainnetV0::ID => endpoint_file_tag::<MainnetV0>(&rest_ip)?,
-                    TestnetV0::ID => endpoint_file_tag::<TestnetV0>(&rest_ip)?,
-                    CanaryV0::ID => endpoint_file_tag::<CanaryV0>(&rest_ip)?,
+                    MainnetV0::ID => endpoint_file_tag::<MainnetV0>(false, &rest_ip)?,
+                    TestnetV0::ID => endpoint_file_tag::<TestnetV0>(false, &rest_ip)?,
+                    CanaryV0::ID => endpoint_file_tag::<CanaryV0>(false, &rest_ip)?,
                     _ => panic!("Invalid network ID specified"),
                 };
 
@@ -308,7 +312,7 @@ impl Start {
         }
 
         // Get a unique tag for this endpoint
-        let tag = endpoint_file_tag::<N>(&rest_ip)?;
+        let tag = endpoint_file_tag::<N>(self.keep_state, &rest_ip)?;
 
         // Determine the ledger path
         let ledger_path = match &self.storage {

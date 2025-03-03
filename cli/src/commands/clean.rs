@@ -13,7 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use amareleo_node::bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode, custom_ledger_dir, proposal_cache_path};
+use amareleo_node::bft::helpers::{
+    DEFAULT_FILE_TAG,
+    amareleo_ledger_dir,
+    amareleo_storage_mode,
+    custom_ledger_dir,
+    proposal_cache_path,
+};
 
 use anyhow::{Result, bail};
 use clap::Parser;
@@ -58,10 +64,12 @@ impl Clean {
     }
 
     pub fn remove_all(&self, keep_state: bool) -> Result<()> {
+        let file_tag = if keep_state { DEFAULT_FILE_TAG } else { "*" };
+
         // Determine the ledger path
         let pattern = match &self.path {
-            Some(path) => custom_ledger_dir(self.network, keep_state, "*", path.clone()),
-            None => amareleo_ledger_dir(self.network, keep_state, "*"),
+            Some(path) => custom_ledger_dir(self.network, keep_state, file_tag, path.clone()),
+            None => amareleo_ledger_dir(self.network, keep_state, file_tag),
         };
 
         if let Some(pattern_str) = pattern.to_str() {

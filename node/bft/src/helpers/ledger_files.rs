@@ -28,16 +28,21 @@ const PROPOSAL_CACHE_TAG: &str = "-proposal-cache-";
 const LOG_STD_FILE: &str = "amareleo-chain";
 const LOG_TMP_FILE: &str = "amareleo-chain-tmp";
 
-/// A string derived from the hash of the REST endpoint, giving us a unique filename per endpoint.
-pub fn endpoint_file_tag<N: Network>(endpoint: &Option<SocketAddr>) -> Result<String> {
-    let default: SocketAddr = "0.0.0.0:3030".parse().unwrap();
+pub const DEFAULT_FILE_TAG: &str = "0";
 
-    // Initialize the hasher.
+/// A string derived from the hash of the REST endpoint, giving us a unique filename per endpoint.
+pub fn endpoint_file_tag<N: Network>(force_default: bool, endpoint: &Option<SocketAddr>) -> Result<String> {
+    if force_default {
+        return Ok(DEFAULT_FILE_TAG.to_string());
+    }
+
     if let Some(socket) = endpoint {
+        let default: SocketAddr = "0.0.0.0:3030".parse().unwrap();
         if *socket == default {
-            return Ok("0".to_string());
+            return Ok(DEFAULT_FILE_TAG.to_string());
         }
 
+        // Initialize the hasher.
         let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
         let endpoint_str = socket.to_string();
         let bits = endpoint_str.to_bits_le();
@@ -47,7 +52,7 @@ pub fn endpoint_file_tag<N: Network>(endpoint: &Option<SocketAddr>) -> Result<St
         return Ok(hash_str[..hash_str.len().min(8)].to_string());
     }
 
-    Ok("0".to_string())
+    Ok(DEFAULT_FILE_TAG.to_string())
 }
 
 /// Returns the ledger dir for the given base path
