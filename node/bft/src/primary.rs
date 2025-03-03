@@ -138,10 +138,10 @@ impl<N: Network> Primary<N> {
     /// Load the proposal cache file and update the Primary state with the stored data.
     async fn load_proposal_cache(&self) -> Result<()> {
         // Fetch the signed proposals from the file system if it exists.
-        match ProposalCache::<N>::exists(self.keep_state, &self.storage_mode) {
+        match ProposalCache::<N>::exists(&self.storage_mode) {
             // If the proposal cache exists, then process the proposal cache.
             true => {
-                match ProposalCache::<N>::load(self.account.address(), self.keep_state, &self.storage_mode) {
+                match ProposalCache::<N>::load(self.account.address(), &self.storage_mode) {
                     Ok(proposal_cache) => {
                         // Extract the proposal and signed proposals.
                         let (latest_certificate_round, proposed_batch, signed_proposals, pending_certificates) =
@@ -1196,7 +1196,7 @@ impl<N: Network> Primary<N> {
                 ProposalCache::new(latest_round, proposal, signed_proposals, pending_certificates)
             };
 
-            if let Err(err) = proposal_cache.store(self.keep_state, &self.storage_mode) {
+            if let Err(err) = proposal_cache.store(&self.storage_mode) {
                 error!("Failed to store the current proposal cache: {err}");
             }
         }

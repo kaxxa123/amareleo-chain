@@ -33,7 +33,13 @@ use amareleo_chain_resources::{
 };
 use amareleo_node::{
     Validator,
-    bft::helpers::{amareleo_ledger_dir, amareleo_storage_mode, custom_ledger_dir},
+    bft::helpers::{
+        amareleo_ledger_dir,
+        amareleo_log_file,
+        amareleo_storage_mode,
+        custom_ledger_dir,
+        endpoint_file_tag,
+    },
 };
 
 use snarkvm::{
@@ -83,8 +89,8 @@ pub struct Start {
     #[clap(default_value = "1", long = "verbosity")]
     pub verbosity: u8,
     /// Specify the path to the log file
-    #[clap(default_value_os_t = std::env::temp_dir().join("amareleo-chain.log"), long = "logfile")]
-    pub logfile: PathBuf,
+    #[clap(long = "logfile")]
+    pub logfile: Option<PathBuf>,
 
     /// Enables the metrics exporter
     #[clap(default_value = "false", long = "metrics")]
@@ -109,7 +115,8 @@ impl Start {
         let shutdown: Arc<AtomicBool> = Default::default();
 
         // Initialize the logger.
-        crate::helpers::initialize_logger(self.verbosity, self.logfile.clone(), shutdown.clone());
+        self.start_logger(shutdown.clone())?;
+
         // Initialize the runtime.
         Self::runtime().block_on(async move {
             // Clone the configurations.
@@ -140,6 +147,35 @@ impl Start {
 }
 
 impl Start {
+    /// Initialze logging
+    fn start_logger(&self, shutdown: Arc<AtomicBool>) -> Result<()> {
+        let log_path = match self.logfile.clone() {
+            Some(path) => path,
+            None => {
+                // Get a unique tag for the specified rest endpoint
+                // Even if --keep-state is set, log files will
+                // always get a unique tag since these all go to
+                // the tmp folder by default, hence causing multiple
+                // instances to write to the same file.
+                let rest_ip = self.rest.or_else(|| Some("0.0.0.0:3030".parse().unwrap()));
+                let tag = match self.network {
+                    MainnetV0::ID => endpoint_file_tag::<MainnetV0>(false, &rest_ip)?,
+                    TestnetV0::ID => endpoint_file_tag::<TestnetV0>(false, &rest_ip)?,
+                    CanaryV0::ID => endpoint_file_tag::<CanaryV0>(false, &rest_ip)?,
+                    _ => panic!("Invalid network ID specified"),
+                };
+
+                amareleo_log_file(self.network, self.keep_state, &tag)
+            }
+        };
+
+        // Initialize the logger.
+        crate::helpers::initialize_logger(self.verbosity, log_path.clone(), true, shutdown);
+
+        println!("📝 Log file path: {}", log_path.display());
+        Ok(())
+    }
+
     /// Compute fixed development node private key.
     fn parse_private_key<N: Network>(&self) -> Result<Account<N>> {
         // Sample the private key of this node.
@@ -157,7 +193,7 @@ impl Start {
     fn parse_development(&mut self) -> Result<()> {
         // If the REST IP is not already specified set the REST IP to `3030`.
         if self.rest.is_none() {
-            self.rest = Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 3030)).unwrap());
+            self.rest = Some(SocketAddr::from_str("0.0.0.0:3030").unwrap());
         }
 
         Ok(())
@@ -275,21 +311,24 @@ impl Start {
             metrics::initialize_metrics(self.metrics_ip);
         }
 
+        // Get a unique tag for this endpoint
+        let tag = endpoint_file_tag::<N>(self.keep_state, &rest_ip)?;
+
         // Determine the ledger path
         let ledger_path = match &self.storage {
-            Some(path) => custom_ledger_dir(self.network, self.keep_state, path.clone()),
-            None => amareleo_ledger_dir(self.network, self.keep_state),
+            Some(path) => custom_ledger_dir(self.network, self.keep_state, &tag,path.clone()),
+            None => amareleo_ledger_dir(self.network, self.keep_state, &tag),
         };
 
         if !self.keep_state {
             // Remove old ledger state
-            Clean::remove_proposal_cache(self.network, self.keep_state, ledger_path.clone())?;
-            let res_text = Clean::remove_ledger(self.keep_state, ledger_path.clone())?;
+            Clean::remove_proposal_cache(ledger_path.clone())?;
+            let res_text = Clean::remove_ledger(ledger_path.clone())?;
             println!("{res_text}\n");
         }
 
         // Initialize the storage mode.
-        let storage_mode = amareleo_storage_mode(self.network, self.keep_state, Some(ledger_path));
+        let storage_mode = amareleo_storage_mode(ledger_path);
         let validator = Validator::new(rest_ip, self.rest_rps, account, genesis, self.keep_state, storage_mode, shutdown.clone()).await?;
         // Initialize the node.
         Ok(Arc::new(validator))

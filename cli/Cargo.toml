@@ -17,6 +17,9 @@ test_targets = ["snarkvm/test_targets"]
 [dependencies.anstyle]
 version = "1"
 
+[dependencies.glob]
+version = "0.3"
+
 [dependencies.anyhow]
 version = "1.0.79"
 

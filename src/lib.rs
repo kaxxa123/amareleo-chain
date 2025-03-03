@@ -25,19 +25,25 @@ use tikv_jemallocator::Jemalloc;
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
-// Obtain information on the build.
-include!(concat!(env!("OUT_DIR"), "/built.rs"));
+pub struct BuildInfo<'a> {
+    pub bin: &'a str,
+    pub version: &'a str,
+    pub repo: &'a str,
+    pub branch: &'a str,
+    pub commit: &'a str,
+    pub features: &'a str,
+}
 
-pub fn main_core(repo_name: &str, bin_name: &str) -> anyhow::Result<()> {
+pub fn main_core(build: &BuildInfo) -> anyhow::Result<()> {
     // A hack to avoid having to go through clap to display advanced version information.
-    check_for_version(bin_name);
+    check_for_version(build);
 
     // Parse the given arguments.
     let cli = CLI::parse();
     // Run the updater.
-    println!("{}", Updater::print_cli(repo_name, bin_name));
+    println!("{}", Updater::print_cli(build.repo, build.bin));
     // Run the CLI.
-    match cli.command.parse(repo_name, bin_name) {
+    match cli.command.parse(build.repo, build.bin) {
         Ok(output) => println!("{output}\n"),
         Err(error) => {
             println!("⚠️  {error}\n");
@@ -48,17 +54,10 @@ pub fn main_core(repo_name: &str, bin_name: &str) -> anyhow::Result<()> {
 }
 
 /// Checks whether the version information was requested and - if so - display it and exit.
-fn check_for_version(bin_name: &str) {
+fn check_for_version(build: &BuildInfo) {
     if let Some(first_arg) = env::args().nth(1) {
         if ["--version", "-V"].contains(&&*first_arg) {
-            let version = PKG_VERSION;
-            let branch = GIT_HEAD_REF.unwrap_or("unknown_branch");
-            let commit = GIT_COMMIT_HASH.unwrap_or("unknown_commit");
-            let mut features = FEATURES_LOWERCASE_STR.to_owned();
-            features.retain(|c| c != ' ');
-
-            println!("{bin_name} {version} {branch} {commit} features=[{features}]");
-
+            println!("{} {} {} {} features=[{}]", build.bin, build.version, build.branch, build.commit, build.features);
             exit(0);
         }
     }

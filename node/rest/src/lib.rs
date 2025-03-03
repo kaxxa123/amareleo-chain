@@ -125,7 +125,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             snarkvm::console::network::TestnetV0::ID => "testnet",
             snarkvm::console::network::CanaryV0::ID => "canary",
             unknown_id => {
-                eprintln!("Unknown network ID ({unknown_id})");
+                error!("Unknown network ID ({unknown_id})");
                 return;
             }
         };

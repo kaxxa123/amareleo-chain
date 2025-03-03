@@ -898,7 +898,7 @@ mod tests {
     use crate::{
         BFT,
         MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
-        helpers::{Storage, amareleo_storage_mode},
+        helpers::{Storage, amareleo_ledger_dir, amareleo_storage_mode},
     };
 
     use amareleo_chain_account::Account;
@@ -1614,7 +1614,9 @@ mod tests {
 
         // Initialize the BFT without bootup.
         let account = Account::try_from(private_keys[0])?;
-        let bft = BFT::new(account.clone(), storage, true, amareleo_storage_mode(1, true, None), ledger.clone())?;
+        let ledger_dir = amareleo_ledger_dir(1, true, "0");
+        let storage_mode = amareleo_storage_mode(ledger_dir);
+        let bft = BFT::new(account.clone(), storage, true, storage_mode.clone(), ledger.clone())?;
 
         // Insert a mock DAG in the BFT without bootup.
         *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(0);
@@ -1639,8 +1641,7 @@ mod tests {
         let bootup_storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
 
         // Initialize a new instance of BFT with bootup.
-        let bootup_bft =
-            BFT::new(account, bootup_storage.clone(), true, amareleo_storage_mode(1, true, None), ledger.clone())?;
+        let bootup_bft = BFT::new(account, bootup_storage.clone(), true, storage_mode.clone(), ledger.clone())?;
 
         // Sync the BFT DAG at bootup.
         bootup_bft.sync_bft_dag_at_bootup(pre_shutdown_certificates.clone()).await;
