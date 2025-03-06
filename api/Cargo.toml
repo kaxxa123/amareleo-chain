@@ -17,12 +17,28 @@ test_targets = ["snarkvm/test_targets"]
 [dependencies.anyhow]
 version = "1.0.79"
 
+[dependencies.indexmap]
+version = "2.1"
+features = ["serde", "rayon"]
+
+[dependencies.rand]
+version = "0.8"
+default-features = false
+
+[dependencies.rand_chacha]
+version = "0.3.0"
+default-features = false
+
 [dependencies.amareleo-chain-account]
 path = "../account"
 version = "=2.0.2"
 
 [dependencies.amareleo-node]
 path = "../node"
+version = "=2.0.2"
+
+[dependencies.amareleo-chain-resources]
+path = "../resources"
 version = "=2.0.2"
 
 [dependencies.aleo-std]

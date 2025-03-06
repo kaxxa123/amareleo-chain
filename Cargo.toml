@@ -22,6 +22,7 @@ members = [
   "resources",
   "account",
   "cli", 
+  "api", 
   "node", 
   "node/bft",
   "node/bft/events",
@@ -77,6 +78,10 @@ version = "=2.0.2"
 
 [dependencies.amareleo-chain-cli]
 path = "./cli"
+version = "=2.0.2"
+
+[dependencies.amareleo-api]
+path = "./api"
 version = "=2.0.2"
 
 [dependencies.amareleo-node]

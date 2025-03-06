@@ -33,10 +33,6 @@ version = "2"
 [dependencies.crossterm]
 version = "0.27"
 
-[dependencies.indexmap]
-version = "2.1"
-features = ["serde", "rayon"]
-
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "../node/metrics"
@@ -45,28 +41,12 @@ version = "=2.0.2"
 [dependencies.num_cpus]
 version = "1"
 
-[dependencies.rand]
-version = "0.8"
-default-features = false
-
-[dependencies.rand_chacha]
-version = "0.3.0"
-default-features = false
-
 [dependencies.rayon]
 version = "1"
 
 [dependencies.self_update]
 version = "0.41"
 features = ["archive-zip", "compression-zip-deflate"]
-
-[dependencies.amareleo-chain-resources]
-path = "../resources"
-version = "=2.0.2"
-
-[dependencies.amareleo-chain-account]
-path = "../account"
-version = "=2.0.2"
 
 [dependencies.amareleo-node]
 path = "../node"

@@ -116,8 +116,12 @@ version = "2.0.2"
 dependencies = [
  "aleo-std",
  "amareleo-chain-account",
+ "amareleo-chain-resources",
  "amareleo-node",
  "anyhow",
+ "indexmap 2.7.0",
+ "rand",
+ "rand_chacha",
  "snarkvm",
 ]
 
@@ -125,6 +129,7 @@ dependencies = [
 name = "amareleo-chain"
 version = "2.0.2"
 dependencies = [
+ "amareleo-api",
  "amareleo-chain-account",
  "amareleo-chain-cli",
  "amareleo-node",
@@ -154,8 +159,6 @@ name = "amareleo-chain-cli"
 version = "2.0.2"
 dependencies = [
  "amareleo-api",
- "amareleo-chain-account",
- "amareleo-chain-resources",
  "amareleo-node",
  "amareleo-node-metrics",
  "amareleo-node-rest",
@@ -165,11 +168,8 @@ dependencies = [
  "colored",
  "crossterm",
  "glob",
- "indexmap 2.7.0",
  "nix",
  "num_cpus",
- "rand",
- "rand_chacha",
  "rayon",
  "self_update 0.41.0",
  "snarkvm",
