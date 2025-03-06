@@ -118,6 +118,7 @@ dependencies = [
  "amareleo-chain-account",
  "amareleo-chain-resources",
  "amareleo-node",
+ "amareleo-node-bft",
  "anyhow",
  "indexmap 2.7.0",
  "rand",

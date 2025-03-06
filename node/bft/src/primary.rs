@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::{
+    DEVELOPMENT_MODE_RNG_SEED,
     MAX_BATCH_DELAY_IN_MS,
     MAX_WORKERS,
     MIN_BATCH_DELAY_IN_SECS,
@@ -316,7 +317,7 @@ impl<N: Network> Primary<N> {
 
 impl<N: Network> Primary<N> {
     pub async fn propose_batch(&self) -> Result<()> {
-        let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
+        let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
         let mut all_acc: Vec<Account<N>> = Vec::new();
 
         for _ in 0u64..4u64 {

@@ -36,11 +36,7 @@ use amareleo_chain_resources::{
     BLOCK0_TESTNET_ID,
 };
 use amareleo_node::Validator;
-
-/// The development mode RNG seed.
-pub const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
-/// The development mode number of genesis committee members.
-pub const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
+use amareleo_node_bft::{DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS, DEVELOPMENT_MODE_RNG_SEED};
 
 pub async fn node_api<N: Network, C: ConsensusStorage<N>>(
     rest_ip: Option<SocketAddr>,

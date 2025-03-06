@@ -897,6 +897,7 @@ impl<N: Network> BFT<N> {
 mod tests {
     use crate::{
         BFT,
+        DEVELOPMENT_MODE_RNG_SEED,
         MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
         helpers::{Storage, amareleo_ledger_dir, amareleo_storage_mode},
     };
@@ -1493,7 +1494,7 @@ mod tests {
         */
 
         let rng = &mut TestRng::default();
-        let rng_pks = &mut ChaChaRng::seed_from_u64(1234567890u64);
+        let rng_pks = &mut ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
 
         let private_keys = vec![
             PrivateKey::new(rng_pks).unwrap(),
@@ -1715,7 +1716,7 @@ mod tests {
         */
 
         let rng = &mut TestRng::default();
-        let rng_pks = &mut ChaChaRng::seed_from_u64(1234567890u64);
+        let rng_pks = &mut ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
 
         let private_keys = vec![
             PrivateKey::new(rng_pks).unwrap(),

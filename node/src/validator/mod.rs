@@ -213,6 +213,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use amareleo_node_bft::DEVELOPMENT_MODE_RNG_SEED;
+
     use snarkvm::prelude::{
         MainnetV0,
         VM,
@@ -235,7 +237,7 @@ mod tests {
         let storage_mode = StorageMode::Development(0);
 
         // Initialize an (insecure) fixed RNG.
-        let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
+        let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
         // Initialize the account.
         let account = Account::<CurrentNetwork>::new(&mut rng).unwrap();
         // Initialize a new VM.

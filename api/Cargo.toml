@@ -37,6 +37,10 @@ version = "=2.0.2"
 path = "../node"
 version = "=2.0.2"
 
+[dependencies.amareleo-node-bft]
+path = "../node/bft"
+version = "=2.0.2"
+
 [dependencies.amareleo-chain-resources]
 path = "../resources"
 version = "=2.0.2"
