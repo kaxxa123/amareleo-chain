@@ -111,6 +111,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "amareleo-api"
+version = "2.0.2"
+dependencies = [
+ "aleo-std",
+ "amareleo-chain-account",
+ "amareleo-node",
+ "anyhow",
+ "snarkvm",
+]
+
+[[package]]
 name = "amareleo-chain"
 version = "2.0.2"
 dependencies = [
@@ -142,6 +153,7 @@ dependencies = [
 name = "amareleo-chain-cli"
 version = "2.0.2"
 dependencies = [
+ "amareleo-api",
  "amareleo-chain-account",
  "amareleo-chain-resources",
  "amareleo-node",

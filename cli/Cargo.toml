@@ -76,6 +76,10 @@ version = "=2.0.2"
 path = "../node/rest"
 version = "=2.0.2"
 
+[dependencies.amareleo-api]
+path = "../api"
+version = "=2.0.2"
+
 [dependencies.snarkvm]
 workspace = true
 

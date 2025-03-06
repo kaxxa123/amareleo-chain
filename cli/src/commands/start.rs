@@ -22,6 +22,7 @@ use rand::{Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 
 use crate::commands::Clean;
+use amareleo_api::node_api;
 use amareleo_chain_account::Account;
 use amareleo_chain_resources::{
     BLOCK0_CANARY,
@@ -329,7 +330,7 @@ impl Start {
 
         // Initialize the storage mode.
         let storage_mode = amareleo_storage_mode(ledger_path);
-        let validator = Validator::new(rest_ip, self.rest_rps, account, genesis, self.keep_state, storage_mode, shutdown.clone()).await?;
+        let validator = node_api(rest_ip, self.rest_rps, account, genesis, self.keep_state, storage_mode, shutdown.clone()).await?;
         // Initialize the node.
         Ok(Arc::new(validator))
     }
