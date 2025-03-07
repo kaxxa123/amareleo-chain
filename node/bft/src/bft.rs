@@ -899,7 +899,7 @@ mod tests {
         BFT,
         DEVELOPMENT_MODE_RNG_SEED,
         MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
-        helpers::{Storage, amareleo_ledger_dir, amareleo_storage_mode},
+        helpers::{Storage, amareleo_storage_mode, default_ledger_dir},
     };
 
     use amareleo_chain_account::Account;
@@ -1615,7 +1615,7 @@ mod tests {
 
         // Initialize the BFT without bootup.
         let account = Account::try_from(private_keys[0])?;
-        let ledger_dir = amareleo_ledger_dir(1, true, "0");
+        let ledger_dir = default_ledger_dir(1, true, "0");
         let storage_mode = amareleo_storage_mode(ledger_dir);
         let bft = BFT::new(account.clone(), storage, true, storage_mode.clone(), ledger.clone())?;
 

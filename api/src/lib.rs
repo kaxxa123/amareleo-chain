@@ -1,5 +1,6 @@
 use std::{
     net::SocketAddr,
+    path::PathBuf,
     sync::{Arc, atomic::AtomicBool},
 };
 
@@ -24,8 +25,6 @@ use snarkvm::{
     utilities::to_bytes_le,
 };
 
-use aleo_std::StorageMode;
-
 use amareleo_chain_account::Account;
 use amareleo_chain_resources::{
     BLOCK0_CANARY,
@@ -36,13 +35,18 @@ use amareleo_chain_resources::{
     BLOCK0_TESTNET_ID,
 };
 use amareleo_node::Validator;
-use amareleo_node_bft::{DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS, DEVELOPMENT_MODE_RNG_SEED};
+use amareleo_node_bft::{
+    DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
+    DEVELOPMENT_MODE_RNG_SEED,
+    helpers::{amareleo_storage_mode, custom_ledger_dir, default_ledger_dir, endpoint_file_tag, proposal_cache_path},
+};
 
 pub async fn node_api<N: Network, C: ConsensusStorage<N>>(
-    rest_ip: Option<SocketAddr>,
+    rest_ip: SocketAddr,
     rest_rps: u32,
     keep_state: bool,
-    storage_mode: StorageMode,
+    ledger_base_path: Option<PathBuf>,
+    ledger_default_naming: bool,
     shutdown: Arc<AtomicBool>,
 ) -> Result<Validator<N, C>> {
     // Get the genesis block.
@@ -51,7 +55,42 @@ pub async fn node_api<N: Network, C: ConsensusStorage<N>>(
     // Get the node account.
     let account = get_node_account::<N>()?;
 
+    // Get the ledger path
+    let tag = endpoint_file_tag::<N>(ledger_default_naming, &rest_ip)?;
+    let ledger_path = match &ledger_base_path {
+        Some(base_path) => custom_ledger_dir(N::ID, keep_state, &tag, base_path.clone()),
+        None => default_ledger_dir(N::ID, keep_state, &tag),
+    };
+
+    if !keep_state {
+        // Clean the temporary ledger.
+        clean_tmp_ledger(ledger_path.clone())?;
+    }
+
+    // Initialize the storage mode.
+    let storage_mode = amareleo_storage_mode(ledger_path);
+
     Validator::new(rest_ip, rest_rps, account, genesis, keep_state, storage_mode, shutdown.clone()).await
+}
+
+fn clean_tmp_ledger(ledger_path: PathBuf) -> Result<()> {
+    // Remove the current proposal cache file, if it exists.
+    let storage_mode = amareleo_storage_mode(ledger_path.clone());
+    let cache_path = proposal_cache_path(&storage_mode)?;
+    if cache_path.exists() {
+        if let Err(err) = std::fs::remove_file(&cache_path) {
+            bail!("Failed on removing proposal cache file at {}: {err}", cache_path.display());
+        }
+    }
+
+    // Remove ledger
+    if ledger_path.exists() {
+        if let Err(err) = std::fs::remove_dir_all(&ledger_path) {
+            bail!("Failed on removing ledger folder {}: {err}", ledger_path.display());
+        }
+    }
+
+    Ok(())
 }
 
 /// Compute fixed development node private key.

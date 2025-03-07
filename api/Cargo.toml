@@ -45,8 +45,5 @@ version = "=2.0.2"
 path = "../resources"
 version = "=2.0.2"
 
-[dependencies.aleo-std]
-workspace = true
-
 [dependencies.snarkvm]
 workspace = true

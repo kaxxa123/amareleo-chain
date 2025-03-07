@@ -17,18 +17,11 @@ use anyhow::Result;
 use clap::Parser;
 use colored::Colorize;
 
-use crate::commands::Clean;
 use amareleo_api::{get_node_account, node_api};
 
 use amareleo_node::{
     Validator,
-    bft::helpers::{
-        amareleo_ledger_dir,
-        amareleo_log_file,
-        amareleo_storage_mode,
-        custom_ledger_dir,
-        endpoint_file_tag,
-    },
+    bft::helpers::{amareleo_log_file, endpoint_file_tag},
 };
 
 use snarkvm::{
@@ -130,7 +123,7 @@ impl Start {
                 // always get a unique tag since these all go to
                 // the tmp folder by default, hence causing multiple
                 // instances to write to the same file.
-                let rest_ip = self.rest.or_else(|| Some("0.0.0.0:3030".parse().unwrap()));
+                let rest_ip = self.rest.as_ref().copied().unwrap_or_else(|| "0.0.0.0:3030".parse().unwrap());
                 let tag = match self.network {
                     MainnetV0::ID => endpoint_file_tag::<MainnetV0>(false, &rest_ip)?,
                     TestnetV0::ID => endpoint_file_tag::<TestnetV0>(false, &rest_ip)?,
@@ -156,25 +149,17 @@ impl Start {
         println!("{}", crate::helpers::welcome_message());
 
         // Parse the REST IP.
-        let rest_ip = self.rest.or_else(|| Some("0.0.0.0:3030".parse().unwrap()));
+        let rest_ip = self.rest.as_ref().copied().unwrap_or_else(|| "0.0.0.0:3030".parse().unwrap());
 
         // Get the node account.
         let account = get_node_account::<N>()?;
-
-        // Print private key
         println!("🔑 Your development private key for node 0 is {}.\n", account.private_key().to_string().bold());
-        // Print the Aleo address.
         println!("👛 Your Aleo address is {}.\n", account.address().to_string().bold());
-        // Print the node type and network.
         println!("🧭 Starting node on {}.\n",N::NAME.bold());
+        println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
 
-        // If the node is running a REST server, print the REST IP and JWT.
-        if let Some(rest_ip) = rest_ip {
-            println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
-
-            if let Ok(jwt_token) = amareleo_node_rest::Claims::new(account.address()).to_jwt_string() {
-                println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
-            }
+        if let Ok(jwt_token) = amareleo_node_rest::Claims::new(account.address()).to_jwt_string() {
+            println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
         }
 
         // Initialize the metrics.
@@ -182,25 +167,14 @@ impl Start {
             metrics::initialize_metrics(self.metrics_ip);
         }
 
-        // Get a unique tag for this endpoint
-        let tag = endpoint_file_tag::<N>(self.keep_state, &rest_ip)?;
+        let validator = node_api(
+            rest_ip,
+            self.rest_rps,
+            self.keep_state,
+            self.storage.clone(),
+            self.keep_state,
+            shutdown.clone()).await?;
 
-        // Determine the ledger path
-        let ledger_path = match &self.storage {
-            Some(path) => custom_ledger_dir(self.network, self.keep_state, &tag,path.clone()),
-            None => amareleo_ledger_dir(self.network, self.keep_state, &tag),
-        };
-
-        if !self.keep_state {
-            // Remove old ledger state
-            Clean::remove_proposal_cache(ledger_path.clone())?;
-            let res_text = Clean::remove_ledger(ledger_path.clone())?;
-            println!("{res_text}\n");
-        }
-
-        // Initialize the storage mode.
-        let storage_mode = amareleo_storage_mode(ledger_path);
-        let validator = node_api(rest_ip, self.rest_rps, self.keep_state, storage_mode, shutdown.clone()).await?;
         // Initialize the node.
         Ok(Arc::new(validator))
     }

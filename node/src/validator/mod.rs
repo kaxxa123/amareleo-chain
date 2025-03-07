@@ -53,7 +53,7 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Initializes a new validator node.
     pub async fn new(
-        rest_ip: Option<SocketAddr>,
+        rest_ip: SocketAddr,
         rest_rps: u32,
         account: Account<N>,
         genesis: Block<N>,
@@ -87,9 +87,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         };
 
         // Initialize the REST server.
-        if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Rest::start(rest_ip, rest_rps, Some(consensus), ledger.clone()).await?);
-        }
+        node.rest = Some(Rest::start(rest_ip, rest_rps, Some(consensus), ledger.clone()).await?);
 
         // Initialize the notification message loop.
         node.handles.lock().push(crate::start_notification_message_loop());
@@ -248,7 +246,7 @@ mod tests {
         println!("Initializing validator node...");
 
         let validator = Validator::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
-            Some(rest),
+            rest,
             10,
             account,
             genesis,
