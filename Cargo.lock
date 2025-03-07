@@ -119,10 +119,15 @@ dependencies = [
  "amareleo-node",
  "amareleo-node-bft",
  "anyhow",
+ "crossterm",
  "indexmap 2.7.0",
  "rand",
  "rand_chacha",
  "snarkvm",
+ "time",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.19",
 ]
 
 [[package]]
@@ -166,7 +171,6 @@ dependencies = [
  "anyhow",
  "clap",
  "colored",
- "crossterm",
  "glob",
  "nix",
  "num_cpus",
@@ -174,10 +178,7 @@ dependencies = [
  "self_update 0.41.0",
  "snarkvm",
  "thiserror 1.0.69",
- "time",
  "tokio",
- "tracing",
- "tracing-subscriber 0.3.19",
 ]
 
 [[package]]

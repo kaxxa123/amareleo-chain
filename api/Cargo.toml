@@ -29,6 +29,24 @@ default-features = false
 version = "0.3.0"
 default-features = false
 
+[dependencies.crossterm]
+version = "0.27"
+
+[dependencies.time]
+version = "0.3"
+features = ["formatting"]
+
+[dependencies.tokio]
+version = "1.28"
+features = ["rt", "rt-multi-thread"]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dependencies.tracing-subscriber]
+version = "0.3"
+features = ["env-filter"]
+
 [dependencies.amareleo-chain-account]
 path = "../account"
 version = "=2.0.2"

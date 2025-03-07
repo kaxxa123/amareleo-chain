@@ -17,12 +17,9 @@ use anyhow::Result;
 use clap::Parser;
 use colored::Colorize;
 
-use amareleo_api::{get_node_account, node_api};
+use amareleo_api::api::{AmareleoApi, AmareleoLog};
 
-use amareleo_node::{
-    Validator,
-    bft::helpers::{amareleo_log_file, endpoint_file_tag},
-};
+use amareleo_node::Validator;
 
 use snarkvm::{
     console::network::{CanaryV0, MainnetV0, Network, TestnetV0},
@@ -80,9 +77,6 @@ impl Start {
         // Prepare the shutdown flag.
         let shutdown: Arc<AtomicBool> = Default::default();
 
-        // Initialize the logger.
-        self.start_logger(shutdown.clone())?;
-
         // Initialize the runtime.
         Self::runtime().block_on(async move {
             // Clone the configurations.
@@ -110,53 +104,22 @@ impl Start {
 
         Ok(String::new())
     }
-}
-
-impl Start {
-    /// Initialze logging
-    fn start_logger(&self, shutdown: Arc<AtomicBool>) -> Result<()> {
-        let log_path = match self.logfile.clone() {
-            Some(path) => path,
-            None => {
-                // Get a unique tag for the specified rest endpoint
-                // Even if --keep-state is set, log files will
-                // always get a unique tag since these all go to
-                // the tmp folder by default, hence causing multiple
-                // instances to write to the same file.
-                let rest_ip = self.rest.as_ref().copied().unwrap_or_else(|| "0.0.0.0:3030".parse().unwrap());
-                let tag = match self.network {
-                    MainnetV0::ID => endpoint_file_tag::<MainnetV0>(false, &rest_ip)?,
-                    TestnetV0::ID => endpoint_file_tag::<TestnetV0>(false, &rest_ip)?,
-                    CanaryV0::ID => endpoint_file_tag::<CanaryV0>(false, &rest_ip)?,
-                    _ => panic!("Invalid network ID specified"),
-                };
-
-                amareleo_log_file(self.network, self.keep_state, &tag)
-            }
-        };
-
-        // Initialize the logger.
-        crate::helpers::initialize_logger(self.verbosity, log_path.clone(), true, shutdown);
-
-        println!("📝 Log file path: {}", log_path.display());
-        Ok(())
-    }
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
     async fn parse_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<Arc<Validator<N, ConsensusDB<N>>>> {
         // Print the welcome.
-        println!("{}", crate::helpers::welcome_message());
+        println!("{}", Self::welcome_message());
 
         // Parse the REST IP.
-        let rest_ip = self.rest.as_ref().copied().unwrap_or_else(|| "0.0.0.0:3030".parse().unwrap());
+        let rest_ip_port = self.rest.as_ref().copied().unwrap_or_else(|| "0.0.0.0:3030".parse().unwrap());
 
         // Get the node account.
-        let account = get_node_account::<N>()?;
+        let account = AmareleoApi::get_node_account::<N>()?;
         println!("🔑 Your development private key for node 0 is {}.\n", account.private_key().to_string().bold());
         println!("👛 Your Aleo address is {}.\n", account.address().to_string().bold());
         println!("🧭 Starting node on {}.\n",N::NAME.bold());
-        println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
+        println!("🌐 Starting the REST server at {}.\n", rest_ip_port.to_string().bold());
 
         if let Ok(jwt_token) = amareleo_node_rest::Claims::new(account.address()).to_jwt_string() {
             println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
@@ -167,13 +130,18 @@ impl Start {
             metrics::initialize_metrics(self.metrics_ip);
         }
 
-        let validator = node_api(
-            rest_ip,
-            self.rest_rps,
-            self.keep_state,
-            self.storage.clone(),
-            self.keep_state,
-            shutdown.clone()).await?;
+        let mut node_api: AmareleoApi = AmareleoApi::default();
+
+        node_api
+        .cfg_ledger(self.keep_state, self.storage.clone(), self.keep_state)
+        .cfg_rest(rest_ip_port, self.rest_rps)
+        .cfg_log(AmareleoLog::All(self.logfile.clone()), self.verbosity);
+
+        let (validator, log_path) = node_api.start(shutdown.clone()).await?;
+
+        if let Some(log_path) = log_path {
+            println!("📝 Log file path: {}", log_path);
+        }
 
         // Initialize the node.
         Ok(Arc::new(validator))
@@ -205,5 +173,31 @@ impl Start {
             .max_blocking_threads(max_tokio_blocking_threads)
             .build()
             .expect("Failed to initialize a runtime for the router")
+    }
+
+    /// Returns the welcome message as a string.
+    fn welcome_message() -> String {
+        use colored::Colorize;
+
+        let mut output = String::new();
+        output += &r#"
+
+         ╦╬╬╬╬╬╦
+        ╬╬╬╬╬╬╬╬╬                    ▄▄▄▄        ▄▄▄
+       ╬╬╬╬╬╬╬╬╬╬╬                  ▐▓▓▓▓▌       ▓▓▓
+      ╬╬╬╬╬╬╬╬╬╬╬╬╬                ▐▓▓▓▓▓▓▌      ▓▓▓     ▄▄▄▄▄▄       ▄▄▄▄▄▄
+     ╬╬╬╬╬╬╬╬╬╬╬╬╬╬╬              ▐▓▓▓  ▓▓▓▌     ▓▓▓   ▄▓▓▀▀▀▀▓▓▄   ▐▓▓▓▓▓▓▓▓▌
+    ╬╬╬╬╬╬╬╜ ╙╬╬╬╬╬╬╬            ▐▓▓▓▌  ▐▓▓▓▌    ▓▓▓  ▐▓▓▓▄▄▄▄▓▓▓▌ ▐▓▓▓    ▓▓▓▌
+   ╬╬╬╬╬╬╣     ╠╬╬╬╬╬╬           ▓▓▓▓▓▓▓▓▓▓▓▓    ▓▓▓  ▐▓▓▀▀▀▀▀▀▀▀▘ ▐▓▓▓    ▓▓▓▌
+  ╬╬╬╬╬╬╣       ╠╬╬╬╬╬╬         ▓▓▓▓▌    ▐▓▓▓▓   ▓▓▓   ▀▓▓▄▄▄▄▓▓▀   ▐▓▓▓▓▓▓▓▓▌
+ ╬╬╬╬╬╬╣         ╠╬╬╬╬╬╬       ▝▀▀▀▀      ▀▀▀▀▘  ▀▀▀     ▀▀▀▀▀▀       ▀▀▀▀▀▀
+╚╬╬╬╬╬╩           ╩╬╬╬╬╩
+
+
+"#
+        .white()
+        .bold();
+        output += &"👋 Welcome to Aleo! We thank you for running a node and supporting privacy.\n".bold();
+        output
     }
 }

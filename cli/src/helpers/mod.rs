@@ -13,14 +13,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod log_writer;
-use log_writer::*;
-
-mod dynamic_format;
-use dynamic_format::*;
-
-pub mod logger;
-pub use logger::*;
-
 pub mod updater;
 pub use updater::*;
