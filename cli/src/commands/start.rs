@@ -115,7 +115,7 @@ impl Start {
         let rest_ip_port = self.rest.as_ref().copied().unwrap_or_else(|| "0.0.0.0:3030".parse().unwrap());
 
         // Get the node account.
-        let account = AmareleoApi::get_node_account::<N>()?;
+        let account = AmareleoApi::<N>::get_node_account()?;
         println!("🔑 Your development private key for node 0 is {}.\n", account.private_key().to_string().bold());
         println!("👛 Your Aleo address is {}.\n", account.address().to_string().bold());
         println!("🧭 Starting node on {}.\n",N::NAME.bold());
@@ -130,18 +130,17 @@ impl Start {
             metrics::initialize_metrics(self.metrics_ip);
         }
 
-        let mut node_api: AmareleoApi = AmareleoApi::default();
+        let mut node_api: AmareleoApi<N> = AmareleoApi::default();
 
         node_api
         .cfg_ledger(self.keep_state, self.storage.clone(), self.keep_state)
         .cfg_rest(rest_ip_port, self.rest_rps)
         .cfg_log(AmareleoLog::All(self.logfile.clone()), self.verbosity);
 
-        let (validator, log_path) = node_api.start(shutdown.clone()).await?;
+        println!("📝 Log file path: {}\n", node_api.get_log_file()?.to_string_lossy());
+        println!("📁 Ledger folder path: {}\n", node_api.get_ledger_folder()?.to_string_lossy());
 
-        if let Some(log_path) = log_path {
-            println!("📝 Log file path: {}", log_path);
-        }
+        let validator = node_api.start(shutdown.clone()).await?;
 
         // Initialize the node.
         Ok(Arc::new(validator))
