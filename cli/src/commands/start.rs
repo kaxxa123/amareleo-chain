@@ -19,19 +19,13 @@ use colored::Colorize;
 
 use amareleo_api::api::{AmareleoApi, AmareleoLog};
 
-use amareleo_node::Validator;
-
 use snarkvm::{
     console::network::{CanaryV0, MainnetV0, Network, TestnetV0},
     prelude::store::helpers::rocksdb::ConsensusDB,
 };
 use std::result::Result::Ok;
 
-use std::{
-    net::SocketAddr,
-    path::PathBuf,
-    sync::{Arc, atomic::AtomicBool},
-};
+use std::{net::SocketAddr, path::PathBuf};
 use tokio::runtime::{self, Runtime};
 
 /// Starts the node.
@@ -74,9 +68,6 @@ pub struct Start {
 impl Start {
     /// Starts the node.
     pub fn parse(self) -> Result<String> {
-        // Prepare the shutdown flag.
-        let shutdown: Arc<AtomicBool> = Default::default();
-
         // Initialize the runtime.
         Self::runtime().block_on(async move {
             // Clone the configurations.
@@ -85,15 +76,15 @@ impl Start {
             match cli.network {
                 MainnetV0::ID => {
                     // Parse the node from the configurations.
-                    cli.parse_node::<MainnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    cli.parse_node::<MainnetV0>().await.expect("Failed to parse the node");
                 }
                 TestnetV0::ID => {
                     // Parse the node from the configurations.
-                    cli.parse_node::<TestnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    cli.parse_node::<TestnetV0>().await.expect("Failed to parse the node");
                 }
                 CanaryV0::ID => {
                     // Parse the node from the configurations.
-                    cli.parse_node::<CanaryV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    cli.parse_node::<CanaryV0>().await.expect("Failed to parse the node");
                 }
                 _ => panic!("Invalid network ID specified"),
             };
@@ -107,7 +98,8 @@ impl Start {
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
-    async fn parse_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<Arc<Validator<N, ConsensusDB<N>>>> {
+    async fn parse_node<N: Network>(&mut self) -> Result<()> {
+
         // Print the welcome.
         println!("{}", Self::welcome_message());
 
@@ -140,10 +132,9 @@ impl Start {
         println!("📝 Log file path: {}\n", node_api.get_log_file()?.to_string_lossy());
         println!("📁 Ledger folder path: {}\n", node_api.get_ledger_folder()?.to_string_lossy());
 
-        let validator = node_api.start(shutdown.clone()).await?;
-
         // Initialize the node.
-        Ok(Arc::new(validator))
+        node_api.start::<ConsensusDB<N>>().await?;
+        Ok(())
     }
 
     /// Returns a runtime for the node.

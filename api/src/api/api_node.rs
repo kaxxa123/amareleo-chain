@@ -73,6 +73,7 @@ pub struct AmareleoApi<N: Network> {
     log_mode: AmareleoLog,
     verbosity: u8,
     started: bool,
+    shutdown: Arc<AtomicBool>,
     phantom: PhantomData<N>,
 }
 
@@ -88,6 +89,7 @@ impl<N: Network> Default for AmareleoApi<N> {
             log_mode: AmareleoLog::None,
             verbosity: 1u8,
             started: false,
+            shutdown: Default::default(),
             phantom: PhantomData,
         }
     }
@@ -171,7 +173,7 @@ impl<N: Network> AmareleoApi<N> {
 // AmareleoApi operations for public consumption
 impl<N: Network> AmareleoApi<N> {
     /// Start a node instance
-    pub async fn start<C: ConsensusStorage<N>>(&self, shutdown: Arc<AtomicBool>) -> Result<Validator<N, C>> {
+    pub async fn start<C: ConsensusStorage<N>>(&self) -> Result<Validator<N, C>> {
         if self.started {
             bail!("Node already started");
         }
@@ -186,12 +188,20 @@ impl<N: Network> AmareleoApi<N> {
         }
 
         if !self.log_mode.is_none() {
-            self.start_logger(shutdown.clone())?;
+            self.start_logger()?;
         }
 
         // Initialize the validator.
-        Validator::new(self.rest_ip, self.rest_rps, account, genesis, self.keep_state, storage_mode, shutdown.clone())
-            .await
+        Validator::new(
+            self.rest_ip,
+            self.rest_rps,
+            account,
+            genesis,
+            self.keep_state,
+            storage_mode,
+            self.shutdown.clone(),
+        )
+        .await
     }
 }
 
@@ -430,9 +440,9 @@ impl<N: Network> AmareleoApi<N> {
     }
 
     /// Initialze logging
-    fn start_logger(&self, shutdown: Arc<AtomicBool>) -> Result<()> {
+    fn start_logger(&self) -> Result<()> {
         let log_path = self.get_log_file()?;
-        crate::helpers::initialize_logger(self.verbosity, log_path, self.log_mode.is_stdout(), shutdown);
+        crate::helpers::initialize_logger(self.verbosity, log_path, self.log_mode.is_stdout(), self.shutdown.clone());
 
         Ok(())
     }
