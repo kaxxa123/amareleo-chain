@@ -22,16 +22,10 @@ use snarkvm::prelude::{Ledger, Network, block::Block, store::ConsensusStorage};
 use aleo_std::StorageMode;
 use anyhow::Result;
 use core::future::Future;
-use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use std::{
-    io,
     net::SocketAddr,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
+    sync::{Arc, atomic::AtomicBool},
 };
 use tokio::task::JoinHandle;
 
@@ -61,9 +55,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         storage_mode: StorageMode,
         shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
-        // Initialize the signal handler.
-        let signal_node = Self::handle_signals(keep_state, shutdown.clone());
-
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, storage_mode.clone())?;
 
@@ -92,8 +83,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Initialize the notification message loop.
         node.handles.lock().push(crate::start_notification_message_loop());
 
-        // Pass the node to the signal handler.
-        let _ = signal_node.set(node.clone());
         // Return the node.
         Ok(node)
     }
@@ -110,77 +99,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
-    /// Handles OS signals for the node to intercept and perform a clean shutdown.
-    /// The optional `shutdown_flag` flag can be used to cleanly terminate the syncing process.
-    fn handle_signals(keep_state: bool, shutdown_flag: Arc<AtomicBool>) -> Arc<OnceCell<Self>> {
-        // In order for the signal handler to be started as early as possible, a reference to the node needs
-        // to be passed to it at a later time.
-        let node: Arc<OnceCell<Self>> = Default::default();
-
-        #[cfg(target_family = "unix")]
-        fn signal_listener() -> impl Future<Output = io::Result<()>> {
-            use tokio::signal::unix::{SignalKind, signal};
-
-            // Handle SIGINT, SIGTERM, SIGQUIT, and SIGHUP.
-            let mut s_int = signal(SignalKind::interrupt()).unwrap();
-            let mut s_term = signal(SignalKind::terminate()).unwrap();
-            let mut s_quit = signal(SignalKind::quit()).unwrap();
-            let mut s_hup = signal(SignalKind::hangup()).unwrap();
-
-            // Return when any of the signals above is received.
-            async move {
-                tokio::select!(
-                    _ = s_int.recv() => (),
-                    _ = s_term.recv() => (),
-                    _ = s_quit.recv() => (),
-                    _ = s_hup.recv() => (),
-                );
-                Ok(())
-            }
-        }
-        #[cfg(not(target_family = "unix"))]
-        fn signal_listener() -> impl Future<Output = io::Result<()>> {
-            tokio::signal::ctrl_c()
-        }
-
-        let node_clone = node.clone();
-        tokio::task::spawn(async move {
-            match signal_listener().await {
-                Ok(()) => {
-                    // If not presrving stte kill the process immidiately.
-                    if !keep_state {
-                        info!("================================================================");
-                        info!(" Node state preservation not required. Terminating immediately. ");
-                        info!("================================================================");
-                        std::process::exit(0);
-                    }
-
-                    warn!("==========================================================================================");
-                    warn!("⚠️  Attention - Starting the graceful shutdown procedure (ETA: 30 seconds)...");
-                    warn!("⚠️  Attention - Avoid DATA CORRUPTION, do NOT interrupt amareleo (or press Ctrl+C again)");
-                    warn!("⚠️  Attention - Please wait until the shutdown gracefully completes (ETA: 30 seconds)");
-                    warn!("==========================================================================================");
-
-                    match node_clone.get() {
-                        // If the node is already initialized, then shut it down.
-                        Some(node) => node.shut_down().await,
-                        // Otherwise, if the node is not yet initialized, then set the shutdown flag directly.
-                        None => shutdown_flag.store(true, Ordering::Relaxed),
-                    }
-
-                    // A best-effort attempt to let any ongoing activity conclude.
-                    tokio::time::sleep(Duration::from_secs(3)).await;
-
-                    // Terminate the process.
-                    std::process::exit(0);
-                }
-                Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),
-            }
-        });
-
-        node
-    }
-
     /// Spawns a task with the given future; it should only be used for long-running tasks.
     pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
         self.handles.lock().push(tokio::spawn(future));
@@ -189,7 +107,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Shuts down the node.
-    async fn shut_down(&self) {
+    pub async fn shut_down(&self) {
         info!("Shutting down...");
 
         // Shut down the node.

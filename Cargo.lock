@@ -197,7 +197,6 @@ dependencies = [
  "amareleo-node-rest",
  "amareleo-node-sync",
  "anyhow",
- "once_cell",
  "parking_lot",
  "rand",
  "rand_chacha",

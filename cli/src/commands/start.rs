@@ -17,16 +17,13 @@ use anyhow::Result;
 use clap::Parser;
 use colored::Colorize;
 
-use amareleo_api::api::{AmareleoApi, AmareleoLog};
-
-use snarkvm::{
-    console::network::{CanaryV0, MainnetV0, Network, TestnetV0},
-    prelude::store::helpers::rocksdb::ConsensusDB,
-};
-use std::result::Result::Ok;
-
-use std::{net::SocketAddr, path::PathBuf};
+use core::future::Future;
+use std::{net::SocketAddr, path::PathBuf, result::Result::Ok, time::Duration};
 use tokio::runtime::{self, Runtime};
+
+use snarkvm::console::network::{CanaryV0, MainnetV0, Network, TestnetV0};
+
+use amareleo_api::api::{AmareleoApi, AmareleoLog};
 
 /// Starts the node.
 #[derive(Clone, Debug, Parser)]
@@ -75,16 +72,16 @@ impl Start {
             // Parse the network.
             match cli.network {
                 MainnetV0::ID => {
-                    // Parse the node from the configurations.
-                    cli.parse_node::<MainnetV0>().await.expect("Failed to parse the node");
+                    let node_api = cli.start_node::<MainnetV0>().await.expect("Failed to parse the node");
+                    cli.handle_termination(node_api);
                 }
                 TestnetV0::ID => {
-                    // Parse the node from the configurations.
-                    cli.parse_node::<TestnetV0>().await.expect("Failed to parse the node");
+                    let node_api = cli.start_node::<TestnetV0>().await.expect("Failed to parse the node");
+                    cli.handle_termination(node_api);
                 }
                 CanaryV0::ID => {
-                    // Parse the node from the configurations.
-                    cli.parse_node::<CanaryV0>().await.expect("Failed to parse the node");
+                    let node_api = cli.start_node::<CanaryV0>().await.expect("Failed to parse the node");
+                    cli.handle_termination(node_api);
                 }
                 _ => panic!("Invalid network ID specified"),
             };
@@ -98,7 +95,7 @@ impl Start {
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
-    async fn parse_node<N: Network>(&mut self) -> Result<()> {
+    async fn start_node<N: Network>(&mut self) -> Result<AmareleoApi<N>> {
 
         // Print the welcome.
         println!("{}", Self::welcome_message());
@@ -133,8 +130,75 @@ impl Start {
         println!("📁 Ledger folder path: {}\n", node_api.get_ledger_folder()?.to_string_lossy());
 
         // Initialize the node.
-        node_api.start::<ConsensusDB<N>>().await?;
-        Ok(())
+        node_api.start().await?;
+        Ok(node_api)
+    }
+
+    /// Handles OS signals for intercept termination and performing a clean shutdown.
+    fn handle_termination<N: Network>(&self, mut node_api: AmareleoApi<N>) {
+        #[cfg(target_family = "unix")]
+        fn signal_listener() -> impl Future<Output = std::io::Result<()>> {
+            use tokio::signal::unix::{SignalKind, signal};
+
+            // Handle SIGINT, SIGTERM, SIGQUIT, and SIGHUP.
+            let mut s_int = signal(SignalKind::interrupt()).unwrap();
+            let mut s_term = signal(SignalKind::terminate()).unwrap();
+            let mut s_quit = signal(SignalKind::quit()).unwrap();
+            let mut s_hup = signal(SignalKind::hangup()).unwrap();
+
+            // Return when any of the signals above is received.
+            async move {
+                tokio::select!(
+                    _ = s_int.recv() => (),
+                    _ = s_term.recv() => (),
+                    _ = s_quit.recv() => (),
+                    _ = s_hup.recv() => (),
+                );
+                Ok(())
+            }
+        }
+        #[cfg(not(target_family = "unix"))]
+        fn signal_listener() -> impl Future<Output = std::io::Result<()>> {
+            tokio::signal::ctrl_c()
+        }
+
+        let keep_state = self.keep_state;
+
+        tokio::task::spawn(async move {
+            match signal_listener().await {
+                Ok(()) => {
+                    // If not presrving stte kill the process immidiately.
+                    if !keep_state {
+                        let term_msg = &r#"
+================================================================
+ Node state preservation not required. Terminating immediately. 
+================================================================
+"#;
+                        println!("{}", term_msg);
+                        std::process::exit(0);
+                    }
+
+                    let term_msg = &r#"
+==========================================================================================
+⚠️  Attention - Starting the graceful shutdown procedure (ETA: 30 seconds)...
+⚠️  Attention - Avoid DATA CORRUPTION, do NOT interrupt amareleo (or press Ctrl+C again)
+⚠️  Attention - Please wait until the shutdown gracefully completes (ETA: 30 seconds)
+==========================================================================================
+"#;
+                    println!("{}", term_msg);
+
+                    // Shut down the node.
+                    node_api.end().await;
+
+                    // A best-effort attempt to let any ongoing activity conclude.
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+
+                    // Terminate the process.
+                    std::process::exit(0);
+                }
+                Err(error) => println!("tokio::signal::ctrl_c encountered an error: {}", error),
+            }
+        });
     }
 
     /// Returns a runtime for the node.

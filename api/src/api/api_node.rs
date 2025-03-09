@@ -11,7 +11,6 @@
 // limitations under the License.
 
 use std::{
-    marker::PhantomData,
     net::SocketAddr,
     path::PathBuf,
     sync::{Arc, atomic::AtomicBool},
@@ -31,7 +30,10 @@ use snarkvm::{
     ledger::{
         block::Block,
         committee::{Committee, MIN_VALIDATOR_STAKE},
-        store::{ConsensusStorage, ConsensusStore, helpers::memory::ConsensusMemory},
+        store::{
+            ConsensusStore,
+            helpers::{memory::ConsensusMemory, rocksdb::ConsensusDB},
+        },
     },
     prelude::{FromBytes, ToBits, ToBytes},
     synthesizer::VM,
@@ -72,9 +74,8 @@ pub struct AmareleoApi<N: Network> {
     ledger_default_naming: bool,
     log_mode: AmareleoLog,
     verbosity: u8,
-    started: bool,
     shutdown: Arc<AtomicBool>,
-    phantom: PhantomData<N>,
+    validator: Option<Arc<Validator<N, ConsensusDB<N>>>>,
 }
 
 impl<N: Network> Default for AmareleoApi<N> {
@@ -88,9 +89,8 @@ impl<N: Network> Default for AmareleoApi<N> {
             ledger_default_naming: false,
             log_mode: AmareleoLog::None,
             verbosity: 1u8,
-            started: false,
             shutdown: Default::default(),
-            phantom: PhantomData,
+            validator: None,
         }
     }
 }
@@ -99,7 +99,7 @@ impl<N: Network> Default for AmareleoApi<N> {
 impl<N: Network> AmareleoApi<N> {
     /// Configure REST server properties
     pub fn cfg_rest(&mut self, ip_port: SocketAddr, rps: u32) -> &mut Self {
-        if !self.started {
+        if !self.is_started() {
             self.rest_ip = ip_port;
             self.rest_rps = rps;
         }
@@ -109,7 +109,7 @@ impl<N: Network> AmareleoApi<N> {
 
     /// Configure ledger storage properties
     pub fn cfg_ledger(&mut self, keep_state: bool, base_path: Option<PathBuf>, default_naming: bool) -> &mut Self {
-        if !self.started {
+        if !self.is_started() {
             self.keep_state = keep_state;
             self.ledger_base_path = base_path;
             self.ledger_default_naming = default_naming;
@@ -120,7 +120,7 @@ impl<N: Network> AmareleoApi<N> {
 
     /// Configure logging properties
     pub fn cfg_log(&mut self, log_mode: AmareleoLog, verbosity: u8) -> &mut Self {
-        if !self.started {
+        if !self.is_started() {
             self.log_mode = log_mode;
             self.verbosity = verbosity;
         }
@@ -168,13 +168,18 @@ impl<N: Network> AmareleoApi<N> {
 
         Ok(ledger_path.to_path_buf())
     }
+
+    /// Check if the node is started
+    pub fn is_started(&self) -> bool {
+        self.validator.is_some()
+    }
 }
 
 // AmareleoApi operations for public consumption
 impl<N: Network> AmareleoApi<N> {
     /// Start a node instance
-    pub async fn start<C: ConsensusStorage<N>>(&self) -> Result<Validator<N, C>> {
-        if self.started {
+    pub async fn start(&mut self) -> Result<()> {
+        if self.is_started() {
             bail!("Node already started");
         }
 
@@ -192,7 +197,7 @@ impl<N: Network> AmareleoApi<N> {
         }
 
         // Initialize the validator.
-        Validator::new(
+        let validator: Validator<N, ConsensusDB<N>> = Validator::new(
             self.rest_ip,
             self.rest_rps,
             account,
@@ -201,7 +206,18 @@ impl<N: Network> AmareleoApi<N> {
             storage_mode,
             self.shutdown.clone(),
         )
-        .await
+        .await?;
+
+        self.validator = Some(Arc::new(validator));
+
+        Ok(())
+    }
+
+    pub async fn end(&mut self) {
+        if let Some(validator) = &self.validator {
+            validator.shut_down().await;
+            self.validator = None;
+        }
     }
 }
 
