@@ -19,5 +19,8 @@ use log_writer::*;
 mod dynamic_format;
 use dynamic_format::*;
 
+pub(crate) mod trace_layers;
+pub(crate) use trace_layers::*;
+
 pub(crate) mod logger;
 pub(crate) use logger::*;
