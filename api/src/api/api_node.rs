@@ -458,8 +458,6 @@ impl<N: Network> AmareleoApi<N> {
     /// Initialze logging
     fn start_logger(&self) -> Result<()> {
         let log_path = self.get_log_file()?;
-        crate::helpers::initialize_logger(self.verbosity, log_path, self.log_mode.is_stdout(), self.shutdown.clone());
-
-        Ok(())
+        crate::helpers::initialize_logger(self.verbosity, log_path, self.log_mode.is_stdout(), self.shutdown.clone())
     }
 }

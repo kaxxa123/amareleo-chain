@@ -15,11 +15,12 @@
 
 use crate::helpers::{DynamicFormatter, LogWriter};
 
+use anyhow::{Result, bail};
 use crossterm::tty::IsTty;
 use std::{
     fs::File,
     io,
-    path::Path,
+    path::PathBuf,
     sync::{Arc, atomic::AtomicBool},
 };
 use tracing_subscriber::{
@@ -27,6 +28,47 @@ use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
 };
+
+/// Initializes a log filter based on the verbosity level.
+fn init_env_filter(verbosity: u8) -> Result<EnvFilter> {
+    let filter = EnvFilter::from_default_env()
+        .add_directive("mio=off".parse()?)
+        .add_directive("tokio_util=off".parse()?)
+        .add_directive("hyper=off".parse()?)
+        .add_directive("reqwest=off".parse()?)
+        .add_directive("want=off".parse()?)
+        .add_directive("warp=off".parse()?);
+
+    let filter = if verbosity >= 2 {
+        filter.add_directive("amareleo_node_sync=trace".parse()?)
+    } else {
+        filter.add_directive("amareleo_node_sync=debug".parse()?)
+    };
+
+    if verbosity >= 3 {
+        Ok(filter.add_directive("amareleo_node_bft=trace".parse()?))
+    } else {
+        Ok(filter.add_directive("amareleo_node_bft=debug".parse()?))
+    }
+}
+
+fn init_log_file(logfile_path: PathBuf) -> Result<File> {
+    // Create the directories tree for a logfile if it doesn't exist.
+    if let Some(logfile_dir) = logfile_path.parent() {
+        if !logfile_dir.exists() && std::fs::create_dir_all(logfile_dir).is_err() {
+            bail!("Failed to create directories, check user has permissions: {}", logfile_dir.to_string_lossy());
+        }
+    } else {
+        bail!("Root directory passed as a logfile");
+    }
+
+    // Create a file to write logs to.
+    let logfile = File::options().append(true).create(true).open(logfile_path.clone());
+    match logfile {
+        Ok(file) => Ok(file),
+        Err(_) => bail!("Failed to open log file {}", logfile_path.to_string_lossy()),
+    }
+}
 
 /// Initializes the logger.
 ///
@@ -36,74 +78,45 @@ use tracing_subscriber::{
 /// 2 => info, debug, trace, amareleo_node_sync=trace
 /// 3 => info, debug, trace, amareleo_node_bft=trace
 /// ```
-pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, logfile: P, stdout_dump: bool, shutdown: Arc<AtomicBool>) {
+pub fn initialize_logger(
+    verbosity: u8,
+    logfile_path: PathBuf,
+    stdout_dump: bool,
+    shutdown: Arc<AtomicBool>,
+) -> Result<()> {
     match verbosity {
         0 => std::env::set_var("RUST_LOG", "info"),
         1 => std::env::set_var("RUST_LOG", "debug"),
         2.. => std::env::set_var("RUST_LOG", "trace"),
     };
 
-    // Filter out undesirable logs. (unfortunately EnvFilter cannot be cloned)
-    let [filter, filter2] = std::array::from_fn(|_| {
-        let filter = EnvFilter::from_default_env()
-            .add_directive("mio=off".parse().unwrap())
-            .add_directive("tokio_util=off".parse().unwrap())
-            .add_directive("hyper=off".parse().unwrap())
-            .add_directive("reqwest=off".parse().unwrap())
-            .add_directive("want=off".parse().unwrap())
-            .add_directive("warp=off".parse().unwrap());
+    // Initialize tracing to file.
+    let trace_to_file = tracing_subscriber::fmt::Layer::default()
+        .with_ansi(false)
+        .with_writer(init_log_file(logfile_path)?)
+        .with_target(verbosity > 2)
+        .with_filter(init_env_filter(verbosity)?);
 
-        let filter = if verbosity >= 2 {
-            filter.add_directive("amareleo_node_sync=trace".parse().unwrap())
-        } else {
-            filter.add_directive("amareleo_node_sync=debug".parse().unwrap())
-        };
-
-        if verbosity >= 3 {
-            filter.add_directive("amareleo_node_bft=trace".parse().unwrap())
-        } else {
-            filter.add_directive("amareleo_node_bft=debug".parse().unwrap())
-        }
-    });
-
-    // Create the directories tree for a logfile if it doesn't exist.
-    let logfile_dir = logfile.as_ref().parent().expect("Root directory passed as a logfile");
-    if !logfile_dir.exists() {
-        std::fs::create_dir_all(logfile_dir)
-            .expect("Failed to create a directories: '{logfile_dir}', please check if user has permissions");
-    }
-    // Create a file to write logs to.
-    let logfile =
-        File::options().append(true).create(true).open(logfile).expect("Failed to open the file for writing logs");
-
-    // Initialize the log sender.
-    // Hardcoding to None as a result of
-    // snarkos start --nodisplay being always true.
-    let log_sender = None;
-
-    // Initialize tracing.
-    let tracing = tracing_subscriber::registry().with(
-        // Add layer redirecting logs to the file
-        tracing_subscriber::fmt::Layer::default()
-            .with_ansi(false)
-            .with_writer(logfile)
-            .with_target(verbosity > 2)
-            .with_filter(filter2),
-    );
+    let subscriber = tracing_subscriber::registry().with(trace_to_file);
 
     let _ = if stdout_dump {
-        tracing
-            .with(
-                // Add layer using LogWriter for stdout / terminal
-                tracing_subscriber::fmt::Layer::default()
-                    .with_ansi(io::stdout().is_tty())
-                    .with_writer(move || LogWriter::new(&log_sender))
-                    .with_target(verbosity > 2)
-                    .event_format(DynamicFormatter::new(shutdown))
-                    .with_filter(filter),
-            )
-            .try_init()
+        // Initialize the log sender.
+        // Hardcoding to None as a result of
+        // snarkos start --nodisplay being always true.
+        let log_sender = None;
+
+        // Add layer using LogWriter for stdout / terminal
+        let trace_to_stdout = tracing_subscriber::fmt::Layer::default()
+            .with_ansi(io::stdout().is_tty())
+            .with_writer(move || LogWriter::new(&log_sender))
+            .with_target(verbosity > 2)
+            .event_format(DynamicFormatter::new(shutdown))
+            .with_filter(init_env_filter(verbosity)?);
+
+        subscriber.with(trace_to_stdout).try_init()
     } else {
-        tracing.try_init()
+        subscriber.try_init()
     };
+
+    Ok(())
 }
