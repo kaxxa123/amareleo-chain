@@ -13,5 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod dynamic_format;
+use dynamic_format::*;
+
+pub(crate) mod logger;
+pub(crate) use logger::*;
+
 pub mod updater;
 pub use updater::*;

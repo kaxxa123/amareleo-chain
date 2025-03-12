@@ -23,7 +23,8 @@ use tokio::runtime::{self, Runtime};
 
 use snarkvm::console::network::{CanaryV0, MainnetV0, Network, TestnetV0};
 
-use amareleo_api::api::{AmareleoApi, AmareleoLog};
+use crate::helpers::initialize_custom_tracing;
+use amareleo_api::api::AmareleoApi;
 
 /// Starts the node.
 #[derive(Clone, Debug, Parser)]
@@ -121,12 +122,24 @@ impl Start {
 
         let mut node_api: AmareleoApi<N> = AmareleoApi::default();
 
+        // Configure the node api including file logging.
+        // We only include file logging for us to easily get the log file path.
+        // Ultimately we opt for custom logging.
         node_api
         .cfg_ledger(self.keep_state, self.storage.clone(), self.keep_state)
         .cfg_rest(rest_ip_port, self.rest_rps)
-        .cfg_log(AmareleoLog::All(self.logfile.clone()), self.verbosity);
+        .cfg_file_log(self.logfile.clone(), self.verbosity);
 
-        println!("📝 Log file path: {}\n", node_api.get_log_file()?.to_string_lossy());
+        // Get the log file path and setup custom logging.
+        let logfile_path = node_api.get_log_file()?;
+        let tracing = initialize_custom_tracing(
+            self.verbosity,
+            logfile_path.clone(),
+            node_api.get_shutdown())?;
+
+        node_api.cfg_custom_log(tracing);
+
+        println!("📝 Log file path: {}\n", logfile_path.to_string_lossy());
         println!("📁 Ledger folder path: {}\n", node_api.get_ledger_folder()?.to_string_lossy());
 
         // Initialize the node.

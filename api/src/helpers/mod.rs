@@ -13,14 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod log_writer;
-use log_writer::*;
+pub mod trace_layers;
+pub use trace_layers::*;
 
-mod dynamic_format;
-use dynamic_format::*;
-
-pub(crate) mod trace_layers;
-pub(crate) use trace_layers::*;
-
-pub(crate) mod logger;
-pub(crate) use logger::*;
+pub mod logger;
+pub use logger::*;

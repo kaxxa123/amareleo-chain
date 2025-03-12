@@ -12,32 +12,45 @@
 
 use std::path::PathBuf;
 
+use crate::helpers::TracingHandler;
+
 /// Amareleo logging selection
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone)]
 pub enum AmareleoLog {
-    /// Log only to a file
+    /// Log to file.
+    /// If Some, the specified path is used.
+    /// If None, the default log file path is used.
     File(Option<PathBuf>),
-    /// Log to both stdout and a file
-    All(Option<PathBuf>),
+
+    /// Custom log handler
+    Custom(TracingHandler),
+
     /// Disable logging
     None,
 }
 
 impl AmareleoLog {
-    /// Get the path to the log file
-    pub fn get_path(&self) -> &Option<PathBuf> {
+    /// Get configured log file path
+    /// Returns Some when a custom log file path is configured.
+    /// Returns None when using the default path and when file logging is disabled.
+    pub fn get_path(&self) -> Option<PathBuf> {
         match self {
-            Self::File(path) | Self::All(path) => path,
-            _ => &None,
+            Self::File(path) => path.clone(),
+            _ => None,
         }
     }
 
-    /// Check if logging to stdout
-    pub fn is_stdout(&self) -> bool {
-        matches!(self, Self::All(_))
+    /// Check if file logging is enabled
+    pub fn is_file(&self) -> bool {
+        matches!(self, Self::File(_))
     }
 
-    /// Check if logging is disabled
+    /// Check if custom logging is enabled
+    pub fn is_custom(&self) -> bool {
+        matches!(self, Self::Custom(_))
+    }
+
+    /// Check if logging is disabled completely
     pub fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }

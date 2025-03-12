@@ -29,13 +29,6 @@ default-features = false
 version = "0.3.0"
 default-features = false
 
-[dependencies.crossterm]
-version = "0.27"
-
-[dependencies.time]
-version = "0.3"
-features = ["formatting"]
-
 [dependencies.tokio]
 version = "1.28"
 features = ["rt", "rt-multi-thread"]

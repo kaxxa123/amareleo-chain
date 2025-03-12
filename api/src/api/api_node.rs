@@ -40,7 +40,10 @@ use snarkvm::{
     utilities::to_bytes_le,
 };
 
-use crate::api::AmareleoLog;
+use crate::{
+    api::AmareleoLog,
+    helpers::{TracingHandler, initialize_tracing},
+};
 
 use amareleo_chain_account::Account;
 use amareleo_chain_resources::{
@@ -118,11 +121,20 @@ impl<N: Network> AmareleoApi<N> {
         self
     }
 
-    /// Configure logging properties
-    pub fn cfg_log(&mut self, log_mode: AmareleoLog, verbosity: u8) -> &mut Self {
+    /// Configure file logging
+    pub fn cfg_file_log(&mut self, log_file: Option<PathBuf>, verbosity: u8) -> &mut Self {
         if !self.is_started() {
-            self.log_mode = log_mode;
+            self.log_mode = AmareleoLog::File(log_file);
             self.verbosity = verbosity;
+        }
+
+        self
+    }
+
+    /// Configure custom logging
+    pub fn cfg_custom_log(&mut self, tracing: TracingHandler) -> &mut Self {
+        if !self.is_started() {
+            self.log_mode = AmareleoLog::Custom(tracing);
         }
 
         self
@@ -143,19 +155,20 @@ impl<N: Network> AmareleoApi<N> {
     /// Get resultant log file path, based on current configuration.
     /// Returns empty string if logging is disabled
     pub fn get_log_file(&self) -> Result<PathBuf> {
-        if self.log_mode.is_none() {
-            bail!("Logging is disabled!");
+        if !self.log_mode.is_file() {
+            bail!("Logging to file is disabled!");
         }
 
-        let end_point_tag = endpoint_file_tag::<N>(false, &self.rest_ip)?;
-
         let log_option = self.log_mode.get_path();
-        let log_path = match log_option {
-            Some(path) => path,
-            None => &amareleo_log_file(N::ID, self.keep_state, &end_point_tag),
+        let log_path = match &log_option {
+            Some(path) => path.clone(),
+            None => {
+                let end_point_tag = endpoint_file_tag::<N>(false, &self.rest_ip)?;
+                amareleo_log_file(N::ID, self.keep_state, &end_point_tag)
+            }
         };
 
-        Ok(log_path.to_path_buf())
+        Ok(log_path)
     }
 
     /// Get resultant ledger folder path, based on current configuration.
@@ -167,6 +180,11 @@ impl<N: Network> AmareleoApi<N> {
         };
 
         Ok(ledger_path.to_path_buf())
+    }
+
+    /// Get the shutdown signal
+    pub fn get_shutdown(&self) -> Arc<AtomicBool> {
+        self.shutdown.clone()
     }
 
     /// Check if the node is started
@@ -192,9 +210,7 @@ impl<N: Network> AmareleoApi<N> {
             Self::clean_tmp_ledger(ledger_path)?;
         }
 
-        if !self.log_mode.is_none() {
-            self.start_logger()?;
-        }
+        self.start_logger()?;
 
         // Initialize the validator.
         let validator: Validator<N, ConsensusDB<N>> = Validator::new(
@@ -457,7 +473,12 @@ impl<N: Network> AmareleoApi<N> {
 
     /// Initialze logging
     fn start_logger(&self) -> Result<()> {
-        let log_path = self.get_log_file()?;
-        crate::helpers::initialize_logger(self.verbosity, log_path, self.log_mode.is_stdout(), self.shutdown.clone())
+        match &self.log_mode {
+            AmareleoLog::File(_) => initialize_tracing(self.verbosity, self.get_log_file()?)?.subscribe_process(),
+            AmareleoLog::Custom(tracing) => tracing.clone().subscribe_process(),
+            AmareleoLog::None => (),
+        }
+
+        Ok(())
     }
 }

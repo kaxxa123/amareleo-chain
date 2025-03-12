@@ -10,10 +10,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    io::{self},
-    sync::Arc,
-};
+use anyhow::Result;
+use std::sync::Arc;
 use tracing::subscriber::DefaultGuard;
 use tracing_subscriber::{Layer, Registry, layer::Layered, prelude::*};
 
@@ -30,7 +28,7 @@ impl TracingHandler {
     }
 
     /// Set one layer subscriber
-    pub fn set_one_layer<L>(mut self, layer1: L) -> io::Result<Self>
+    pub fn set_one_layer<L>(mut self, layer1: L) -> Result<Self>
     where
         L: Layer<Registry> + Send + Sync + 'static,
     {
@@ -42,7 +40,7 @@ impl TracingHandler {
     }
 
     /// Set two layer subscriber
-    pub fn set_two_layers<L, LL>(mut self, layer1: L, layer2: LL) -> io::Result<Self>
+    pub fn set_two_layers<L, LL>(mut self, layer1: L, layer2: LL) -> Result<Self>
     where
         L: Layer<Registry> + Send + Sync + 'static,
         LL: Layer<Layered<L, Registry>> + Send + Sync + 'static,
@@ -55,11 +53,13 @@ impl TracingHandler {
     }
 
     /// Set subscriber as the default for the current process    
+    #[allow(dead_code)]
     pub fn subscribe_process(self) {
         let _ = self.subscriber.try_init();
     }
 
     /// Set subscriber as the default for the current thread
+    #[allow(dead_code)]
     pub fn subscribe_thread(self) -> DefaultGuard {
         tracing::subscriber::set_default(self.subscriber)
     }

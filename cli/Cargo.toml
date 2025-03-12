@@ -45,6 +45,20 @@ version = "1"
 version = "0.41"
 features = ["archive-zip", "compression-zip-deflate"]
 
+[dependencies.crossterm]
+version = "0.27"
+
+[dependencies.time]
+version = "0.3"
+features = ["formatting"]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dependencies.tracing-subscriber]
+version = "0.3"
+features = ["env-filter"]
+
 [dependencies.amareleo-node]
 path = "../node"
 version = "=2.0.2"
