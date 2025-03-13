@@ -67,7 +67,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone(), shutdown.clone()));
 
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger_service.clone(), keep_state, storage_mode.clone())?;
+        let mut consensus =
+            Consensus::new(account.clone(), ledger_service.clone(), keep_state, storage_mode.clone(), tracing.clone())?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.

@@ -19,6 +19,7 @@
 extern crate tracing;
 
 use amareleo_chain_account::Account;
+use amareleo_chain_tracing::TracingHandler;
 use amareleo_node_bft::{
     BFT,
     MAX_BATCH_DELAY_IN_MS,
@@ -105,6 +106,8 @@ pub struct Consensus<N: Network> {
     seen_transactions: Arc<Mutex<LruCache<N::TransactionID, ()>>>,
     #[cfg(feature = "metrics")]
     transmissions_queue_timestamps: Arc<Mutex<HashMap<TransmissionID<N>, i64>>>,
+    /// Tracing handle
+    tracing: Option<TracingHandler>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -116,6 +119,7 @@ impl<N: Network> Consensus<N> {
         ledger: Arc<dyn LedgerService<N>>,
         keep_state: bool,
         storage_mode: StorageMode,
+        tracing: Option<TracingHandler>,
     ) -> Result<Self> {
         // Initialize the Narwhal transmissions.
         let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode.clone())?);
@@ -134,12 +138,14 @@ impl<N: Network> Consensus<N> {
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             #[cfg(feature = "metrics")]
             transmissions_queue_timestamps: Default::default(),
+            tracing,
             handles: Default::default(),
         })
     }
 
     /// Run the consensus instance.
     pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
+        let _guard = self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread());
         info!("Starting the consensus instance...");
         // Set the primary sender.
         self.primary_sender.set(primary_sender.clone()).expect("Primary sender already set");
@@ -281,6 +287,8 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: Solution<N>) -> Result<()> {
+        let _guard = self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread());
+
         // Calculate the transmission checksum.
         let checksum = Data::<Solution<N>>::Buffer(solution.to_bytes_le()?.into()).to_checksum::<N>()?;
         #[cfg(feature = "metrics")]
@@ -317,6 +325,8 @@ impl<N: Network> Consensus<N> {
 
     /// Processes unconfirmed transactions in the memory pool.
     pub async fn process_unconfirmed_solutions(&self) -> Result<()> {
+        let _guard = self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread());
+
         // If the memory pool of this node is full, return early.
         let num_unconfirmed_solutions = self.num_unconfirmed_solutions();
         let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
@@ -356,6 +366,8 @@ impl<N: Network> Consensus<N> {
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
+        let _guard = self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread());
+
         // Calculate the transmission checksum.
         let checksum = Data::<Transaction<N>>::Buffer(transaction.to_bytes_le()?.into()).to_checksum::<N>()?;
         #[cfg(feature = "metrics")]
@@ -400,6 +412,8 @@ impl<N: Network> Consensus<N> {
 
     /// Processes unconfirmed transactions in the memory pool.
     pub async fn process_unconfirmed_transactions(&self) -> Result<()> {
+        let _guard = self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread());
+
         // If the memory pool of this node is full, return early.
         let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
         if num_unconfirmed_transmissions >= Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE {
@@ -465,7 +479,9 @@ impl<N: Network> Consensus<N> {
 
         // Process the unconfirmed transactions in the memory pool.
         let self_ = self.clone();
+        let tracing_ = self.tracing.clone();
         self.spawn(async move {
+            let _guard = tracing_.map(|trace_handle| trace_handle.subscribe_thread());
             loop {
                 // Sleep briefly.
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS)).await;
@@ -488,6 +504,8 @@ impl<N: Network> Consensus<N> {
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
         callback: oneshot::Sender<Result<()>>,
     ) {
+        let _guard = self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread());
+
         // Try to advance to the next block.
         let self_ = self.clone();
         let transmissions_ = transmissions.clone();
@@ -560,6 +578,8 @@ impl<N: Network> Consensus<N> {
 
     /// Reinserts the given transmissions into the memory pool.
     async fn reinsert_transmissions(&self, transmissions: IndexMap<TransmissionID<N>, Transmission<N>>) {
+        let _guard = self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread());
+
         // Iterate over the transmissions.
         for (transmission_id, transmission) in transmissions.into_iter() {
             // Reinsert the transmission into the memory pool.
@@ -605,6 +625,7 @@ impl<N: Network> Consensus<N> {
 
     /// Shuts down the BFT.
     pub async fn shut_down(&self) {
+        let _guard = self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread());
         info!("Shutting down consensus...");
         // Shut down the BFT.
         self.bft.shut_down().await;
