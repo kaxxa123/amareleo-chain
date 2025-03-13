@@ -24,7 +24,7 @@ use tokio::runtime::{self, Runtime};
 use snarkvm::console::network::{CanaryV0, MainnetV0, Network, TestnetV0};
 
 use crate::helpers::initialize_custom_tracing;
-use amareleo_api::api::AmareleoApi;
+use amareleo_chain_api::api::AmareleoApi;
 
 /// Starts the node.
 #[derive(Clone, Debug, Parser)]

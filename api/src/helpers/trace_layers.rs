@@ -52,14 +52,7 @@ impl TracingHandler {
         Ok(self)
     }
 
-    /// Set subscriber as the default for the current process    
-    #[allow(dead_code)]
-    pub fn subscribe_process(self) {
-        let _ = self.subscriber.try_init();
-    }
-
     /// Set subscriber as the default for the current thread
-    #[allow(dead_code)]
     pub fn subscribe_thread(self) -> DefaultGuard {
         tracing::subscriber::set_default(self.subscriber)
     }

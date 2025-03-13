@@ -1,5 +1,5 @@
 [package]
-name = "amareleo-api"
+name = "amareleo-chain-api"
 version = "2.0.2"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "API for a lite Aleo development node"

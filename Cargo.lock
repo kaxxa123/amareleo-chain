@@ -111,29 +111,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
-name = "amareleo-api"
-version = "2.0.2"
-dependencies = [
- "amareleo-chain-account",
- "amareleo-chain-resources",
- "amareleo-node",
- "amareleo-node-bft",
- "anyhow",
- "indexmap 2.7.0",
- "rand",
- "rand_chacha",
- "snarkvm",
- "tokio",
- "tracing",
- "tracing-subscriber 0.3.19",
-]
-
-[[package]]
 name = "amareleo-chain"
 version = "2.0.2"
 dependencies = [
- "amareleo-api",
  "amareleo-chain-account",
+ "amareleo-chain-api",
  "amareleo-chain-cli",
  "amareleo-node",
  "amareleo-node-bft",
@@ -158,10 +140,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "amareleo-chain-api"
+version = "2.0.2"
+dependencies = [
+ "amareleo-chain-account",
+ "amareleo-chain-resources",
+ "amareleo-node",
+ "amareleo-node-bft",
+ "anyhow",
+ "indexmap 2.7.0",
+ "rand",
+ "rand_chacha",
+ "snarkvm",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.19",
+]
+
+[[package]]
 name = "amareleo-chain-cli"
 version = "2.0.2"
 dependencies = [
- "amareleo-api",
+ "amareleo-chain-api",
  "amareleo-node",
  "amareleo-node-metrics",
  "amareleo-node-rest",

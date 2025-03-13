@@ -80,7 +80,7 @@ version = "=2.0.2"
 path = "./cli"
 version = "=2.0.2"
 
-[dependencies.amareleo-api]
+[dependencies.amareleo-chain-api]
 path = "./api"
 version = "=2.0.2"
 

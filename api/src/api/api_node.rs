@@ -76,6 +76,7 @@ pub struct AmareleoApi<N: Network> {
     ledger_base_path: Option<PathBuf>,
     ledger_default_naming: bool,
     log_mode: AmareleoLog,
+    log_trace: Option<TracingHandler>,
     verbosity: u8,
     shutdown: Arc<AtomicBool>,
     validator: Option<Arc<Validator<N, ConsensusDB<N>>>>,
@@ -91,6 +92,7 @@ impl<N: Network> Default for AmareleoApi<N> {
             ledger_base_path: None,
             ledger_default_naming: false,
             log_mode: AmareleoLog::None,
+            log_trace: None,
             verbosity: 1u8,
             shutdown: Default::default(),
             validator: None,
@@ -98,7 +100,7 @@ impl<N: Network> Default for AmareleoApi<N> {
     }
 }
 
-// AmareleoApi configuration
+// AmareleoApi configuration setters
 impl<N: Network> AmareleoApi<N> {
     /// Configure REST server properties
     pub fn cfg_rest(&mut self, ip_port: SocketAddr, rps: u32) -> &mut Self {
@@ -139,9 +141,17 @@ impl<N: Network> AmareleoApi<N> {
 
         self
     }
+
+    pub fn cfg_no_log(&mut self) -> &mut Self {
+        if !self.is_started() {
+            self.log_mode = AmareleoLog::None;
+        }
+
+        self
+    }
 }
 
-// AmareleoApi info getters
+// AmareleoApi public getters
 impl<N: Network> AmareleoApi<N> {
     /// Get fixed development-mode node account
     pub fn get_node_account() -> Result<Account<N>> {
@@ -210,7 +220,7 @@ impl<N: Network> AmareleoApi<N> {
             Self::clean_tmp_ledger(ledger_path)?;
         }
 
-        self.start_logger()?;
+        self.trace_init()?;
 
         // Initialize the validator.
         let validator: Validator<N, ConsensusDB<N>> = Validator::new(
@@ -237,7 +247,31 @@ impl<N: Network> AmareleoApi<N> {
     }
 }
 
-// AmareleoApi private helpers
+// AmareleoApi helpers
+impl<N: Network> AmareleoApi<N> {
+    /// Initialze logging
+    fn trace_init(&mut self) -> Result<()> {
+        // Determine the effective TraceHandler
+        self.log_trace = match &self.log_mode {
+            AmareleoLog::File(_) => Some(initialize_tracing(self.verbosity, self.get_log_file()?)?),
+            AmareleoLog::Custom(tracing) => Some(tracing.clone()),
+            AmareleoLog::None => None,
+        };
+
+        Ok(())
+    }
+
+    /// Get TracingHandler
+    pub fn trace_handler(&self) -> Option<TracingHandler> {
+        if !self.is_started() {
+            return None;
+        }
+
+        self.log_trace.clone()
+    }
+}
+
+// AmareleoApi private static helpers
 impl<N: Network> AmareleoApi<N> {
     /// Cleans the temporary ledger
     fn clean_tmp_ledger(ledger_path: PathBuf) -> Result<()> {
@@ -469,16 +503,5 @@ impl<N: Network> AmareleoApi<N> {
         std::fs::write(&file_path, block.to_bytes_le()?)?;
         // Return the genesis block.
         Ok(block)
-    }
-
-    /// Initialze logging
-    fn start_logger(&self) -> Result<()> {
-        match &self.log_mode {
-            AmareleoLog::File(_) => initialize_tracing(self.verbosity, self.get_log_file()?)?.subscribe_process(),
-            AmareleoLog::Custom(tracing) => tracing.clone().subscribe_process(),
-            AmareleoLog::None => (),
-        }
-
-        Ok(())
     }
 }
