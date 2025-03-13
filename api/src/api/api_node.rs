@@ -40,10 +40,7 @@ use snarkvm::{
     utilities::to_bytes_le,
 };
 
-use crate::{
-    api::AmareleoLog,
-    helpers::{TracingHandler, initialize_tracing},
-};
+use crate::AmareleoLog;
 
 use amareleo_chain_account::Account;
 use amareleo_chain_resources::{
@@ -54,6 +51,7 @@ use amareleo_chain_resources::{
     BLOCK0_TESTNET,
     BLOCK0_TESTNET_ID,
 };
+use amareleo_chain_tracing::{TracingHandler, initialize_tracing};
 use amareleo_node::Validator;
 use amareleo_node_bft::{
     DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,

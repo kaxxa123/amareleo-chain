@@ -14,7 +14,7 @@ use anyhow::{Result, bail};
 use std::{fs::File, path::PathBuf};
 use tracing_subscriber::{EnvFilter, fmt::Layer as FmtLayer, layer::Layer};
 
-use crate::helpers::TracingHandler;
+use crate::TracingHandler;
 
 /// Initializes a log filter based on the verbosity level.
 /// ```ignore

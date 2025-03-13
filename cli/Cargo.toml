@@ -67,6 +67,10 @@ version = "=2.0.2"
 path = "../node/rest"
 version = "=2.0.2"
 
+[dependencies.amareleo-chain-tracing]
+path = "../tracing"
+version = "=2.0.2"
+
 [dependencies.amareleo-chain-api]
 path = "../api"
 version = "=2.0.2"

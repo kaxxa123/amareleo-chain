@@ -19,7 +19,7 @@ use std::{
 use tracing_subscriber::{fmt::Layer as FmtLayer, layer::Layer};
 
 use crate::helpers::DynamicFormatter;
-use amareleo_chain_api::helpers::{TracingHandler, init_env_filter, init_file_writer};
+use amareleo_chain_tracing::{TracingHandler, init_env_filter, init_file_writer};
 
 /// Initializes logger.
 pub fn initialize_custom_tracing(

@@ -12,7 +12,7 @@
 
 use std::path::PathBuf;
 
-use crate::helpers::TracingHandler;
+use amareleo_chain_tracing::TracingHandler;
 
 /// Amareleo logging selection
 #[derive(Clone)]

@@ -23,6 +23,7 @@ members = [
   "account",
   "cli", 
   "api", 
+  "tracing",
   "node", 
   "node/bft",
   "node/bft/events",
@@ -78,6 +79,10 @@ version = "=2.0.2"
 
 [dependencies.amareleo-chain-cli]
 path = "./cli"
+version = "=2.0.2"
+
+[dependencies.amareleo-chain-tracing]
+path = "./tracing"
 version = "=2.0.2"
 
 [dependencies.amareleo-chain-api]

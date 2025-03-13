@@ -117,6 +117,7 @@ dependencies = [
  "amareleo-chain-account",
  "amareleo-chain-api",
  "amareleo-chain-cli",
+ "amareleo-chain-tracing",
  "amareleo-node",
  "amareleo-node-bft",
  "amareleo-node-consensus",
@@ -145,6 +146,7 @@ version = "2.0.2"
 dependencies = [
  "amareleo-chain-account",
  "amareleo-chain-resources",
+ "amareleo-chain-tracing",
  "amareleo-node",
  "amareleo-node-bft",
  "anyhow",
@@ -162,6 +164,7 @@ name = "amareleo-chain-cli"
 version = "2.0.2"
 dependencies = [
  "amareleo-chain-api",
+ "amareleo-chain-tracing",
  "amareleo-node",
  "amareleo-node-metrics",
  "amareleo-node-rest",
@@ -186,6 +189,15 @@ dependencies = [
 [[package]]
 name = "amareleo-chain-resources"
 version = "2.0.2"
+
+[[package]]
+name = "amareleo-chain-tracing"
+version = "2.0.2"
+dependencies = [
+ "anyhow",
+ "tracing",
+ "tracing-subscriber 0.3.19",
+]
 
 [[package]]
 name = "amareleo-node"
