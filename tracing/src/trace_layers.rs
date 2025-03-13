@@ -28,33 +28,31 @@ impl TracingHandler {
     }
 
     /// Set one layer subscriber
-    pub fn set_one_layer<L>(mut self, layer1: L) -> Result<Self>
+    pub fn set_one_layer<L>(&mut self, layer1: L) -> Result<()>
     where
         L: Layer<Registry> + Send + Sync + 'static,
     {
         // Compose the subscriber with both layers
         let inner_subscriber = tracing_subscriber::registry().with(layer1);
-
         self.subscriber = Arc::new(inner_subscriber);
-        Ok(self)
+        Ok(())
     }
 
     /// Set two layer subscriber
-    pub fn set_two_layers<L, LL>(mut self, layer1: L, layer2: LL) -> Result<Self>
+    pub fn set_two_layers<L, LL>(&mut self, layer1: L, layer2: LL) -> Result<()>
     where
         L: Layer<Registry> + Send + Sync + 'static,
         LL: Layer<Layered<L, Registry>> + Send + Sync + 'static,
     {
         // Compose the subscriber with both layers
         let inner_subscriber = tracing_subscriber::registry().with(layer1).with(layer2);
-
         self.subscriber = Arc::new(inner_subscriber);
-        Ok(self)
+        Ok(())
     }
 
     /// Set subscriber as the default for the current thread
-    pub fn subscribe_thread(self) -> DefaultGuard {
-        tracing::subscriber::set_default(self.subscriber)
+    pub fn subscribe_thread(&self) -> DefaultGuard {
+        tracing::subscriber::set_default(self.subscriber.clone())
     }
 }
 

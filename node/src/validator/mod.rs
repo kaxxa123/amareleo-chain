@@ -14,9 +14,11 @@
 // limitations under the License.
 
 use amareleo_chain_account::Account;
+use amareleo_chain_tracing::TracingHandler;
 use amareleo_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use amareleo_node_consensus::Consensus;
 use amareleo_node_rest::Rest;
+
 use snarkvm::prelude::{Ledger, Network, block::Block, store::ConsensusStorage};
 
 use aleo_std::StorageMode;
@@ -40,6 +42,8 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     rest: Option<Rest<N, C>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// Tracing handle
+    tracing: Option<TracingHandler>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
@@ -53,6 +57,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         genesis: Block<N>,
         keep_state: bool,
         storage_mode: StorageMode,
+        tracing: Option<TracingHandler>,
         shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
         // Initialize the ledger.
@@ -74,6 +79,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             consensus: consensus.clone(),
             rest: None,
             handles: Default::default(),
+            tracing,
             shutdown,
         };
 
@@ -108,6 +114,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Shuts down the node.
     pub async fn shut_down(&self) {
+        let _guard = self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread());
+
         info!("Shutting down...");
 
         // Shut down the node.
@@ -123,6 +131,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         self.consensus.shut_down().await;
 
         info!("Node has shut down.");
+        info!("");
     }
 }
 
@@ -170,6 +179,7 @@ mod tests {
             genesis,
             false,
             storage_mode,
+            None,
             Default::default(),
         )
         .await

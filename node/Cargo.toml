@@ -45,6 +45,10 @@ default-features = false
 version = "1"
 optional = true
 
+[dependencies.amareleo-chain-tracing]
+path = "../tracing"
+version = "=2.0.2"
+
 [dependencies.amareleo-chain-account]
 path = "../account"
 version = "=2.0.2"

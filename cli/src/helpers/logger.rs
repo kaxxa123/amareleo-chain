@@ -41,5 +41,7 @@ pub fn initialize_custom_tracing(
         .event_format(DynamicFormatter::new(shutdown))
         .with_filter(init_env_filter(verbosity)?);
 
-    TracingHandler::new().set_two_layers(trace_to_file, stdout_layer)
+    let mut tracing = TracingHandler::new();
+    tracing.set_two_layers(trace_to_file, stdout_layer)?;
+    Ok(tracing)
 }

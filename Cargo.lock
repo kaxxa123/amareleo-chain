@@ -205,6 +205,7 @@ version = "2.0.2"
 dependencies = [
  "aleo-std",
  "amareleo-chain-account",
+ "amareleo-chain-tracing",
  "amareleo-node-bft",
  "amareleo-node-consensus",
  "amareleo-node-metrics",

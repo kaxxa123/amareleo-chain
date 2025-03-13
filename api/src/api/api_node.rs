@@ -228,6 +228,7 @@ impl<N: Network> AmareleoApi<N> {
             genesis,
             self.keep_state,
             storage_mode,
+            self.log_trace.clone(),
             self.shutdown.clone(),
         )
         .await?;
