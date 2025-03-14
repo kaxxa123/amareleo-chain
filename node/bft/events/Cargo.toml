@@ -37,8 +37,8 @@ version = "1"
 [dependencies.serde]
 version = "1"
 
-[dependencies.amareleo-node-sync-locators]
-path = "../../sync/locators"
+[dependencies.amareleo-node-sync]
+path = "../../sync"
 version = "=2.0.2"
 
 [dependencies.snarkvm]
@@ -64,6 +64,6 @@ version = "0.3.1"
 [dev-dependencies.time]
 version = "0.3"
 
-[dev-dependencies.amareleo-node-sync-locators]
-path = "../../sync/locators"
+[dev-dependencies.amareleo-node-sync]
+path = "../../sync"
 features = ["test"]

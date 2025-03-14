@@ -245,7 +245,7 @@ name = "amareleo-node-bft-events"
 version = "2.0.2"
 dependencies = [
  "amareleo-node-metrics",
- "amareleo-node-sync-locators",
+ "amareleo-node-sync",
  "anyhow",
  "bytes",
  "indexmap 2.7.0",
@@ -350,15 +350,6 @@ dependencies = [
 
 [[package]]
 name = "amareleo-node-sync"
-version = "2.0.2"
-dependencies = [
- "amareleo-node-metrics",
- "amareleo-node-sync-locators",
- "snarkvm",
-]
-
-[[package]]
-name = "amareleo-node-sync-locators"
 version = "2.0.2"
 dependencies = [
  "anyhow",

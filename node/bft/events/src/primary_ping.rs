@@ -78,7 +78,7 @@ impl<N: Network> FromBytes for PrimaryPing<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{PrimaryPing, certificate_response::prop_tests::any_batch_certificate};
-    use amareleo_node_sync_locators::{BlockLocators, test_helpers::sample_block_locators};
+    use amareleo_node_sync::{BlockLocators, test_helpers::sample_block_locators};
     use snarkvm::utilities::{FromBytes, ToBytes};
 
     use bytes::{Buf, BufMut, BytesMut};

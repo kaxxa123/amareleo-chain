@@ -30,8 +30,7 @@ members = [
   "node/consensus",
   "node/metrics",
   "node/rest",
-  "node/sync",
-  "node/sync/locators"
+  "node/sync"
   ]
 
 [lib]

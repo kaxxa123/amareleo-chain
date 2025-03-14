@@ -270,15 +270,6 @@ jobs:
           workspace_member: node/sync
           cache_key: v3.0.0-rust-1.81.0-node-sync-cache
 
-  node-sync-locators:
-    docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.medium >>
-    steps:
-      - run_serial:
-          workspace_member: node/sync/locators
-          cache_key: v3.0.0-rust-1.81.0-node-sync-locators-cache
-
   check-fmt:
     docker:
       - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
@@ -371,10 +362,6 @@ workflows:
             branches:
               only: [main, develop]
       - node-sync:
-          filters: 
-            branches:
-              only: [main, develop]
-      - node-sync-locators:
           filters: 
             branches:
               only: [main, develop]
