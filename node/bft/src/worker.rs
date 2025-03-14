@@ -18,6 +18,7 @@ use crate::{
     ProposedBatch,
     helpers::{Ready, Storage, fmt_id},
 };
+use amareleo_chain_tracing::TracingHandler;
 use amareleo_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
@@ -31,6 +32,7 @@ use snarkvm::{
 use colored::Colorize;
 use indexmap::{IndexMap, IndexSet};
 use std::sync::Arc;
+use tracing::subscriber::DefaultGuard;
 
 #[derive(Clone)]
 pub struct Worker<N: Network> {
@@ -42,6 +44,8 @@ pub struct Worker<N: Network> {
     ledger: Arc<dyn LedgerService<N>>,
     /// The proposed batch.
     proposed_batch: Arc<ProposedBatch<N>>,
+    /// Tracing handle
+    tracing: Option<TracingHandler>,
     /// The ready queue.
     ready: Ready<N>,
 }
@@ -53,11 +57,12 @@ impl<N: Network> Worker<N> {
         storage: Storage<N>,
         ledger: Arc<dyn LedgerService<N>>,
         proposed_batch: Arc<ProposedBatch<N>>,
+        tracing: Option<TracingHandler>,
     ) -> Result<Self> {
         // Ensure the worker ID is valid.
         ensure!(id < MAX_WORKERS, "Invalid worker ID '{id}'");
         // Return the worker.
-        Ok(Self { id, storage, ledger, proposed_batch, ready: Default::default() })
+        Ok(Self { id, storage, ledger, proposed_batch, tracing, ready: Default::default() })
     }
 
     /// Returns the worker ID.
@@ -126,6 +131,11 @@ impl<N: Network> Worker<N> {
 }
 
 impl<N: Network> Worker<N> {
+    /// Retruns tracing guard
+    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
+    }
+
     /// Returns `true` if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
     pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
         let transmission_id = transmission_id.into();
@@ -195,6 +205,7 @@ impl<N: Network> Worker<N> {
         solution_id: SolutionID<N>,
         solution: Data<Solution<N>>,
     ) -> Result<()> {
+        let _guard = self.get_tracing_guard();
         // Construct the transmission.
         let transmission = Transmission::Solution(solution.clone());
         // Compute the checksum.
@@ -225,6 +236,7 @@ impl<N: Network> Worker<N> {
         transaction_id: N::TransactionID,
         transaction: Data<Transaction<N>>,
     ) -> Result<()> {
+        let _guard = self.get_tracing_guard();
         // Construct the transmission.
         let transmission = Transmission::Transaction(transaction.clone());
         // Compute the checksum.
@@ -340,10 +352,10 @@ mod tests {
         mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1, None);
 
         // Create the Worker.
-        let worker = Worker::new(0, storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(0, storage, ledger, Default::default(), None).unwrap();
         let solution = Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
         let solution_id = rng.gen::<u64>().into();
         let solution_checksum = solution.to_checksum::<CurrentNetwork>().unwrap();
@@ -367,10 +379,10 @@ mod tests {
         mock_ledger.expect_check_solution_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1, None);
 
         // Create the Worker.
-        let worker = Worker::new(0, storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(0, storage, ledger, Default::default(), None).unwrap();
         let solution_id = rng.gen::<u64>().into();
         let solution = Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
         let checksum = solution.to_checksum::<CurrentNetwork>().unwrap();
@@ -394,10 +406,10 @@ mod tests {
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1, None);
 
         // Create the Worker.
-        let worker = Worker::new(0, storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(0, storage, ledger, Default::default(), None).unwrap();
         let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
         let transaction = Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
         let checksum = transaction.to_checksum::<CurrentNetwork>().unwrap();
@@ -421,10 +433,10 @@ mod tests {
         mock_ledger.expect_check_transaction_basic().returning(|_, _| Err(anyhow!("")));
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1, None);
 
         // Create the Worker.
-        let worker = Worker::new(0, storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(0, storage, ledger, Default::default(), None).unwrap();
         let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
         let transaction = Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
         let checksum = transaction.to_checksum::<CurrentNetwork>().unwrap();
@@ -454,7 +466,7 @@ mod tests {
             let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(mock_ledger);
             // Initialize the storage.
             let storage =
-                Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+                Storage::<CurrentNetwork>::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds, None);
 
             // Ensure that the storage GC round is correct.
             assert_eq!(storage.gc_round(), expected_gc_round);
@@ -493,7 +505,7 @@ mod prop_tests {
     fn worker_initialization(#[strategy(0..MAX_WORKERS)] id: u8, storage: Storage<CurrentNetwork>) {
         let committee = new_test_committee(4);
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(MockLedgerService::new(committee));
-        let worker = Worker::new(id, storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(id, storage, ledger, Default::default(), None).unwrap();
         assert_eq!(worker.id(), id);
     }
 
@@ -501,7 +513,7 @@ mod prop_tests {
     fn invalid_worker_id(#[strategy(MAX_WORKERS..)] id: u8, storage: Storage<CurrentNetwork>) {
         let committee = new_test_committee(4);
         let ledger: Arc<dyn LedgerService<CurrentNetwork>> = Arc::new(MockLedgerService::new(committee));
-        let worker = Worker::new(id, storage, ledger, Default::default());
+        let worker = Worker::new(id, storage, ledger, Default::default(), None);
         // TODO once Worker implements Debug, simplify this with `unwrap_err`
         if let Err(error) = worker {
             assert_eq!(error.to_string(), format!("Invalid worker ID '{}'", id));

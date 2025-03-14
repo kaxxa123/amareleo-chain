@@ -228,6 +228,7 @@ version = "2.0.2"
 dependencies = [
  "aleo-std",
  "amareleo-chain-account",
+ "amareleo-chain-tracing",
  "amareleo-node-bft-events",
  "amareleo-node-bft-ledger-service",
  "amareleo-node-bft-storage-service",
@@ -354,6 +355,7 @@ dependencies = [
 name = "amareleo-node-rest"
 version = "2.0.2"
 dependencies = [
+ "amareleo-chain-tracing",
  "amareleo-node-consensus",
  "anyhow",
  "axum",

@@ -21,6 +21,12 @@ pub struct TracingHandler {
     subscriber: Arc<dyn tracing::Subscriber + Send + Sync + 'static>,
 }
 
+impl std::fmt::Debug for TracingHandler {
+    fn fmt(&self, _f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
 impl TracingHandler {
     /// Creates a new TracingHandler with a default Registry subscriber
     pub fn new() -> Self {

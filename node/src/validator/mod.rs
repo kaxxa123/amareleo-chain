@@ -30,6 +30,7 @@ use std::{
     sync::{Arc, atomic::AtomicBool},
 };
 use tokio::task::JoinHandle;
+use tracing::subscriber::DefaultGuard;
 
 /// A validator is a full node, capable of validating blocks.
 #[derive(Clone)]
@@ -80,12 +81,12 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             consensus: consensus.clone(),
             rest: None,
             handles: Default::default(),
-            tracing,
+            tracing: tracing.clone(),
             shutdown,
         };
 
         // Initialize the REST server.
-        node.rest = Some(Rest::start(rest_ip, rest_rps, Some(consensus), ledger.clone()).await?);
+        node.rest = Some(Rest::start(rest_ip, rest_rps, Some(consensus), ledger.clone(), tracing.clone()).await?);
 
         // Initialize the notification message loop.
         node.handles.lock().push(crate::start_notification_message_loop());
@@ -113,9 +114,14 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
+    /// Retruns tracing guard
+    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
+    }
+
     /// Shuts down the node.
     pub async fn shut_down(&self) {
-        let _guard = self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread());
+        let _guard = self.get_tracing_guard();
 
         info!("Shutting down...");
 

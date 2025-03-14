@@ -23,6 +23,7 @@ pub use helpers::*;
 
 mod routes;
 
+use amareleo_chain_tracing::TracingHandler;
 use amareleo_node_consensus::Consensus;
 use snarkvm::{
     console::{program::ProgramID, types::Field},
@@ -49,6 +50,7 @@ use tower_http::{
     cors::{Any, CorsLayer},
     trace::TraceLayer,
 };
+use tracing::subscriber::DefaultGuard;
 
 /// A REST API server for the ledger.
 #[derive(Clone)]
@@ -57,6 +59,8 @@ pub struct Rest<N: Network, C: ConsensusStorage<N>> {
     consensus: Option<Consensus<N>>,
     /// The ledger.
     ledger: Ledger<N, C>,
+    /// Tracing handle
+    tracing: Option<TracingHandler>,
     /// The server handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -68,9 +72,10 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
         rest_rps: u32,
         consensus: Option<Consensus<N>>,
         ledger: Ledger<N, C>,
+        tracing: Option<TracingHandler>,
     ) -> Result<Self> {
         // Initialize the server.
-        let mut server = Self { consensus, ledger, handles: Default::default() };
+        let mut server = Self { consensus, ledger, tracing, handles: Default::default() };
         // Spawn the server.
         server.spawn_server(rest_ip, rest_rps).await;
         // Return the server.
@@ -88,10 +93,17 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     pub const fn handles(&self) -> &Arc<Mutex<Vec<JoinHandle<()>>>> {
         &self.handles
     }
+
+    /// Retruns tracing guard
+    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
+    }
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     async fn spawn_server(&mut self, rest_ip: SocketAddr, rest_rps: u32) {
+        let _guard = self.get_tracing_guard();
+
         let cors = CorsLayer::new()
             .allow_origin(Any)
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
@@ -275,7 +287,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                 // Enable tower-http tracing.
                 .layer(TraceLayer::new_for_http())
                 // Custom logging.
-                .layer(middleware::from_fn(log_middleware))
+                .layer(middleware::from_fn_with_state(self.clone(), Self::log_middleware))
                 // Enable CORS.
                 .layer(cors)
                 // Cap body size at 512KiB.
@@ -293,16 +305,18 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                 .expect("couldn't start rest server");
         }))
     }
-}
 
-async fn log_middleware(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    request: Request<Body>,
-    next: Next,
-) -> Result<Response, StatusCode> {
-    info!("Received '{} {}' from '{addr}'", request.method(), request.uri());
+    async fn log_middleware(
+        State(rest): State<Self>,
+        ConnectInfo(addr): ConnectInfo<SocketAddr>,
+        request: Request<Body>,
+        next: Next,
+    ) -> Result<Response, StatusCode> {
+        let _guard = rest.get_tracing_guard();
+        info!("Received '{} {}' from '{addr}'", request.method(), request.uri());
 
-    Ok(next.run(request).await)
+        Ok(next.run(request).await)
+    }
 }
 
 /// Formats an ID into a truncated identifier (for logging purposes).
