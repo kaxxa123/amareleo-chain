@@ -21,7 +21,7 @@ use crate::events::{
     TransmissionRequest,
     TransmissionResponse,
 };
-use amareleo_node_sync::locators::BlockLocators;
+use amareleo_node_sync::BlockLocators;
 use snarkvm::{
     console::network::*,
     ledger::{

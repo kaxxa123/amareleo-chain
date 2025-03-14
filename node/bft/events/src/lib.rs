@@ -66,7 +66,7 @@ pub use validators_response::ValidatorsResponse;
 mod worker_ping;
 pub use worker_ping::WorkerPing;
 
-use amareleo_node_sync_locators::BlockLocators;
+use amareleo_node_sync::BlockLocators;
 use snarkvm::{
     console::prelude::{FromBytes, Network, Read, ToBytes, Write, error},
     ledger::{
