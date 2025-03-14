@@ -15,7 +15,7 @@
 
 use crate::helpers::{BFTSender, Storage};
 use amareleo_node_bft_ledger_service::LedgerService;
-use amareleo_node_sync::locators::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
+use amareleo_node_sync::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::{
     console::network::Network,
     ledger::authority::Authority,
