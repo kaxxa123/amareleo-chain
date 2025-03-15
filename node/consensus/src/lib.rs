@@ -123,7 +123,7 @@ impl<N: Network> Consensus<N> {
         tracing: Option<TracingHandler>,
     ) -> Result<Self> {
         // Initialize the Narwhal transmissions.
-        let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode.clone())?);
+        let transmissions = Arc::new(BFTPersistentStorage::open(storage_mode.clone(), tracing.clone())?);
         // Initialize the Narwhal storage.
         let storage =
             NarwhalStorage::new(ledger.clone(), transmissions, BatchHeader::<N>::MAX_GC_ROUNDS as u64, tracing.clone());
