@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::{LedgerService, fmt_id, spawn_blocking};
+use amareleo_chain_tracing::TracingHandler;
 use snarkvm::{
     ledger::{
         Ledger,
@@ -25,6 +26,7 @@ use snarkvm::{
     },
     prelude::{Address, Field, FromBytes, Network, Result, bail, cfg_into_iter},
 };
+use tracing::subscriber::DefaultGuard;
 
 use indexmap::IndexMap;
 use lru::LruCache;
@@ -54,15 +56,21 @@ pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     committee_cache: Arc<Mutex<LruCache<u64, Committee<N>>>>,
     block_cache: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
     latest_leader: Arc<RwLock<Option<(u64, Address<N>)>>>,
+    tracing: Option<TracingHandler>,
     shutdown: Arc<AtomicBool>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     /// Initializes a new core ledger service.
-    pub fn new(ledger: Ledger<N, C>, shutdown: Arc<AtomicBool>) -> Self {
+    pub fn new(ledger: Ledger<N, C>, tracing: Option<TracingHandler>, shutdown: Arc<AtomicBool>) -> Self {
         let committee_cache = Arc::new(Mutex::new(LruCache::new(COMMITTEE_CACHE_SIZE.try_into().unwrap())));
         let block_cache = Arc::new(RwLock::new(BTreeMap::new()));
-        Self { ledger, committee_cache, block_cache, latest_leader: Default::default(), shutdown }
+        Self { ledger, committee_cache, block_cache, latest_leader: Default::default(), tracing, shutdown }
+    }
+
+    /// Retruns tracing guard
+    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
     }
 }
 
@@ -376,6 +384,8 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     /// Adds the given block as the next block in the ledger.
     #[cfg(feature = "ledger-write")]
     fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
+        let _guard = self.get_tracing_guard();
+
         // If the Ctrl-C handler registered the signal, then skip advancing to the next block.
         if self.shutdown.load(Ordering::Acquire) {
             bail!("Skipping advancing to block {} - The node is shutting down", block.height());

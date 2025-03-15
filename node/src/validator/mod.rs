@@ -65,7 +65,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let ledger = Ledger::load(genesis, storage_mode.clone())?;
 
         // Initialize the ledger service.
-        let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone(), shutdown.clone()));
+        let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone(), tracing.clone(), shutdown.clone()));
 
         // Initialize the consensus.
         let mut consensus =

@@ -291,6 +291,7 @@ dependencies = [
 name = "amareleo-node-bft-ledger-service"
 version = "2.0.2"
 dependencies = [
+ "amareleo-chain-tracing",
  "amareleo-node-metrics",
  "async-trait",
  "indexmap 2.7.0",
