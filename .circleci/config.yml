@@ -198,6 +198,15 @@ jobs:
           workspace_member: cli
           cache_key: v3.0.0-rust-1.82.0-cli-cache
 
+  api:
+    docker:
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
+    steps:
+      - run_serial:
+          workspace_member: api
+          cache_key: v3.0.0-rust-1.82.0-api-cache
+
   node:
     docker:
       - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
@@ -330,6 +339,10 @@ workflows:
             branches:
               only: [main, develop]
       - cli:
+          filters: 
+            branches:
+              only: [main, develop]
+      - api:
           filters: 
             branches:
               only: [main, develop]

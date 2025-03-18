@@ -62,3 +62,6 @@ version = "=2.0.2"
 
 [dependencies.snarkvm]
 workspace = true
+
+[dev-dependencies.serial_test]
+version = "3.2.0"

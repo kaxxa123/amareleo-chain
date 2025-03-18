@@ -10,6 +10,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(test)]
+mod api_tests;
+
 pub use api_node::*;
 pub mod api_node;
 
