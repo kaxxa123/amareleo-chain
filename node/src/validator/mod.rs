@@ -125,6 +125,12 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         info!("Shutting down...");
 
+        // Shut down rest server.
+        if let Some(rest) = &self.rest {
+            trace!("Shutting down the REST server...");
+            rest.shut_down().await;
+        }
+
         // Shut down the node.
         trace!("Shutting down the node...");
         self.shutdown.store(true, std::sync::atomic::Ordering::Release);

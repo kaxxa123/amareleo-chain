@@ -33,7 +33,7 @@ pub fn initialize_custom_tracing(
         .with_target(verbosity > 2)
         .with_filter(init_env_filter(verbosity)?);
 
-    // Add layer using LogWriter for stdout / terminal
+    // Add layer for stdout
     let stdout_layer = FmtLayer::default()
         .with_ansi(std::io::stdout().is_tty())
         .with_writer(std::io::stdout)
