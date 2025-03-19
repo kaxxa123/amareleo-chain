@@ -51,6 +51,8 @@ impl<N: Network> Sync<N> {
 
     /// Initializes the sync module and sync the storage with the ledger at bootup.
     pub async fn initialize(&self, bft_sender: Option<BFTSender<N>>) -> Result<()> {
+        let _guard = self.storage.get_tracing_guard();
+
         // If a BFT sender was provided, set it.
         if let Some(bft_sender) = bft_sender {
             self.bft_sender.set(bft_sender).expect("BFT sender already set in gateway");
@@ -64,6 +66,7 @@ impl<N: Network> Sync<N> {
 
     /// Starts the sync module.
     pub async fn run(&self) -> Result<()> {
+        let _guard = self.storage.get_tracing_guard();
         info!("Starting the sync module...");
 
         // Update the sync status.
@@ -81,6 +84,7 @@ impl<N: Network> Sync<N> {
 impl<N: Network> Sync<N> {
     /// Syncs the storage with the ledger at bootup.
     async fn sync_storage_with_ledger_at_bootup(&self) -> Result<()> {
+        let _guard = self.storage.get_tracing_guard();
         // Retrieve the latest block in the ledger.
         let latest_block = self.ledger.latest_block();
 

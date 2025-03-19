@@ -15,13 +15,15 @@ keywords = [
 categories = [ "cryptography", "cryptography::cryptocurrencies", "os" ]
 license = "Apache-2.0"
 edition = "2021"
-rust-version = "1.81.0" # Attention - Change the MSRV in rust-toolchain and in .circleci/config.yml as well
+rust-version = "1.82.0" # Attention - Change the MSRV in rust-toolchain and in .circleci/config.yml as well
 
 [workspace]
 members = [
   "resources",
   "account",
   "cli", 
+  "api", 
+  "tracing",
   "node", 
   "node/bft",
   "node/bft/events",
@@ -76,6 +78,14 @@ version = "=2.0.2"
 
 [dependencies.amareleo-chain-cli]
 path = "./cli"
+version = "=2.0.2"
+
+[dependencies.amareleo-chain-tracing]
+path = "./tracing"
+version = "=2.0.2"
+
+[dependencies.amareleo-chain-api]
+path = "./api"
 version = "=2.0.2"
 
 [dependencies.amareleo-node]

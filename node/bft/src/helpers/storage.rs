@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::helpers::{check_timestamp_for_liveness, fmt_id};
+use amareleo_chain_tracing::TracingHandler;
 use amareleo_node_bft_ledger_service::LedgerService;
 use amareleo_node_bft_storage_service::StorageService;
 use snarkvm::{
@@ -33,6 +34,7 @@ use std::{
         atomic::{AtomicU32, AtomicU64, Ordering},
     },
 };
+use tracing::subscriber::DefaultGuard;
 
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network>(Arc<StorageInner<N>>);
@@ -87,6 +89,8 @@ pub struct StorageInner<N: Network> {
     batch_ids: RwLock<IndexMap<Field<N>, u64>>,
     /// The map of `transmission ID` to `(transmission, certificate IDs)` entries.
     transmissions: Arc<dyn StorageService<N>>,
+    /// Tracing handle
+    tracing: Option<TracingHandler>,
 }
 
 impl<N: Network> Storage<N> {
@@ -95,6 +99,7 @@ impl<N: Network> Storage<N> {
         ledger: Arc<dyn LedgerService<N>>,
         transmissions: Arc<dyn StorageService<N>>,
         max_gc_rounds: u64,
+        tracing: Option<TracingHandler>,
     ) -> Self {
         // Retrieve the current committee.
         let committee = ledger.current_committee().expect("Ledger is missing a committee.");
@@ -112,6 +117,7 @@ impl<N: Network> Storage<N> {
             certificates: Default::default(),
             batch_ids: Default::default(),
             transmissions,
+            tracing,
         }));
         // Update the storage to the current round.
         storage.update_current_round(current_round);
@@ -148,9 +154,16 @@ impl<N: Network> Storage<N> {
         self.max_gc_rounds
     }
 
+    /// Retruns tracing guard
+    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
+    }
+
     /// Increments storage to the next round, updating the current round.
     /// Note: This method is only called once per round, upon certification of the primary's batch.
     pub fn increment_to_next_round(&self, current_round: u64) -> Result<u64> {
+        let _guard = self.get_tracing_guard();
+
         // Determine the next round.
         let next_round = current_round + 1;
 
@@ -624,6 +637,7 @@ impl<N: Network> Storage<N> {
     /// If the certificate was successfully removed, `true` is returned.
     /// If the certificate did not exist in storage, `false` is returned.
     fn remove_certificate(&self, certificate_id: Field<N>) -> bool {
+        let _guard = self.get_tracing_guard();
         // Retrieve the certificate.
         let Some(certificate) = self.get_certificate(certificate_id) else {
             warn!("Certificate {certificate_id} does not exist in storage");
@@ -675,6 +689,7 @@ impl<N: Network> Storage<N> {
 
     /// Syncs the current round with the block.
     pub(crate) fn sync_round_with_block(&self, next_round: u64) {
+        let _guard = self.get_tracing_guard();
         // Retrieve the current round in the block.
         let next_round = next_round.max(1);
         // If the round in the block is greater than the current round in storage, sync the round.
@@ -710,6 +725,8 @@ impl<N: Network> Storage<N> {
         // Track the block's aborted solutions and transactions.
         let aborted_solutions: IndexSet<_> = block.aborted_solution_ids().iter().collect();
         let aborted_transactions: IndexSet<_> = block.aborted_transaction_ids().iter().collect();
+
+        let _guard = self.get_tracing_guard();
 
         // Iterate over the transmission IDs.
         for transmission_id in certificate.transmission_ids() {
@@ -942,7 +959,7 @@ pub(crate) mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), 1, None);
 
         // Ensure the storage is empty.
         assert_storage(&storage, &[], &[], &[], &Default::default());
@@ -1008,7 +1025,7 @@ pub(crate) mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), 1, None);
 
         // Ensure the storage is empty.
         assert_storage(&storage, &[], &[], &[], &Default::default());
@@ -1094,7 +1111,7 @@ pub mod prop_tests {
             (any::<CommitteeContext>(), 0..BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
                     let ledger = Arc::new(MockLedgerService::new(committee));
-                    Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), gc_rounds)
+                    Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), gc_rounds, None)
                 })
                 .boxed()
         }
@@ -1103,7 +1120,7 @@ pub mod prop_tests {
             (Just(context), 0..BatchHeader::<CurrentNetwork>::MAX_GC_ROUNDS as u64)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
                     let ledger = Arc::new(MockLedgerService::new(committee));
-                    Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), gc_rounds)
+                    Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), gc_rounds, None)
                 })
                 .boxed()
         }
@@ -1226,7 +1243,7 @@ pub mod prop_tests {
 
         // Initialize the storage.
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, Arc::new(BFTMemoryService::new()), 1, None);
 
         // Ensure the storage is empty.
         assert_storage(&storage, &[], &[], &[], &Default::default());

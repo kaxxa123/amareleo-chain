@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::StorageService;
+use amareleo_chain_tracing::TracingHandler;
 use snarkvm::{
     ledger::{
         committee::Committee,
@@ -32,6 +33,7 @@ use snarkvm::{
     },
     prelude::{Field, Network, Result, bail},
 };
+use tracing::subscriber::DefaultGuard;
 
 use aleo_std::StorageMode;
 use anyhow::anyhow;
@@ -56,11 +58,13 @@ pub struct BFTPersistentStorage<N: Network> {
     cache_transmissions: Mutex<LruCache<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>>,
     /// The LRU cache for `aborted transmission ID` to `certificate IDs` entries that are part of the persistent storage.
     cache_aborted_transmission_ids: Mutex<LruCache<TransmissionID<N>, IndexSet<Field<N>>>>,
+    /// Tracing handle
+    tracing: Option<TracingHandler>,
 }
 
 impl<N: Network> BFTPersistentStorage<N> {
     /// Initializes a new BFT persistent storage service.
-    pub fn open(storage_mode: StorageMode) -> Result<Self> {
+    pub fn open(storage_mode: StorageMode, tracing: Option<TracingHandler>) -> Result<Self> {
         let capacity = NonZeroUsize::new(
             (Committee::<N>::MAX_COMMITTEE_SIZE as usize) * (BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH) * 2,
         )
@@ -75,7 +79,13 @@ impl<N: Network> BFTPersistentStorage<N> {
             )?,
             cache_transmissions: Mutex::new(LruCache::new(capacity)),
             cache_aborted_transmission_ids: Mutex::new(LruCache::new(capacity)),
+            tracing,
         })
+    }
+
+    /// Retruns tracing guard
+    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
     }
 
     /// Initializes a new BFT persistent storage service for testing.
@@ -99,6 +109,7 @@ impl<N: Network> BFTPersistentStorage<N> {
             )?,
             cache_transmissions: Mutex::new(LruCache::new(capacity)),
             cache_aborted_transmission_ids: Mutex::new(LruCache::new(capacity)),
+            tracing: None,
         })
     }
 }
@@ -106,6 +117,7 @@ impl<N: Network> BFTPersistentStorage<N> {
 impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     /// Returns `true` if the storage contains the specified `transmission ID`.
     fn contains_transmission(&self, transmission_id: TransmissionID<N>) -> bool {
+        let _guard = self.get_tracing_guard();
         // Check if the transmission ID exists in storage.
         match self.transmissions.contains_key_confirmed(&transmission_id) {
             Ok(true) => return true,
@@ -125,6 +137,7 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     /// Returns the transmission for the given `transmission ID`.
     /// If the transmission ID does not exist in storage, `None` is returned.
     fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>> {
+        let _guard = self.get_tracing_guard();
         // Try to get the transmission from the cache first.
         if let Some((transmission, _)) = self.cache_transmissions.lock().get_mut(&transmission_id) {
             return Some(transmission.clone());
@@ -181,6 +194,7 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
         aborted_transmission_ids: HashSet<TransmissionID<N>>,
         mut missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
+        let _guard = self.get_tracing_guard();
         // First, handle the non-aborted transmissions.
         'outer: for transmission_id in transmission_ids {
             // Try to fetch from the persistent storage.
@@ -251,6 +265,7 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     ///
     /// If the transmission no longer references any certificate IDs, the entry is removed from storage.
     fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &IndexSet<TransmissionID<N>>) {
+        let _guard = self.get_tracing_guard();
         // If this is the last certificate ID for the transmission ID, remove the transmission.
         for transmission_id in transmission_ids {
             // Retrieve the transmission entry.

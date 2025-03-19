@@ -58,7 +58,7 @@ cd amareleo-chain
 cargo install --locked --path .
 ```
 
-Otherwise, ensure your machine has `Rust v1.81+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install). Next clone and install `amareleo-chain` as follows:
+Otherwise, ensure your machine has `Rust v1.82+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install). Next clone and install `amareleo-chain` as follows:
 
 ```BASH
 git clone https://github.com/kaxxa123/amareleo-chain.git

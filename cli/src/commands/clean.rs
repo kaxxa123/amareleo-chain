@@ -15,9 +15,9 @@
 
 use amareleo_node::bft::helpers::{
     DEFAULT_FILE_TAG,
-    amareleo_ledger_dir,
     amareleo_storage_mode,
     custom_ledger_dir,
+    default_ledger_dir,
     proposal_cache_path,
 };
 
@@ -69,7 +69,7 @@ impl Clean {
         // Determine the ledger path
         let pattern = match &self.path {
             Some(path) => custom_ledger_dir(self.network, keep_state, file_tag, path.clone()),
-            None => amareleo_ledger_dir(self.network, keep_state, file_tag),
+            None => default_ledger_dir(self.network, keep_state, file_tag),
         };
 
         if let Some(pattern_str) = pattern.to_str() {

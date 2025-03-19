@@ -13,63 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow::{Result, bail, ensure};
+use anyhow::Result;
 use clap::Parser;
 use colored::Colorize;
-use core::str::FromStr;
-use indexmap::IndexMap;
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaChaRng;
 
-use crate::commands::Clean;
-use amareleo_chain_account::Account;
-use amareleo_chain_resources::{
-    BLOCK0_CANARY,
-    BLOCK0_CANARY_ID,
-    BLOCK0_MAINNET,
-    BLOCK0_MAINNET_ID,
-    BLOCK0_TESTNET,
-    BLOCK0_TESTNET_ID,
-};
-use amareleo_node::{
-    Validator,
-    bft::helpers::{
-        amareleo_ledger_dir,
-        amareleo_log_file,
-        amareleo_storage_mode,
-        custom_ledger_dir,
-        endpoint_file_tag,
-    },
-};
-
-use snarkvm::{
-    console::{
-        account::{Address, PrivateKey},
-        algorithms::Hash,
-        network::{CanaryV0, MainnetV0, Network, TestnetV0},
-    },
-    ledger::{
-        block::Block,
-        committee::{Committee, MIN_VALIDATOR_STAKE},
-        store::{ConsensusStore, helpers::memory::ConsensusMemory},
-    },
-    prelude::{FromBytes, ToBits, ToBytes, store::helpers::rocksdb::ConsensusDB},
-    synthesizer::VM,
-    utilities::to_bytes_le,
-};
-use std::result::Result::Ok;
-
-use std::{
-    net::SocketAddr,
-    path::PathBuf,
-    sync::{Arc, atomic::AtomicBool},
-};
+use core::future::Future;
+use std::{net::SocketAddr, path::PathBuf, result::Result::Ok, time::Duration};
 use tokio::runtime::{self, Runtime};
 
-/// The development mode RNG seed.
-const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
-/// The development mode number of genesis committee members.
-const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
+use snarkvm::console::network::{CanaryV0, MainnetV0, Network, TestnetV0};
+
+use crate::helpers::initialize_custom_tracing;
+use amareleo_chain_api::AmareleoApi;
 
 /// Starts the node.
 #[derive(Clone, Debug, Parser)]
@@ -111,12 +66,6 @@ pub struct Start {
 impl Start {
     /// Starts the node.
     pub fn parse(self) -> Result<String> {
-        // Prepare the shutdown flag.
-        let shutdown: Arc<AtomicBool> = Default::default();
-
-        // Initialize the logger.
-        self.start_logger(shutdown.clone())?;
-
         // Initialize the runtime.
         Self::runtime().block_on(async move {
             // Clone the configurations.
@@ -124,16 +73,16 @@ impl Start {
             // Parse the network.
             match cli.network {
                 MainnetV0::ID => {
-                    // Parse the node from the configurations.
-                    cli.parse_node::<MainnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    let node_api = cli.start_node::<MainnetV0>().await.expect("Failed to parse the node");
+                    cli.handle_termination(node_api);
                 }
                 TestnetV0::ID => {
-                    // Parse the node from the configurations.
-                    cli.parse_node::<TestnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    let node_api = cli.start_node::<TestnetV0>().await.expect("Failed to parse the node");
+                    cli.handle_termination(node_api);
                 }
                 CanaryV0::ID => {
-                    // Parse the node from the configurations.
-                    cli.parse_node::<CanaryV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    let node_api = cli.start_node::<CanaryV0>().await.expect("Failed to parse the node");
+                    cli.handle_termination(node_api);
                 }
                 _ => panic!("Invalid network ID specified"),
             };
@@ -144,166 +93,26 @@ impl Start {
 
         Ok(String::new())
     }
-}
-
-impl Start {
-    /// Initialze logging
-    fn start_logger(&self, shutdown: Arc<AtomicBool>) -> Result<()> {
-        let log_path = match self.logfile.clone() {
-            Some(path) => path,
-            None => {
-                // Get a unique tag for the specified rest endpoint
-                // Even if --keep-state is set, log files will
-                // always get a unique tag since these all go to
-                // the tmp folder by default, hence causing multiple
-                // instances to write to the same file.
-                let rest_ip = self.rest.or_else(|| Some("0.0.0.0:3030".parse().unwrap()));
-                let tag = match self.network {
-                    MainnetV0::ID => endpoint_file_tag::<MainnetV0>(false, &rest_ip)?,
-                    TestnetV0::ID => endpoint_file_tag::<TestnetV0>(false, &rest_ip)?,
-                    CanaryV0::ID => endpoint_file_tag::<CanaryV0>(false, &rest_ip)?,
-                    _ => panic!("Invalid network ID specified"),
-                };
-
-                amareleo_log_file(self.network, self.keep_state, &tag)
-            }
-        };
-
-        // Initialize the logger.
-        crate::helpers::initialize_logger(self.verbosity, log_path.clone(), true, shutdown);
-
-        println!("📝 Log file path: {}", log_path.display());
-        Ok(())
-    }
-
-    /// Compute fixed development node private key.
-    fn parse_private_key<N: Network>(&self) -> Result<Account<N>> {
-        // Sample the private key of this node.
-        Account::try_from({
-            // Initialize the (fixed) RNG.
-            let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
-
-            let private_key = PrivateKey::<N>::new(&mut rng)?;
-            println!("🔑 Your development private key for node 0 is {}.\n", private_key.to_string().bold());
-            private_key
-        })
-    }
-
-    /// Updates the configurations if the node is in development mode.
-    fn parse_development(&mut self) -> Result<()> {
-        // If the REST IP is not already specified set the REST IP to `3030`.
-        if self.rest.is_none() {
-            self.rest = Some(SocketAddr::from_str("0.0.0.0:3030").unwrap());
-        }
-
-        Ok(())
-    }
-
-    /// Returns an alternative genesis block if the node is in development mode.
-    /// Otherwise, returns the actual genesis block.
-    fn parse_genesis<N: Network>(&self) -> Result<Block<N>> {
-        // Initialize the (fixed) RNG.
-        let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
-
-        // Initialize the development private keys.
-        let development_private_keys = (0..DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS)
-            .map(|_| PrivateKey::<N>::new(&mut rng))
-            .collect::<Result<Vec<_>>>()?;
-        // Initialize the development addresses.
-        let development_addresses =
-            development_private_keys.iter().map(Address::<N>::try_from).collect::<Result<Vec<_>>>()?;
-
-        let (committee, bonded_balances) = {
-            // Calculate the committee stake per member.
-            let stake_per_member = N::STARTING_SUPPLY
-                .saturating_div(2)
-                .saturating_div(DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64);
-            ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
-
-            // Construct the committee members and distribute stakes evenly among committee members.
-            let members = development_addresses
-                .iter()
-                .map(|address| (*address, (stake_per_member, true, rng.gen_range(0..100))))
-                .collect::<IndexMap<_, _>>();
-
-            // Construct the bonded balances.
-            // Note: The withdrawal address is set to the staker address.
-            let bonded_balances = members
-                .iter()
-                .map(|(address, (stake, _, _))| (*address, (*address, *address, *stake)))
-                .collect::<IndexMap<_, _>>();
-
-            // Construct the committee.
-            let committee = Committee::<N>::new(0u64, members)?;
-            (committee, bonded_balances)
-        };
-
-        // Ensure that the number of committee members is correct.
-        ensure!(
-            committee.members().len() == DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as usize,
-            "Number of committee members {} does not match the expected number of members {DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS}",
-            committee.members().len()
-        );
-
-        // Calculate the public balance per validator.
-        let remaining_balance = N::STARTING_SUPPLY.saturating_sub(committee.total_stake());
-        let public_balance_per_validator =
-            remaining_balance.saturating_div(DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64);
-
-        // Construct the public balances with fairly equal distribution.
-        let mut public_balances = development_private_keys
-            .iter()
-            .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
-            .collect::<Result<indexmap::IndexMap<_, _>>>()?;
-
-        // If there is some leftover balance, add it to the 0-th validator.
-        let leftover = remaining_balance
-            .saturating_sub(public_balance_per_validator * DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64);
-        if leftover > 0 {
-            let (_, balance) = public_balances.get_index_mut(0).unwrap();
-            *balance += leftover;
-        }
-
-        // Check if the sum of committee stakes and public balances equals the total starting supply.
-        let public_balances_sum: u64 = public_balances.values().copied().sum();
-        if committee.total_stake() + public_balances_sum != N::STARTING_SUPPLY {
-            bail!("Sum of committee stakes and public balances does not equal total starting supply.");
-        }
-
-        // Construct the genesis block.
-        load_or_compute_genesis(development_private_keys[0], committee, public_balances, bonded_balances, &mut rng)
-    }
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
-    async fn parse_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<Arc<Validator<N, ConsensusDB<N>>>> {
+    async fn start_node<N: Network>(&mut self) -> Result<AmareleoApi<N>> {
+
         // Print the welcome.
-        println!("{}", crate::helpers::welcome_message());
-
-        // Parse the development configurations.
-        self.parse_development()?;
-
-        // Parse the genesis block.
-        let genesis = self.parse_genesis::<N>()?;
-
-        // Parse the private key of the node.
-        let account = self.parse_private_key::<N>()?;
+        println!("{}", Self::welcome_message());
 
         // Parse the REST IP.
-        let rest_ip = self.rest.or_else(|| Some("0.0.0.0:3030".parse().unwrap()));
+        let rest_ip_port = self.rest.as_ref().copied().unwrap_or_else(|| "0.0.0.0:3030".parse().unwrap());
 
-        // Print the Aleo address.
+        // Get the node account.
+        let account = AmareleoApi::<N>::get_node_account()?;
+        println!("🔑 Your development private key for node 0 is {}.\n", account.private_key().to_string().bold());
         println!("👛 Your Aleo address is {}.\n", account.address().to_string().bold());
-        // Print the node type and network.
         println!("🧭 Starting node on {}.\n",N::NAME.bold());
+        println!("🌐 Starting the REST server at {}.\n", rest_ip_port.to_string().bold());
 
-        // If the node is running a REST server, print the REST IP and JWT.
-        if let Some(rest_ip) = rest_ip {
-            println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
-
-            if let Ok(jwt_token) = amareleo_node_rest::Claims::new(account.address()).to_jwt_string() {
-                println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
-            }
+        if let Ok(jwt_token) = amareleo_node_rest::Claims::new(account.address()).to_jwt_string() {
+            println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
         }
 
         // Initialize the metrics.
@@ -311,27 +120,98 @@ impl Start {
             metrics::initialize_metrics(self.metrics_ip);
         }
 
-        // Get a unique tag for this endpoint
-        let tag = endpoint_file_tag::<N>(self.keep_state, &rest_ip)?;
+        let mut node_api: AmareleoApi<N> = AmareleoApi::default();
 
-        // Determine the ledger path
-        let ledger_path = match &self.storage {
-            Some(path) => custom_ledger_dir(self.network, self.keep_state, &tag,path.clone()),
-            None => amareleo_ledger_dir(self.network, self.keep_state, &tag),
-        };
+        // Configure the node api including file logging.
+        // We only include file logging for us to easily get the log file path.
+        // Ultimately we opt for custom logging.
+        node_api
+        .cfg_ledger(self.keep_state, self.storage.clone(), self.keep_state)
+        .cfg_rest(rest_ip_port, self.rest_rps)
+        .cfg_file_log(self.logfile.clone(), self.verbosity);
 
-        if !self.keep_state {
-            // Remove old ledger state
-            Clean::remove_proposal_cache(ledger_path.clone())?;
-            let res_text = Clean::remove_ledger(ledger_path.clone())?;
-            println!("{res_text}\n");
+        // Get the log file path and setup custom logging.
+        let logfile_path = node_api.get_log_file()?;
+        let tracing = initialize_custom_tracing(
+            self.verbosity,
+            logfile_path.clone(),
+            node_api.get_shutdown())?;
+
+        node_api.cfg_custom_log(tracing);
+
+        println!("📝 Log file path: {}\n", logfile_path.to_string_lossy());
+        println!("📁 Ledger folder path: {}\n", node_api.get_ledger_folder()?.to_string_lossy());
+
+        // Initialize the node.
+        node_api.start().await?;
+        Ok(node_api)
+    }
+
+    /// Handles OS signals for intercept termination and performing a clean shutdown.
+    fn handle_termination<N: Network>(&self, mut node_api: AmareleoApi<N>) {
+        #[cfg(target_family = "unix")]
+        fn signal_listener() -> impl Future<Output = std::io::Result<()>> {
+            use tokio::signal::unix::{SignalKind, signal};
+
+            // Handle SIGINT, SIGTERM, SIGQUIT, and SIGHUP.
+            let mut s_int = signal(SignalKind::interrupt()).unwrap();
+            let mut s_term = signal(SignalKind::terminate()).unwrap();
+            let mut s_quit = signal(SignalKind::quit()).unwrap();
+            let mut s_hup = signal(SignalKind::hangup()).unwrap();
+
+            // Return when any of the signals above is received.
+            async move {
+                tokio::select!(
+                    _ = s_int.recv() => (),
+                    _ = s_term.recv() => (),
+                    _ = s_quit.recv() => (),
+                    _ = s_hup.recv() => (),
+                );
+                Ok(())
+            }
+        }
+        #[cfg(not(target_family = "unix"))]
+        fn signal_listener() -> impl Future<Output = std::io::Result<()>> {
+            tokio::signal::ctrl_c()
         }
 
-        // Initialize the storage mode.
-        let storage_mode = amareleo_storage_mode(ledger_path);
-        let validator = Validator::new(rest_ip, self.rest_rps, account, genesis, self.keep_state, storage_mode, shutdown.clone()).await?;
-        // Initialize the node.
-        Ok(Arc::new(validator))
+        let keep_state = self.keep_state;
+
+        tokio::task::spawn(async move {
+            match signal_listener().await {
+                Ok(()) => {
+                    // If not presrving stte kill the process immidiately.
+                    if !keep_state {
+                        let term_msg = &r#"
+================================================================
+ Node state preservation not required. Terminating immediately. 
+================================================================
+"#;
+                        println!("{}", term_msg);
+                        std::process::exit(0);
+                    }
+
+                    let term_msg = &r#"
+==========================================================================================
+⚠️  Attention - Starting the graceful shutdown procedure (ETA: 30 seconds)...
+⚠️  Attention - Avoid DATA CORRUPTION, do NOT interrupt amareleo (or press Ctrl+C again)
+⚠️  Attention - Please wait until the shutdown gracefully completes (ETA: 30 seconds)
+==========================================================================================
+"#;
+                    println!("{}", term_msg);
+
+                    // Shut down the node.
+                    node_api.end().await;
+
+                    // A best-effort attempt to let any ongoing activity conclude.
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+
+                    // Terminate the process.
+                    std::process::exit(0);
+                }
+                Err(error) => println!("tokio::signal::ctrl_c encountered an error: {}", error),
+            }
+        });
     }
 
     /// Returns a runtime for the node.
@@ -361,135 +241,30 @@ impl Start {
             .build()
             .expect("Failed to initialize a runtime for the router")
     }
-}
 
-/// Loads or computes the genesis block.
-fn load_or_compute_genesis<N: Network>(
-    genesis_private_key: PrivateKey<N>,
-    committee: Committee<N>,
-    public_balances: indexmap::IndexMap<Address<N>, u64>,
-    bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, Address<N>, u64)>,
-    rng: &mut ChaChaRng,
-) -> Result<Block<N>> {
-    // Construct the preimage.
-    let mut preimage = Vec::new();
-    let raw_block0: &[u8];
-    let raw_blockid: &str;
+    /// Returns the welcome message as a string.
+    fn welcome_message() -> String {
+        use colored::Colorize;
 
-    // Input the network ID.
-    preimage.extend(&N::ID.to_le_bytes());
-    // Input the genesis coinbase target.
-    preimage.extend(&to_bytes_le![N::GENESIS_COINBASE_TARGET]?);
-    // Input the genesis proof target.
-    preimage.extend(&to_bytes_le![N::GENESIS_PROOF_TARGET]?);
+        let mut output = String::new();
+        output += &r#"
 
-    // Input the genesis private key, committee, and public balances.
-    preimage.extend(genesis_private_key.to_bytes_le()?);
-    preimage.extend(committee.to_bytes_le()?);
-    preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
-    preimage.extend(&to_bytes_le![
-        bonded_balances
-            .iter()
-            .flat_map(|(staker, (validator, withdrawal, amount))| to_bytes_le![staker, validator, withdrawal, amount])
-            .collect::<Vec<_>>()
-    ]?);
+         ╦╬╬╬╬╬╦
+        ╬╬╬╬╬╬╬╬╬                    ▄▄▄▄        ▄▄▄
+       ╬╬╬╬╬╬╬╬╬╬╬                  ▐▓▓▓▓▌       ▓▓▓
+      ╬╬╬╬╬╬╬╬╬╬╬╬╬                ▐▓▓▓▓▓▓▌      ▓▓▓     ▄▄▄▄▄▄       ▄▄▄▄▄▄
+     ╬╬╬╬╬╬╬╬╬╬╬╬╬╬╬              ▐▓▓▓  ▓▓▓▌     ▓▓▓   ▄▓▓▀▀▀▀▓▓▄   ▐▓▓▓▓▓▓▓▓▌
+    ╬╬╬╬╬╬╬╜ ╙╬╬╬╬╬╬╬            ▐▓▓▓▌  ▐▓▓▓▌    ▓▓▓  ▐▓▓▓▄▄▄▄▓▓▓▌ ▐▓▓▓    ▓▓▓▌
+   ╬╬╬╬╬╬╣     ╠╬╬╬╬╬╬           ▓▓▓▓▓▓▓▓▓▓▓▓    ▓▓▓  ▐▓▓▀▀▀▀▀▀▀▀▘ ▐▓▓▓    ▓▓▓▌
+  ╬╬╬╬╬╬╣       ╠╬╬╬╬╬╬         ▓▓▓▓▌    ▐▓▓▓▓   ▓▓▓   ▀▓▓▄▄▄▄▓▓▀   ▐▓▓▓▓▓▓▓▓▌
+ ╬╬╬╬╬╬╣         ╠╬╬╬╬╬╬       ▝▀▀▀▀      ▀▀▀▀▘  ▀▀▀     ▀▀▀▀▀▀       ▀▀▀▀▀▀
+╚╬╬╬╬╬╩           ╩╬╬╬╬╩
 
-    // Input the parameters' metadata based on network
-    match N::ID {
-        snarkvm::console::network::MainnetV0::ID => {
-            preimage.extend(snarkvm::parameters::mainnet::BondValidatorVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::mainnet::TransferPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::mainnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::mainnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::mainnet::FeePrivateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::mainnet::FeePublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::mainnet::InclusionVerifier::METADATA.as_bytes());
-            raw_block0 = BLOCK0_MAINNET;
-            raw_blockid = BLOCK0_MAINNET_ID;
-        }
-        snarkvm::console::network::TestnetV0::ID => {
-            preimage.extend(snarkvm::parameters::testnet::BondValidatorVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::testnet::BondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::testnet::UnbondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::testnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::testnet::SetValidatorStateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::testnet::TransferPrivateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::testnet::TransferPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::testnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::testnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::testnet::FeePrivateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::testnet::FeePublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::testnet::InclusionVerifier::METADATA.as_bytes());
-            raw_block0 = BLOCK0_TESTNET;
-            raw_blockid = BLOCK0_TESTNET_ID;
-        }
-        snarkvm::console::network::CanaryV0::ID => {
-            preimage.extend(snarkvm::parameters::canary::BondValidatorVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::canary::BondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::canary::UnbondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::canary::ClaimUnbondPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::canary::SetValidatorStateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::canary::TransferPrivateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::canary::TransferPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::canary::TransferPrivateToPublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::canary::TransferPublicToPrivateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::canary::FeePrivateVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::canary::FeePublicVerifier::METADATA.as_bytes());
-            preimage.extend(snarkvm::parameters::canary::InclusionVerifier::METADATA.as_bytes());
-            raw_block0 = BLOCK0_CANARY;
-            raw_blockid = BLOCK0_CANARY_ID;
-        }
-        _ => {
-            // Unrecognized Network ID
-            bail!("Unrecognized Network ID: {}", N::ID);
-        }
+
+"#
+        .white()
+        .bold();
+        output += &"👋 Welcome to Aleo! We thank you for running a node and supporting privacy.\n".bold();
+        output
     }
-
-    // Initialize the hasher.
-    let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
-    // Compute the hash.
-    // NOTE: this is a fast-to-compute but *IMPERFECT* identifier for the genesis block.
-    //       to know the actualy genesis block hash, you need to compute the block itself.
-    let hash = hasher.hash(&preimage.to_bits_le())?.to_string();
-    if hash == raw_blockid {
-        println!("Loading Genesis Block from internal resource.");
-        let block = Block::from_bytes_le(raw_block0)?;
-        return Ok(block);
-    }
-
-    // A closure to load the block.
-    let load_block = |file_path| -> Result<Block<N>> {
-        // Attempts to load the genesis block file locally.
-        let buffer = std::fs::read(file_path)?;
-        // Return the genesis block.
-        Block::from_bytes_le(&buffer)
-    };
-
-    // Construct the file path.
-    let file_path = std::env::temp_dir().join(hash);
-    // println!("Genesis Block file path: {}", file_path.display());
-
-    // Check if the genesis block exists.
-    if file_path.exists() {
-        // If the block loads successfully, return it.
-        if let Ok(block) = load_block(&file_path) {
-            return Ok(block);
-        }
-    }
-
-    /* Otherwise, compute the genesis block and store it. */
-
-    // Initialize a new VM.
-    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(0u16)?)?;
-    // Initialize the genesis block.
-    let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng)?;
-    // Write the genesis block to the file.
-    std::fs::write(&file_path, block.to_bytes_le()?)?;
-    // Return the genesis block.
-    Ok(block)
 }

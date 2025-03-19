@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::helpers::{Proposal, SignedProposals, ledger_files::proposal_cache_path};
-
+use amareleo_chain_tracing::TracingHandler;
 use snarkvm::{
     console::{account::Address, network::Network, program::SUBDAG_CERTIFICATES_DEPTH},
     ledger::narwhal::BatchCertificate,
@@ -66,8 +66,12 @@ impl<N: Network> ProposalCache<N> {
     }
 
     /// Load the proposal cache from the file system and ensure that the proposal cache is valid.
-    pub fn load(expected_signer: Address<N>, storage_mode: &StorageMode) -> Result<Self> {
-        // Construct the proposal cache file system path.
+    pub fn load(
+        expected_signer: Address<N>,
+        storage_mode: &StorageMode,
+        tracing: Option<TracingHandler>,
+    ) -> Result<Self> {
+        let _guard = tracing.map(|trace_handle| trace_handle.subscribe_thread());
         let path = proposal_cache_path(storage_mode)?;
 
         // Deserialize the proposal cache from the file system.
@@ -90,7 +94,8 @@ impl<N: Network> ProposalCache<N> {
     }
 
     /// Store the proposal cache to the file system.
-    pub fn store(&self, storage_mode: &StorageMode) -> Result<()> {
+    pub fn store(&self, storage_mode: &StorageMode, tracing: Option<TracingHandler>) -> Result<()> {
+        let _guard = tracing.map(|trace_handle| trace_handle.subscribe_thread());
         let path = proposal_cache_path(storage_mode)?;
         info!("Storing the proposal cache to {}...", path.display());
 

@@ -1,6 +1,3 @@
-// Copyright 2024 Aleo Network Foundation
-// This file is part of the snarkOS library.
-
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
@@ -13,11 +10,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod dynamic_format;
-use dynamic_format::*;
+#![forbid(unsafe_code)]
+#![recursion_limit = "256"]
 
-pub(crate) mod logger;
-pub(crate) use logger::*;
+mod trace_layers;
+pub use trace_layers::*;
 
-pub mod updater;
-pub use updater::*;
+mod logger;
+pub use logger::*;

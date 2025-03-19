@@ -45,9 +45,6 @@ pub use challenge_response::ChallengeResponse;
 mod disconnect;
 pub use disconnect::{Disconnect, DisconnectReason};
 
-mod helpers;
-pub use helpers::*;
-
 mod primary_ping;
 pub use primary_ping::PrimaryPing;
 

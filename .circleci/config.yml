@@ -60,7 +60,7 @@ commands:
     parameters:
       cache_key:
         type: string
-        default: v3.0.0-rust-1.81.0-snarkos-stable-cache
+        default: v3.0.0-rust-1.82.0-snarkos-stable-cache
     steps:
       - run: set -e
       - run:
@@ -88,7 +88,7 @@ commands:
     parameters:
       cache_key:
         type: string
-        default: v3.0.0-rust-1.81.0-snarkos-stable-cache
+        default: v3.0.0-rust-1.82.0-snarkos-stable-cache
     steps:
       - run: (sccache -s||true)
       - run: set +e
@@ -173,127 +173,136 @@ commands:
 jobs:
   amareleo-chain:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: .
-          cache_key: v3.0.0-rust-1.81.0-stable-cache
+          cache_key: v3.0.0-rust-1.82.0-stable-cache
 
   account:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: account
-          cache_key: v3.0.0-rust-1.81.0-account-cache
+          cache_key: v3.0.0-rust-1.82.0-account-cache
 
   cli:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: cli
-          cache_key: v3.0.0-rust-1.81.0-cli-cache
+          cache_key: v3.0.0-rust-1.82.0-cli-cache
+
+  api:
+    docker:
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
+    steps:
+      - run_serial:
+          workspace_member: api
+          cache_key: v3.0.0-rust-1.82.0-api-cache
 
   node:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node
-          cache_key: v3.0.0-rust-1.81.0-node-cache
+          cache_key: v3.0.0-rust-1.82.0-node-cache
 
   node-bft:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/bft
-          cache_key: v3.0.0-rust-1.81.0-node-bft-cache
+          cache_key: v3.0.0-rust-1.82.0-node-bft-cache
 
   node-bft-events:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/bft/events
-          cache_key: v3.0.0-rust-1.81.0-node-bft-events-cache
+          cache_key: v3.0.0-rust-1.82.0-node-bft-events-cache
 
   node-bft-ledger-service:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/bft/ledger-service
-          cache_key: v3.0.0-rust-1.81.0-node-bft-ledger-service-cache
+          cache_key: v3.0.0-rust-1.82.0-node-bft-ledger-service-cache
 
   node-bft-storage-service:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/bft/storage-service
-          cache_key: v3.0.0-rust-1.81.0-node-bft-storage-service-cache
+          cache_key: v3.0.0-rust-1.82.0-node-bft-storage-service-cache
 
   node-consensus:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/consensus
-          cache_key: v3.0.0-rust-1.81.0-node-consensus-cache
+          cache_key: v3.0.0-rust-1.82.0-node-consensus-cache
 
   node-rest:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/rest
-          cache_key: v3.0.0-rust-1.81.0-node-rest-cache
+          cache_key: v3.0.0-rust-1.82.0-node-rest-cache
 
   node-sync:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - run_serial:
           workspace_member: node/sync
-          cache_key: v3.0.0-rust-1.81.0-node-sync-cache
+          cache_key: v3.0.0-rust-1.82.0-node-sync-cache
 
   check-fmt:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - checkout
       - install_rust_nightly
       - setup_environment:
-          cache_key: v3.0.0-rust-1.81.0-fmt-cache
+          cache_key: v3.0.0-rust-1.82.0-fmt-cache
       - run:
           name: Check style
           no_output_timeout: 35m
           command: cargo +nightly fmt --all -- --check
       - clear_environment:
-          cache_key: v3.0.0-rust-1.81.0-fmt-cache
+          cache_key: v3.0.0-rust-1.82.0-fmt-cache
 
   check-clippy:
     docker:
-      - image: cimg/rust:1.81.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+      - image: cimg/rust:1.82.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
     resource_class: << pipeline.parameters.medium >>
     steps:
       - checkout
       - setup_environment:
-          cache_key: v3.0.0-rust-1.81.0-clippy-cache
+          cache_key: v3.0.0-rust-1.82.0-clippy-cache
       - run:
           name: Check lint
           no_output_timeout: 35m
@@ -301,7 +310,7 @@ jobs:
             cargo clippy --workspace --all-targets -- -D warnings
             cargo clippy --workspace --all-targets --all-features -- -D warnings
       - clear_environment:
-          cache_key: v3.0.0-rust-1.81.0-clippy-cache
+          cache_key: v3.0.0-rust-1.82.0-clippy-cache
 
   verify-windows:
     executor:
@@ -330,6 +339,10 @@ workflows:
             branches:
               only: [main, develop]
       - cli:
+          filters: 
+            branches:
+              only: [main, develop]
+      - api:
           filters: 
             branches:
               only: [main, develop]

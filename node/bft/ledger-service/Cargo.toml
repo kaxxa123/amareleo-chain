@@ -17,8 +17,7 @@ ledger-write = []
 metrics = ["dep:metrics", "snarkvm/metrics"]
 mock = ["parking_lot", "tracing"]
 prover = []
-test = ["mock", "translucent"]
-translucent = ["ledger"]
+test = ["mock"]
 test_targets = ["snarkvm/test_targets"]
 
 [dependencies.async-trait]
@@ -61,3 +60,7 @@ optional = true
 [dependencies.tracing]
 version = "0.1"
 optional = true
+
+[dependencies.amareleo-chain-tracing]
+path = "../../../tracing"
+version = "=2.0.2"
