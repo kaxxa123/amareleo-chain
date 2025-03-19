@@ -110,7 +110,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
             let _ = handle.await;
         }
 
-        trace!("REST server shutdown completed.");
+        info!("REST server shutdown completed.");
     }
 }
 
@@ -357,7 +357,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             error!("REST server shutdown signaling error: {}", error);
         }
 
-        trace!("REST server shutdown signal recieved.");
+        info!("REST server shutdown signal recieved...");
     }
 }
 
