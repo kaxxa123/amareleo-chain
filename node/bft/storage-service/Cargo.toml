@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-bft-storage-service"
-version = "2.0.2"
+version = "2.1.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A storage service for the memory pool in a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -39,7 +39,7 @@ workspace = true
 
 [dependencies.amareleo-chain-tracing]
 path = "../../../tracing"
-version = "=2.0.2"
+version = "=2.1.0"
 
 [dependencies.tracing]
 version = "0.1"

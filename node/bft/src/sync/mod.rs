@@ -90,9 +90,13 @@ impl<N: Network> Sync<N> {
 
         // Retrieve the block height.
         let block_height = latest_block.height();
-        // Determine the number of maximum number of blocks that would have been garbage collected.
+        // Determine the maximum number of blocks corresponding to rounds
+        // that would not have been garbage collected, i.e. that would be kept in storage.
+        // Since at most one block is created every two rounds,
+        // this is half of the maximum number of rounds kept in storage.
         let max_gc_blocks = u32::try_from(self.storage.max_gc_rounds())?.saturating_div(2);
-        // Determine the earliest height, conservatively set to the block height minus the max GC rounds.
+        // Determine the earliest height of blocks corresponding to rounds kept in storage,
+        // conservatively set to the block height minus the maximum number of blocks calculated above.
         // By virtue of the BFT protocol, we can guarantee that all GC range blocks will be loaded.
         let gc_height = block_height.saturating_sub(max_gc_blocks);
         // Retrieve the blocks.
@@ -110,7 +114,10 @@ impl<N: Network> Sync<N> {
         self.storage.garbage_collect_certificates(latest_block.round());
         // Iterate over the blocks.
         for block in &blocks {
-            // If the block authority is a subdag, then sync the batch certificates with the block.
+            // If the block authority is a sub-DAG, then sync the batch certificates with the block.
+            // Note that the block authority is always a sub-DAG in production;
+            // beacon signatures are only used for testing,
+            // and as placeholder (irrelevant) block authority in the genesis block.
             if let Authority::Quorum(subdag) = block.authority() {
                 // Reconstruct the unconfirmed transactions.
                 let unconfirmed_transactions = cfg_iter!(block.transactions())

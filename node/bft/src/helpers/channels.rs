@@ -242,6 +242,9 @@ impl<N: Network> SyncSender<N> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the request to update the peer locators.
+        // This `tx_block_sync_update_peer_locators.send()` call
+        // causes the `rx_block_sync_update_peer_locators.recv()` call
+        // in one of the loops in [`Sync::run()`] to return.
         self.tx_block_sync_update_peer_locators.send((peer_ip, block_locators, callback_sender)).await?;
         // Await the callback to continue.
         callback_receiver.await?
@@ -252,6 +255,9 @@ impl<N: Network> SyncSender<N> {
         // Initialize a callback sender and receiver.
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Send the request to advance with sync blocks.
+        // This `tx_block_sync_advance_with_sync_blocks.send()` call
+        // causes the `rx_block_sync_advance_with_sync_blocks.recv()` call
+        // in one of the loops in [`Sync::run()`] to return.
         self.tx_block_sync_advance_with_sync_blocks.send((peer_ip, blocks, callback_sender)).await?;
         // Await the callback to continue.
         callback_receiver.await?

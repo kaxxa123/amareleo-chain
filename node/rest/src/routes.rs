@@ -124,6 +124,14 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         Ok(ErasedJson::pretty(rest.ledger.get_height(&hash)?))
     }
 
+    // GET /<network>/block/{height}/header
+    pub(crate) async fn get_block_header(
+        State(rest): State<Self>,
+        Path(height): Path<u32>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_header(height)?))
+    }
+
     // GET /<network>/block/{height}/transactions
     pub(crate) async fn get_block_transactions(
         State(rest): State<Self>,

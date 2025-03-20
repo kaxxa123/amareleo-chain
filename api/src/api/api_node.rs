@@ -465,8 +465,8 @@ impl<N: Network> AmareleoApi<N> {
         // Initialize the hasher.
         let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
         // Compute the hash.
-        // NOTE: this is a fast-to-compute but *IMPERFECT* identifier for the genesis block.
-        //       to know the actualy genesis block hash, you need to compute the block itself.
+        // NOTE: this is a fast-to-compute but *IMPERFECT* identifier for the genesis block;
+        //       to know the actual genesis block hash, you need to compute the block itself.
         let hash = hasher.hash(&preimage.to_bits_le())?.to_string();
         if hash == raw_blockid {
             let block = Block::from_bytes_le(raw_block0)?;
