@@ -210,7 +210,7 @@ impl<N: Network> FromBytes for Proposal<N> {
         // Read the number of signatures.
         let num_signatures = u32::read_le(&mut reader)?;
         // Ensure the number of signatures is within bounds (this is an early safety check).
-        if num_signatures as usize > Committee::<N>::MAX_COMMITTEE_SIZE as usize {
+        if num_signatures as usize > Committee::<N>::max_committee_size().map_err(error)? as usize {
             return Err(error("Invalid number of signatures in the proposal"));
         }
         // Read the signatures.

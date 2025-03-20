@@ -65,10 +65,10 @@ pub struct BFTPersistentStorage<N: Network> {
 impl<N: Network> BFTPersistentStorage<N> {
     /// Initializes a new BFT persistent storage service.
     pub fn open(storage_mode: StorageMode, tracing: Option<TracingHandler>) -> Result<Self> {
-        let capacity = NonZeroUsize::new(
-            (Committee::<N>::MAX_COMMITTEE_SIZE as usize) * (BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH) * 2,
-        )
-        .ok_or_else(|| anyhow!("Could not construct NonZeroUsize"))?;
+        let max_committee_size = Committee::<N>::max_committee_size().unwrap();
+        let capacity =
+            NonZeroUsize::new((max_committee_size as usize) * (BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH) * 2)
+                .ok_or_else(|| anyhow!("Could not construct NonZeroUsize"))?;
 
         Ok(Self {
             transmissions: internal::RocksDB::open_map(N::ID, storage_mode.clone(), MapID::BFT(BFTMap::Transmissions))?,
@@ -91,10 +91,10 @@ impl<N: Network> BFTPersistentStorage<N> {
     /// Initializes a new BFT persistent storage service for testing.
     #[cfg(any(test, feature = "test"))]
     pub fn open_testing(temp_dir: std::path::PathBuf, dev: Option<u16>) -> Result<Self> {
-        let capacity = NonZeroUsize::new(
-            (Committee::<N>::MAX_COMMITTEE_SIZE as usize) * (BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH) * 2,
-        )
-        .ok_or_else(|| anyhow!("Could not construct NonZeroUsize"))?;
+        let max_committee_size = Committee::<N>::max_committee_size().unwrap();
+        let capacity =
+            NonZeroUsize::new((max_committee_size as usize) * (BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH) * 2)
+                .ok_or_else(|| anyhow!("Could not construct NonZeroUsize"))?;
 
         Ok(Self {
             transmissions: internal::RocksDB::open_map_testing(

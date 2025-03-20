@@ -390,7 +390,7 @@ impl<N: Network> Primary<N> {
 
         // Ensure that the primary does not create a new proposal too quickly.
         if let Err(e) = self.check_proposal_timestamp(previous_round, self.account.address(), now()) {
-            debug!("Primary is safely skipping a batch proposal - {}", format!("{e}").dimmed());
+            debug!("Primary is safely skipping a batch proposal for round {round} - {}", format!("{e}").dimmed());
             return Ok(0u64);
         }
 
@@ -437,7 +437,7 @@ impl<N: Network> Primary<N> {
             // If quorum threshold is not reached, return early.
             if !committee_lookback.is_quorum_threshold_reached(&connected_validators) {
                 debug!(
-                    "Primary is safely skipping a batch proposal {}",
+                    "Primary is safely skipping a batch proposal for round {round} {}",
                     "(please connect to more validators)".dimmed()
                 );
                 trace!("Primary is connected to {} validators", connected_validators.len() - 1);
@@ -467,7 +467,7 @@ impl<N: Network> Primary<N> {
         // If the batch is not ready to be proposed, return early.
         if !is_ready {
             debug!(
-                "Primary is safely skipping a batch proposal {}",
+                "Primary is safely skipping a batch proposal for round {round} {}",
                 format!("(previous round {previous_round} has not reached quorum)").dimmed()
             );
             return Ok(0u64);
@@ -760,15 +760,19 @@ impl<N: Network> Primary<N> {
             loop {
                 // Sleep briefly, but longer than if there were no batch.
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS)).await;
+                let current_round = self_.current_round();
                 // If the primary is not synced, then do not propose a batch.
                 if !self_.is_synced() {
-                    debug!("Skipping batch proposal {}", "(node is syncing)".dimmed());
+                    debug!("Skipping batch proposal for round {current_round} {}", "(node is syncing)".dimmed());
                     continue;
                 }
                 // A best-effort attempt to skip the scheduled batch proposal if
                 // round progression already triggered one.
                 if self_.propose_lock.try_lock().is_err() {
-                    trace!("Skipping batch proposal {}", "(node is already proposing)".dimmed());
+                    trace!(
+                        "Skipping batch proposal for round {current_round} {}",
+                        "(node is already proposing)".dimmed()
+                    );
                     continue;
                 };
                 // If there is no proposed batch, attempt to propose a batch.

@@ -113,7 +113,7 @@ pub(crate) mod tests {
         rng: &mut TestRng,
     ) -> SignedProposals<CurrentNetwork> {
         let mut signed_proposals: HashMap<_, _> = Default::default();
-        for _ in 0..CurrentNetwork::MAX_CERTIFICATES {
+        for _ in 0..CurrentNetwork::LATEST_MAX_CERTIFICATES().unwrap() {
             let private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
             let address = Address::try_from(&private_key).unwrap();
 

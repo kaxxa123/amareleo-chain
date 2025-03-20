@@ -892,7 +892,7 @@ impl<N: Network> BFT<N> {
         // Acquire the BFT write lock.
         let mut dag = self.dag.write();
 
-        // Commit all the certificates excluding the latest leader certificate.
+        // Commit all the certificates.
         for certificate in certificates {
             dag.commit(&certificate, self.storage().max_gc_rounds());
         }

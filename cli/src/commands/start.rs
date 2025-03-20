@@ -48,10 +48,12 @@ pub struct Start {
     pub logfile: Option<PathBuf>,
 
     /// Enables the metrics exporter
+    #[cfg(feature = "metrics")]
     #[clap(default_value = "false", long = "metrics")]
     pub metrics: bool,
     /// Specify the IP address and port for the metrics exporter [default: 127.0.0.1:9000]
     #[clap(long = "metrics-ip")]
+    #[cfg(feature = "metrics")]
     pub metrics_ip: Option<SocketAddr>,
 
     /// Specify the path to the ledger storage directory [default: current directory]
@@ -116,6 +118,7 @@ impl Start {
         }
 
         // Initialize the metrics.
+        #[cfg(feature = "metrics")]
         if self.metrics {
             metrics::initialize_metrics(self.metrics_ip);
         }

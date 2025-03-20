@@ -196,10 +196,8 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                 )
                 // The path param here is actually only the height, but the name must match the route
                 // above, otherwise there'll be a conflict at runtime.
-                .route(
-                    &format!("/{network}/block/:height_or_hash/transactions"),
-                    get(Self::get_block_transactions),
-                )
+                .route(&format!("/{network}/block/:height_or_hash/header"), get(Self::get_block_header))
+                .route(&format!("/{network}/block/:height_or_hash/transactions"), get(Self::get_block_transactions))
                 // GET and POST ../transaction/..
                 .route(
                     &format!("/{network}/transaction/:id"),
