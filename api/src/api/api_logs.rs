@@ -17,12 +17,14 @@ use amareleo_chain_tracing::TracingHandler;
 /// Amareleo logging selection
 #[derive(Clone)]
 pub enum AmareleoLog {
-    /// Log to file.
+    /// Log to file
     /// If Some, the specified path is used.
     /// If None, the default log file path is used.
     File(Option<PathBuf>),
 
     /// Custom log handler
+    /// Overrides the default log handler with your own
+    /// tracing subscribers.
     Custom(TracingHandler),
 
     /// Disable logging
@@ -50,7 +52,7 @@ impl AmareleoLog {
         matches!(self, Self::Custom(_))
     }
 
-    /// Check if logging is disabled completely
+    /// Check if logging is disabled altogether
     pub fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }

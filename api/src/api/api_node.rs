@@ -66,6 +66,7 @@ use amareleo_node_bft::{
     },
 };
 
+/// Amareleo node object, for creating and managing a node instance
 #[derive(Clone)]
 pub struct AmareleoApi<N: Network> {
     rest_ip: SocketAddr,
@@ -81,7 +82,9 @@ pub struct AmareleoApi<N: Network> {
 }
 
 impl<N: Network> Default for AmareleoApi<N> {
-    /// Default configuration
+    /// Create a node with default configuration.
+    /// Listenning to port 3030, with 10 requests per second limit.
+    /// No ledger state retenttion, default ledger folder naming, no logging.
     fn default() -> Self {
         Self {
             rest_ip: "0.0.0.0:3030".parse().unwrap(),
@@ -100,7 +103,9 @@ impl<N: Network> Default for AmareleoApi<N> {
 
 // AmareleoApi configuration setters
 impl<N: Network> AmareleoApi<N> {
-    /// Configure REST server properties
+    /// Configure REST server IP, port, and requests per second limit
+    /// ip_port: SocketAddr - IP and port to listen to
+    /// rps: u32 - requests per second limit
     pub fn cfg_rest(&mut self, ip_port: SocketAddr, rps: u32) -> &mut Self {
         if !self.is_started() {
             self.rest_ip = ip_port;
@@ -111,6 +116,9 @@ impl<N: Network> AmareleoApi<N> {
     }
 
     /// Configure ledger storage properties
+    /// keep_state: bool - keep ledger state between restarts
+    /// base_path: Option<PathBuf> - custom ledger folder path
+    /// default_naming: bool - use default ledger folder naming, instead of deriving unique names from the rest IP:port configuration.
     pub fn cfg_ledger(&mut self, keep_state: bool, base_path: Option<PathBuf>, default_naming: bool) -> &mut Self {
         if !self.is_started() {
             self.keep_state = keep_state;
@@ -121,7 +129,9 @@ impl<N: Network> AmareleoApi<N> {
         self
     }
 
-    /// Configure file logging
+    /// Configure file logging path and verbosity level
+    /// log_file: Option<PathBuf> - custom log file path, or None for default path
+    /// verbosity: u8 - log verbosity level between 0 and 4, where 0 is the least verbose
     pub fn cfg_file_log(&mut self, log_file: Option<PathBuf>, verbosity: u8) -> &mut Self {
         if !self.is_started() {
             self.log_mode = AmareleoLog::File(log_file);
@@ -132,6 +142,7 @@ impl<N: Network> AmareleoApi<N> {
     }
 
     /// Configure custom logging
+    /// tracing: TracingHandler - custom tracing subscriber
     pub fn cfg_custom_log(&mut self, tracing: TracingHandler) -> &mut Self {
         if !self.is_started() {
             self.log_mode = AmareleoLog::Custom(tracing);
@@ -140,6 +151,7 @@ impl<N: Network> AmareleoApi<N> {
         self
     }
 
+    /// Disable logging
     pub fn cfg_no_log(&mut self) -> &mut Self {
         if !self.is_started() {
             self.log_mode = AmareleoLog::None;
@@ -151,7 +163,7 @@ impl<N: Network> AmareleoApi<N> {
 
 // AmareleoApi public getters
 impl<N: Network> AmareleoApi<N> {
-    /// Get fixed development-mode node account
+    /// Get well known development-mode node account, use the public and private credits to pay for transaction fees.
     pub fn get_node_account() -> Result<Account<N>> {
         Account::try_from({
             // Initialize the (fixed) RNG.
@@ -161,7 +173,7 @@ impl<N: Network> AmareleoApi<N> {
     }
 
     /// Get resultant log file path, based on current configuration.
-    /// Returns empty string if logging is disabled
+    /// Fails if file logging is not configured.
     pub fn get_log_file(&self) -> Result<PathBuf> {
         if !self.log_mode.is_file() {
             bail!("Logging to file is disabled!");
@@ -188,11 +200,6 @@ impl<N: Network> AmareleoApi<N> {
         };
 
         Ok(ledger_path.to_path_buf())
-    }
-
-    /// Get the shutdown signal
-    pub fn get_shutdown(&self) -> Arc<AtomicBool> {
-        self.shutdown.clone()
     }
 
     /// Check if the node is started
@@ -238,6 +245,7 @@ impl<N: Network> AmareleoApi<N> {
         Ok(())
     }
 
+    /// Stop the node instance
     pub async fn end(&mut self) {
         if let Some(validator) = &self.validator {
             validator.shut_down().await;
@@ -246,7 +254,7 @@ impl<N: Network> AmareleoApi<N> {
     }
 }
 
-// AmareleoApi helpers
+// AmareleoApi private non-static helpers
 impl<N: Network> AmareleoApi<N> {
     /// Initialze logging
     fn trace_init(&mut self) -> Result<()> {
@@ -259,20 +267,11 @@ impl<N: Network> AmareleoApi<N> {
 
         Ok(())
     }
-
-    /// Get TracingHandler
-    pub fn trace_handler(&self) -> Option<TracingHandler> {
-        if !self.is_started() {
-            return None;
-        }
-
-        self.log_trace.clone()
-    }
 }
 
 // AmareleoApi private static helpers
 impl<N: Network> AmareleoApi<N> {
-    /// Cleans the temporary ledger
+    // Cleans the temporary ledger
     fn clean_tmp_ledger(ledger_path: PathBuf) -> Result<()> {
         // Remove the current proposal cache file, if it exists.
         let storage_mode = amareleo_storage_mode(ledger_path.clone());
@@ -293,7 +292,7 @@ impl<N: Network> AmareleoApi<N> {
         Ok(())
     }
 
-    /// Returns genesis block for the development mode node.
+    // Returns genesis block for the development mode node.
     fn get_genesis() -> Result<Block<N>> {
         // Initialize the (fixed) RNG.
         let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
@@ -373,7 +372,7 @@ impl<N: Network> AmareleoApi<N> {
         )
     }
 
-    /// Loads or computes the genesis block.
+    // Loads or computes the genesis block.
     fn load_or_compute_genesis(
         genesis_private_key: PrivateKey<N>,
         committee: Committee<N>,

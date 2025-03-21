@@ -18,7 +18,13 @@ use clap::Parser;
 use colored::Colorize;
 
 use core::future::Future;
-use std::{net::SocketAddr, path::PathBuf, result::Result::Ok, time::Duration};
+use std::{
+    net::SocketAddr,
+    path::PathBuf,
+    result::Result::Ok,
+    sync::{Arc, atomic::AtomicBool},
+    time::Duration,
+};
 use tokio::runtime::{self, Runtime};
 
 use snarkvm::console::network::{CanaryV0, MainnetV0, Network, TestnetV0};
@@ -71,20 +77,24 @@ impl Start {
         // Initialize the runtime.
         Self::runtime().block_on(async move {
             // Clone the configurations.
+            let shutdown: Arc<AtomicBool> = Default::default();
             let mut cli = self.clone();
             // Parse the network.
             match cli.network {
                 MainnetV0::ID => {
-                    let node_api = cli.start_node::<MainnetV0>().await.expect("Failed to parse the node");
-                    cli.handle_termination(node_api);
+                    let node_api =
+                        cli.start_node::<MainnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    cli.handle_termination(node_api, shutdown);
                 }
                 TestnetV0::ID => {
-                    let node_api = cli.start_node::<TestnetV0>().await.expect("Failed to parse the node");
-                    cli.handle_termination(node_api);
+                    let node_api =
+                        cli.start_node::<TestnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    cli.handle_termination(node_api, shutdown);
                 }
                 CanaryV0::ID => {
-                    let node_api = cli.start_node::<CanaryV0>().await.expect("Failed to parse the node");
-                    cli.handle_termination(node_api);
+                    let node_api =
+                        cli.start_node::<CanaryV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    cli.handle_termination(node_api, shutdown);
                 }
                 _ => panic!("Invalid network ID specified"),
             };
@@ -98,7 +108,7 @@ impl Start {
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
-    async fn start_node<N: Network>(&mut self) -> Result<AmareleoApi<N>> {
+    async fn start_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<AmareleoApi<N>> {
 
         // Print the welcome.
         println!("{}", Self::welcome_message());
@@ -138,7 +148,7 @@ impl Start {
         let tracing = initialize_custom_tracing(
             self.verbosity,
             logfile_path.clone(),
-            node_api.get_shutdown())?;
+            shutdown)?;
 
         node_api.cfg_custom_log(tracing);
 
@@ -151,7 +161,7 @@ impl Start {
     }
 
     /// Handles OS signals for intercept termination and performing a clean shutdown.
-    fn handle_termination<N: Network>(&self, mut node_api: AmareleoApi<N>) {
+    fn handle_termination<N: Network>(&self, mut node_api: AmareleoApi<N>, shutdown: Arc<AtomicBool>) {
         #[cfg(target_family = "unix")]
         fn signal_listener() -> impl Future<Output = std::io::Result<()>> {
             use tokio::signal::unix::{SignalKind, signal};
@@ -202,6 +212,7 @@ impl Start {
 ==========================================================================================
 "#;
                     println!("{}", term_msg);
+                    shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
 
                     // Shut down the node.
                     node_api.end().await;
