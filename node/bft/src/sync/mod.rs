@@ -15,7 +15,7 @@
 
 use crate::helpers::{BFTSender, Storage};
 use amareleo_node_bft_ledger_service::LedgerService;
-use amareleo_node_sync::locators::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
+use amareleo_node_sync::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::{
     console::network::Network,
     ledger::authority::Authority,
@@ -51,6 +51,8 @@ impl<N: Network> Sync<N> {
 
     /// Initializes the sync module and sync the storage with the ledger at bootup.
     pub async fn initialize(&self, bft_sender: Option<BFTSender<N>>) -> Result<()> {
+        let _guard = self.storage.get_tracing_guard();
+
         // If a BFT sender was provided, set it.
         if let Some(bft_sender) = bft_sender {
             self.bft_sender.set(bft_sender).expect("BFT sender already set in gateway");
@@ -64,6 +66,7 @@ impl<N: Network> Sync<N> {
 
     /// Starts the sync module.
     pub async fn run(&self) -> Result<()> {
+        let _guard = self.storage.get_tracing_guard();
         info!("Starting the sync module...");
 
         // Update the sync status.
@@ -81,14 +84,19 @@ impl<N: Network> Sync<N> {
 impl<N: Network> Sync<N> {
     /// Syncs the storage with the ledger at bootup.
     async fn sync_storage_with_ledger_at_bootup(&self) -> Result<()> {
+        let _guard = self.storage.get_tracing_guard();
         // Retrieve the latest block in the ledger.
         let latest_block = self.ledger.latest_block();
 
         // Retrieve the block height.
         let block_height = latest_block.height();
-        // Determine the number of maximum number of blocks that would have been garbage collected.
+        // Determine the maximum number of blocks corresponding to rounds
+        // that would not have been garbage collected, i.e. that would be kept in storage.
+        // Since at most one block is created every two rounds,
+        // this is half of the maximum number of rounds kept in storage.
         let max_gc_blocks = u32::try_from(self.storage.max_gc_rounds())?.saturating_div(2);
-        // Determine the earliest height, conservatively set to the block height minus the max GC rounds.
+        // Determine the earliest height of blocks corresponding to rounds kept in storage,
+        // conservatively set to the block height minus the maximum number of blocks calculated above.
         // By virtue of the BFT protocol, we can guarantee that all GC range blocks will be loaded.
         let gc_height = block_height.saturating_sub(max_gc_blocks);
         // Retrieve the blocks.
@@ -106,7 +114,10 @@ impl<N: Network> Sync<N> {
         self.storage.garbage_collect_certificates(latest_block.round());
         // Iterate over the blocks.
         for block in &blocks {
-            // If the block authority is a subdag, then sync the batch certificates with the block.
+            // If the block authority is a sub-DAG, then sync the batch certificates with the block.
+            // Note that the block authority is always a sub-DAG in production;
+            // beacon signatures are only used for testing,
+            // and as placeholder (irrelevant) block authority in the genesis block.
             if let Authority::Quorum(subdag) = block.authority() {
                 // Reconstruct the unconfirmed transactions.
                 let unconfirmed_transactions = cfg_iter!(block.transactions())

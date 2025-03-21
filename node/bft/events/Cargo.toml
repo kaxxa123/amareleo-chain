@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-bft-events"
-version = "2.0.2"
+version = "2.1.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "Events for the gateway in a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -28,7 +28,7 @@ features = ["serde", "rayon"]
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "../../metrics"
-version = "=2.0.2"
+version = "=2.1.0"
 optional = true
 
 [dependencies.rayon]
@@ -37,9 +37,9 @@ version = "1"
 [dependencies.serde]
 version = "1"
 
-[dependencies.amareleo-node-sync-locators]
-path = "../../sync/locators"
-version = "=2.0.2"
+[dependencies.amareleo-node-sync]
+path = "../../sync"
+version = "=2.1.0"
 
 [dependencies.snarkvm]
 workspace = true
@@ -64,6 +64,6 @@ version = "0.3.1"
 [dev-dependencies.time]
 version = "0.3"
 
-[dev-dependencies.amareleo-node-sync-locators]
-path = "../../sync/locators"
+[dev-dependencies.amareleo-node-sync]
+path = "../../sync"
 features = ["test"]

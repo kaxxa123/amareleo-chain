@@ -1,8 +1,8 @@
 [package]
 name = "amareleo-node-sync"
-version = "2.0.2"
+version = "2.1.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
-description = "A synchronization module for a lite Aleo development node"
+description = "Synchronization for a lite Aleo development node"
 homepage = "https://amareleo.com"
 repository = "https://github.com/kaxxa123/amareleo-chain"
 keywords = ["aleo", "amareleo", "blockchain", "decentralized", "zero-knowledge"]
@@ -12,24 +12,21 @@ edition = "2021"
 
 [features]
 default = []
-metrics = ["dep:metrics"]
-test = ["amareleo-node-sync-locators/test"]
+test = []
 test_targets = ["snarkvm/test_targets"]
 
-[dependencies.metrics]
-package = "amareleo-node-metrics"
-path = "../metrics"
-version = "=2.0.2"
-optional = true
+[dependencies.anyhow]
+version = "1.0"
 
-[dependencies.amareleo-node-sync-locators]
-path = "locators"
-version = "=2.0.2"
+[dependencies.indexmap]
+version = "2.1"
+features = ["serde", "rayon"]
 
-[dev-dependencies.amareleo-node-sync-locators]
-path = "locators"
-features = ["test"]
+[dependencies.serde]
+version = "1"
 
-[dev-dependencies.snarkvm]
+[dependencies.snarkvm]
 workspace = true
-features = ["test-helpers"]
+
+[dependencies.tracing]
+version = "0.1"

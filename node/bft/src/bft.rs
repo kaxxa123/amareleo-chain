@@ -30,6 +30,7 @@ use crate::{
 };
 use aleo_std::StorageMode;
 use amareleo_chain_account::Account;
+use amareleo_chain_tracing::TracingHandler;
 use amareleo_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::account::Address,
@@ -57,6 +58,7 @@ use tokio::{
     sync::{Mutex as TMutex, OnceCell, oneshot},
     task::JoinHandle,
 };
+use tracing::subscriber::DefaultGuard;
 
 #[derive(Clone)]
 pub struct BFT<N: Network> {
@@ -70,6 +72,8 @@ pub struct BFT<N: Network> {
     leader_certificate_timer: Arc<AtomicI64>,
     /// The consensus sender.
     consensus_sender: Arc<OnceCell<ConsensusSender<N>>>,
+    /// Tracing handle
+    tracing: Option<TracingHandler>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The BFT lock.
@@ -84,13 +88,15 @@ impl<N: Network> BFT<N> {
         keep_state: bool,
         storage_mode: StorageMode,
         ledger: Arc<dyn LedgerService<N>>,
+        tracing: Option<TracingHandler>,
     ) -> Result<Self> {
         Ok(Self {
-            primary: Primary::new(account, storage, keep_state, storage_mode, ledger)?,
+            primary: Primary::new(account, storage, keep_state, storage_mode, ledger, tracing.clone())?,
             dag: Default::default(),
             leader_certificate: Default::default(),
             leader_certificate_timer: Default::default(),
             consensus_sender: Default::default(),
+            tracing: tracing.clone(),
             handles: Default::default(),
             lock: Default::default(),
         })
@@ -103,6 +109,7 @@ impl<N: Network> BFT<N> {
         primary_sender: PrimarySender<N>,
         primary_receiver: PrimaryReceiver<N>,
     ) -> Result<()> {
+        let _guard = self.get_tracing_guard();
         info!("Starting the BFT instance...");
         // Initialize the BFT channels.
         let (bft_sender, bft_receiver) = init_bft_channels::<N>();
@@ -146,6 +153,11 @@ impl<N: Network> BFT<N> {
     /// Returns the certificate of the leader from the current even round, if one was present.
     pub const fn leader_certificate(&self) -> &Arc<RwLock<Option<BatchCertificate<N>>>> {
         &self.leader_certificate
+    }
+
+    /// Retruns tracing guard
+    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
     }
 }
 
@@ -196,6 +208,8 @@ impl<N: Network> BFT<N> {
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
     fn update_to_next_round(&self, current_round: u64) -> bool {
+        let _guard = self.get_tracing_guard();
+
         // Ensure the current round is at least the storage round (this is a sanity check).
         let storage_round = self.storage().current_round();
         if current_round < storage_round {
@@ -268,6 +282,7 @@ impl<N: Network> BFT<N> {
     /// This method runs on every even round, by determining the leader of the current even round,
     /// and setting the leader certificate to their certificate in the round, if they were present.
     fn update_leader_certificate_to_even_round(&self, even_round: u64) -> bool {
+        let _guard = self.get_tracing_guard();
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
@@ -335,6 +350,8 @@ impl<N: Network> BFT<N> {
         committee: Committee<N>,
         current_round: u64,
     ) -> bool {
+        let _guard = self.get_tracing_guard();
+
         // Retrieve the authors for the current round.
         let authors = certificates.into_iter().map(|c| c.author()).collect();
         // Check if quorum threshold is reached.
@@ -367,6 +384,8 @@ impl<N: Network> BFT<N> {
     ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
     ///  - The leader certificate timer has expired.
     fn is_leader_quorum_or_nonleaders_available(&self, odd_round: u64) -> bool {
+        let _guard = self.get_tracing_guard();
+
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
@@ -454,11 +473,12 @@ impl<N: Network> BFT<N> {
     ) -> Result<()> {
         // Acquire the BFT lock.
         let _lock = self.lock.lock().await;
+        let _guard = self.get_tracing_guard();
 
         // Retrieve the certificate round.
         let certificate_round = certificate.round();
         // Insert the certificate into the DAG.
-        self.dag.write().insert(certificate);
+        self.dag.write().insert(certificate, self.tracing.clone());
 
         // Construct the commit round.
         let commit_round = certificate_round.saturating_sub(1);
@@ -534,6 +554,8 @@ impl<N: Network> BFT<N> {
         &self,
         leader_certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        let _guard = self.get_tracing_guard();
+
         // Fetch the leader round.
         let latest_leader_round = leader_certificate.round();
         // Determine the list of all previous leader certificates since the last committed round.
@@ -870,7 +892,7 @@ impl<N: Network> BFT<N> {
         // Acquire the BFT write lock.
         let mut dag = self.dag.write();
 
-        // Commit all the certificates excluding the latest leader certificate.
+        // Commit all the certificates.
         for certificate in certificates {
             dag.commit(&certificate, self.storage().max_gc_rounds());
         }
@@ -883,6 +905,7 @@ impl<N: Network> BFT<N> {
 
     /// Shuts down the BFT.
     pub async fn shut_down(&self) {
+        let _guard = self.get_tracing_guard();
         info!("Shutting down the BFT...");
         // Acquire the lock.
         let _lock = self.lock.lock().await;
@@ -897,8 +920,9 @@ impl<N: Network> BFT<N> {
 mod tests {
     use crate::{
         BFT,
+        DEVELOPMENT_MODE_RNG_SEED,
         MAX_LEADER_CERTIFICATE_DELAY_IN_SECS,
-        helpers::{Storage, amareleo_storage_mode},
+        helpers::{Storage, amareleo_storage_mode, default_ledger_dir},
     };
 
     use amareleo_chain_account::Account;
@@ -940,7 +964,7 @@ mod tests {
         let account = Account::new(rng).unwrap();
         let ledger = Arc::new(MockLedgerService::new(committee.clone()));
         let transmissions = Arc::new(BFTMemoryService::new());
-        let storage = Storage::new(ledger.clone(), transmissions, max_gc_rounds);
+        let storage = Storage::new(ledger.clone(), transmissions, max_gc_rounds, None);
 
         (committee, account, ledger, storage)
     }
@@ -972,11 +996,11 @@ mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee.clone()));
         // Initialize the storage.
-        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10);
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10, None);
         // Initialize the account.
         let account = Account::new(rng)?;
         // Initialize the BFT.
-        let bft = BFT::new(account.clone(), storage.clone(), false, StorageMode::Development(0), ledger.clone())?;
+        let bft = BFT::new(account.clone(), storage.clone(), false, StorageMode::Development(0), ledger.clone(), None)?;
         assert!(bft.is_timer_expired());
         // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
@@ -1011,7 +1035,7 @@ mod tests {
         assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger, None)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
 
         // Store is at round 1, and we are checking for round 2.
@@ -1033,7 +1057,7 @@ mod tests {
         assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger, None)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
 
         // Ensure this call fails on an even round.
@@ -1069,11 +1093,11 @@ mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee.clone()));
         // Initialize the storage.
-        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10);
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10, None);
         // Initialize the account.
         let account = Account::new(rng)?;
         // Initialize the BFT.
-        let bft = BFT::new(account.clone(), storage.clone(), false, StorageMode::Development(0), ledger.clone())?;
+        let bft = BFT::new(account.clone(), storage.clone(), false, StorageMode::Development(0), ledger.clone(), None)?;
         // Set the leader certificate.
         let leader_certificate = sample_batch_certificate_for_round(2, rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
@@ -1085,7 +1109,8 @@ mod tests {
         assert!(result);
 
         // Initialize a new BFT.
-        let bft_timer = BFT::new(account.clone(), storage.clone(), false, StorageMode::Development(0), ledger.clone())?;
+        let bft_timer =
+            BFT::new(account.clone(), storage.clone(), false, StorageMode::Development(0), ledger.clone(), None)?;
         // If the leader certificate is not set and the timer has not expired, we are not ready for the next round.
         let result = bft_timer.is_even_round_ready_for_next_round(certificates.clone(), committee.clone(), 2);
         if !bft_timer.is_timer_expired() {
@@ -1116,7 +1141,7 @@ mod tests {
         assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger, None)?;
 
         // Ensure this call fails on an odd round.
         let result = bft.update_leader_certificate_to_even_round(1);
@@ -1134,7 +1159,7 @@ mod tests {
         assert_eq!(storage.max_gc_rounds(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger, None)?;
 
         // Ensure this call succeeds on an even round.
         let result = bft.update_leader_certificate_to_even_round(6);
@@ -1173,7 +1198,7 @@ mod tests {
 
         // Initialize the storage.
         let transmissions = Arc::new(BFTMemoryService::new());
-        let storage = Storage::new(ledger.clone(), transmissions, 10);
+        let storage = Storage::new(ledger.clone(), transmissions, 10, None);
         storage.testing_only_insert_certificate_testing_only(certificates[0].clone());
         storage.testing_only_insert_certificate_testing_only(certificates[1].clone());
         storage.testing_only_insert_certificate_testing_only(certificates[2].clone());
@@ -1186,7 +1211,7 @@ mod tests {
 
         // Initialize the BFT.
         let account = Account::new(rng)?;
-        let bft = BFT::new(account, storage.clone(), false, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage.clone(), false, StorageMode::Development(0), ledger, None)?;
 
         // Set the leader certificate.
         *bft.leader_certificate.write() = Some(leader_certificate);
@@ -1222,9 +1247,9 @@ mod tests {
         // Ensure the function succeeds in returning only certificates above GC.
         {
             // Initialize the storage.
-            let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
+            let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1, None);
             // Initialize the BFT.
-            let bft = BFT::new(account.clone(), storage, false, StorageMode::Development(0), ledger.clone())?;
+            let bft = BFT::new(account.clone(), storage, false, StorageMode::Development(0), ledger.clone(), None)?;
 
             // Insert a mock DAG in the BFT.
             *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(3);
@@ -1252,9 +1277,9 @@ mod tests {
         // Ensure the function succeeds in returning all given certificates.
         {
             // Initialize the storage.
-            let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1);
+            let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 1, None);
             // Initialize the BFT.
-            let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
+            let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger, None)?;
 
             // Insert a mock DAG in the BFT.
             *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(2);
@@ -1312,7 +1337,7 @@ mod tests {
         /* Test missing previous certificate. */
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage, false, StorageMode::Development(0), ledger, None)?;
 
         // The expected error message.
         let error_msg = format!(
@@ -1361,7 +1386,7 @@ mod tests {
 
         // Initialize the storage.
         let transmissions = Arc::new(BFTMemoryService::new());
-        let storage = Storage::new(ledger.clone(), transmissions, max_gc_rounds);
+        let storage = Storage::new(ledger.clone(), transmissions, max_gc_rounds, None);
         // Insert the certificates into the storage.
         for certificate in certificates.iter() {
             storage.testing_only_insert_certificate_testing_only(certificate.clone());
@@ -1373,7 +1398,7 @@ mod tests {
 
         // Initialize the BFT.
         let account = Account::new(rng)?;
-        let bft = BFT::new(account, storage.clone(), false, StorageMode::Development(0), ledger)?;
+        let bft = BFT::new(account, storage.clone(), false, StorageMode::Development(0), ledger, None)?;
         // Insert a mock DAG in the BFT.
         *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(commit_round);
 
@@ -1427,7 +1452,7 @@ mod tests {
         let ledger = Arc::new(MockLedgerService::new(committee.clone()));
 
         // Initialize the storage.
-        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds, None);
         // Insert the certificates into the storage.
         for certificate in certificates.iter() {
             storage.testing_only_insert_certificate_testing_only(certificate.clone());
@@ -1439,7 +1464,7 @@ mod tests {
 
         // Initialize the BFT.
         let account = Account::new(rng)?;
-        let bft = BFT::new(account.clone(), storage, false, StorageMode::Development(0), ledger.clone())?;
+        let bft = BFT::new(account.clone(), storage, false, StorageMode::Development(0), ledger.clone(), None)?;
 
         // Insert a mock DAG in the BFT.
         *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(commit_round);
@@ -1455,9 +1480,9 @@ mod tests {
         // Simulate a bootup of the BFT.
 
         // Initialize a new instance of storage.
-        let storage_2 = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        let storage_2 = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds, None);
         // Initialize a new instance of BFT.
-        let bootup_bft = BFT::new(account, storage_2, false, StorageMode::Development(0), ledger)?;
+        let bootup_bft = BFT::new(account, storage_2, false, StorageMode::Development(0), ledger, None)?;
 
         // Sync the BFT DAG at bootup.
         bootup_bft.sync_bft_dag_at_bootup(certificates.clone()).await;
@@ -1493,7 +1518,7 @@ mod tests {
         */
 
         let rng = &mut TestRng::default();
-        let rng_pks = &mut ChaChaRng::seed_from_u64(1234567890u64);
+        let rng_pks = &mut ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
 
         let private_keys = vec![
             PrivateKey::new(rng_pks).unwrap(),
@@ -1577,7 +1602,7 @@ mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee.clone()));
         // Initialize the storage.
-        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds, None);
         // Get the leaders for the next 2 commit rounds.
         let leader = address0; // committee.get_leader(commit_round).unwrap();
         let next_leader = address0; // committee.get_leader(next_round).unwrap();
@@ -1614,7 +1639,9 @@ mod tests {
 
         // Initialize the BFT without bootup.
         let account = Account::try_from(private_keys[0])?;
-        let bft = BFT::new(account.clone(), storage, true, amareleo_storage_mode(1, true, None), ledger.clone())?;
+        let ledger_dir = default_ledger_dir(1, true, "0");
+        let storage_mode = amareleo_storage_mode(ledger_dir);
+        let bft = BFT::new(account.clone(), storage, true, storage_mode.clone(), ledger.clone(), None)?;
 
         // Insert a mock DAG in the BFT without bootup.
         *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(0);
@@ -1636,11 +1663,10 @@ mod tests {
         // Simulate a bootup of the BFT.
 
         // Initialize a new instance of storage.
-        let bootup_storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        let bootup_storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds, None);
 
         // Initialize a new instance of BFT with bootup.
-        let bootup_bft =
-            BFT::new(account, bootup_storage.clone(), true, amareleo_storage_mode(1, true, None), ledger.clone())?;
+        let bootup_bft = BFT::new(account, bootup_storage.clone(), true, storage_mode.clone(), ledger.clone(), None)?;
 
         // Sync the BFT DAG at bootup.
         bootup_bft.sync_bft_dag_at_bootup(pre_shutdown_certificates.clone()).await;
@@ -1714,7 +1740,7 @@ mod tests {
         */
 
         let rng = &mut TestRng::default();
-        let rng_pks = &mut ChaChaRng::seed_from_u64(1234567890u64);
+        let rng_pks = &mut ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
 
         let private_keys = vec![
             PrivateKey::new(rng_pks).unwrap(),
@@ -1798,7 +1824,7 @@ mod tests {
         // Initialize the ledger.
         let ledger = Arc::new(MockLedgerService::new(committee.clone()));
         // Initialize the storage.
-        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds);
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), max_gc_rounds, None);
         // Get the leaders for the next 2 commit rounds.
         let leader = address0; // committee.get_leader(commit_round).unwrap();
         let next_leader = address0; // committee.get_leader(next_round).unwrap();
@@ -1822,7 +1848,7 @@ mod tests {
         // Initialize the bootup BFT.
         let account = Account::try_from(private_keys[0])?;
         let bootup_bft =
-            BFT::new(account.clone(), storage.clone(), false, StorageMode::Development(0), ledger.clone())?;
+            BFT::new(account.clone(), storage.clone(), false, StorageMode::Development(0), ledger.clone(), None)?;
         // Insert a mock DAG in the BFT without bootup.
         *bootup_bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(0);
         // Sync the BFT DAG at bootup.

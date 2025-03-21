@@ -45,9 +45,6 @@ pub use challenge_response::ChallengeResponse;
 mod disconnect;
 pub use disconnect::{Disconnect, DisconnectReason};
 
-mod helpers;
-pub use helpers::*;
-
 mod primary_ping;
 pub use primary_ping::PrimaryPing;
 
@@ -66,7 +63,7 @@ pub use validators_response::ValidatorsResponse;
 mod worker_ping;
 pub use worker_ping::WorkerPing;
 
-use amareleo_node_sync_locators::BlockLocators;
+use amareleo_node_sync::BlockLocators;
 use snarkvm::{
     console::prelude::{FromBytes, Network, Read, ToBytes, Write, error},
     ledger::{

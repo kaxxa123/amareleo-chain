@@ -22,6 +22,9 @@ pub use dag::*;
 pub mod partition;
 pub use partition::*;
 
+pub mod ledger_files;
+pub use ledger_files::*;
+
 pub mod proposal_cache;
 pub use proposal_cache::*;
 

@@ -1,6 +1,3 @@
-// Copyright 2024 Aleo Network Foundation
-// This file is part of the snarkOS library.
-
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
@@ -14,9 +11,10 @@
 // limitations under the License.
 
 #![forbid(unsafe_code)]
+#![recursion_limit = "256"]
 
-#[macro_use]
-extern crate tracing;
+mod trace_layers;
+pub use trace_layers::*;
 
-mod block_locators;
-pub use block_locators::*;
+mod logger;
+pub use logger::*;

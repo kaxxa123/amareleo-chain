@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain-account"
-version = "2.0.2"
+version = "2.1.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "Account for a lite Aleo development node"
 homepage = "https://amareleo.com"

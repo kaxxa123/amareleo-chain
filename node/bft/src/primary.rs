@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::{
+    DEVELOPMENT_MODE_RNG_SEED,
     MAX_BATCH_DELAY_IN_MS,
     MAX_WORKERS,
     MIN_BATCH_DELAY_IN_SECS,
@@ -35,6 +36,7 @@ use crate::{
     spawn_blocking,
 };
 use amareleo_chain_account::Account;
+use amareleo_chain_tracing::TracingHandler;
 use amareleo_node_bft_ledger_service::LedgerService;
 use amareleo_node_sync::DUMMY_SELF_IP;
 use snarkvm::{
@@ -68,6 +70,7 @@ use tokio::{
     sync::{Mutex as TMutex, OnceCell},
     task::JoinHandle,
 };
+use tracing::subscriber::DefaultGuard;
 
 /// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
@@ -98,6 +101,8 @@ pub struct Primary<N: Network> {
     signed_proposals: Arc<RwLock<SignedProposals<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// Tracing handle
+    tracing: Option<TracingHandler>,
     /// The lock for propose_batch.
     propose_lock: Arc<TMutex<u64>>,
 }
@@ -113,6 +118,7 @@ impl<N: Network> Primary<N> {
         keep_state: bool,
         storage_mode: StorageMode,
         ledger: Arc<dyn LedgerService<N>>,
+        tracing: Option<TracingHandler>,
     ) -> Result<Self> {
         // Initialize the sync module.
         let sync = Sync::new(storage.clone(), ledger.clone());
@@ -131,17 +137,25 @@ impl<N: Network> Primary<N> {
             latest_proposed_batch_timestamp: Default::default(),
             signed_proposals: Default::default(),
             handles: Default::default(),
+            tracing,
             propose_lock: Default::default(),
         })
     }
 
+    /// Retruns tracing guard
+    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
+    }
+
     /// Load the proposal cache file and update the Primary state with the stored data.
     async fn load_proposal_cache(&self) -> Result<()> {
+        let _guard = self.get_tracing_guard();
+
         // Fetch the signed proposals from the file system if it exists.
-        match ProposalCache::<N>::exists(self.keep_state, &self.storage_mode) {
+        match ProposalCache::<N>::exists(&self.storage_mode) {
             // If the proposal cache exists, then process the proposal cache.
             true => {
-                match ProposalCache::<N>::load(self.account.address(), self.keep_state, &self.storage_mode) {
+                match ProposalCache::<N>::load(self.account.address(), &self.storage_mode, self.tracing.clone()) {
                     Ok(proposal_cache) => {
                         // Extract the proposal and signed proposals.
                         let (latest_certificate_round, proposed_batch, signed_proposals, pending_certificates) =
@@ -188,6 +202,7 @@ impl<N: Network> Primary<N> {
         _primary_sender: PrimarySender<N>,
         primary_receiver: PrimaryReceiver<N>,
     ) -> Result<()> {
+        let _guard = self.get_tracing_guard();
         info!("Starting the primary instance of the memory pool...");
 
         // Set the BFT sender.
@@ -201,7 +216,13 @@ impl<N: Network> Primary<N> {
         // Initialize the workers.
         for id in 0..MAX_WORKERS {
             // Construct the worker instance.
-            let worker = Worker::new(id, self.storage.clone(), self.ledger.clone(), self.proposed_batch.clone())?;
+            let worker = Worker::new(
+                id,
+                self.storage.clone(),
+                self.ledger.clone(),
+                self.proposed_batch.clone(),
+                self.tracing.clone(),
+            )?;
 
             // Add the worker to the list of workers.
             workers.push(worker);
@@ -316,7 +337,7 @@ impl<N: Network> Primary<N> {
 
 impl<N: Network> Primary<N> {
     pub async fn propose_batch(&self) -> Result<()> {
-        let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
+        let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
         let mut all_acc: Vec<Account<N>> = Vec::new();
 
         for _ in 0u64..4u64 {
@@ -348,6 +369,7 @@ impl<N: Network> Primary<N> {
     pub async fn propose_batch_lite(&self, other_acc: &[&Account<N>]) -> Result<u64> {
         // This function isn't re-entrant.
         let mut lock_guard = self.propose_lock.lock().await;
+        let _guard = self.get_tracing_guard();
 
         // Retrieve the current round.
         let round = self.current_round();
@@ -368,7 +390,7 @@ impl<N: Network> Primary<N> {
 
         // Ensure that the primary does not create a new proposal too quickly.
         if let Err(e) = self.check_proposal_timestamp(previous_round, self.account.address(), now()) {
-            debug!("Primary is safely skipping a batch proposal - {}", format!("{e}").dimmed());
+            debug!("Primary is safely skipping a batch proposal for round {round} - {}", format!("{e}").dimmed());
             return Ok(0u64);
         }
 
@@ -415,7 +437,7 @@ impl<N: Network> Primary<N> {
             // If quorum threshold is not reached, return early.
             if !committee_lookback.is_quorum_threshold_reached(&connected_validators) {
                 debug!(
-                    "Primary is safely skipping a batch proposal {}",
+                    "Primary is safely skipping a batch proposal for round {round} {}",
                     "(please connect to more validators)".dimmed()
                 );
                 trace!("Primary is connected to {} validators", connected_validators.len() - 1);
@@ -445,7 +467,7 @@ impl<N: Network> Primary<N> {
         // If the batch is not ready to be proposed, return early.
         if !is_ready {
             debug!(
-                "Primary is safely skipping a batch proposal {}",
+                "Primary is safely skipping a batch proposal for round {round} {}",
                 format!("(previous round {previous_round} has not reached quorum)").dimmed()
             );
             return Ok(0u64);
@@ -619,6 +641,7 @@ impl<N: Network> Primary<N> {
         other_acc: &[&Account<N>],
         round: u64,
     ) -> Result<()> {
+        let _guard = self.get_tracing_guard();
         let transmissions: IndexMap<_, _> = Default::default();
         let transmission_ids = transmissions.keys().copied().collect();
 
@@ -731,19 +754,25 @@ impl<N: Network> Primary<N> {
 
         // Start the batch proposer.
         let self_ = self.clone();
+        let guard = self_.get_tracing_guard();
         self.spawn(async move {
+            let _guard = guard;
             loop {
                 // Sleep briefly, but longer than if there were no batch.
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS)).await;
+                let current_round = self_.current_round();
                 // If the primary is not synced, then do not propose a batch.
                 if !self_.is_synced() {
-                    debug!("Skipping batch proposal {}", "(node is syncing)".dimmed());
+                    debug!("Skipping batch proposal for round {current_round} {}", "(node is syncing)".dimmed());
                     continue;
                 }
                 // A best-effort attempt to skip the scheduled batch proposal if
                 // round progression already triggered one.
                 if self_.propose_lock.try_lock().is_err() {
-                    trace!("Skipping batch proposal {}", "(node is already proposing)".dimmed());
+                    trace!(
+                        "Skipping batch proposal for round {current_round} {}",
+                        "(node is already proposing)".dimmed()
+                    );
                     continue;
                 };
                 // If there is no proposed batch, attempt to propose a batch.
@@ -759,7 +788,9 @@ impl<N: Network> Primary<N> {
         // Note: This is necessary to ensure that the primary is not stuck on a previous round
         // despite having received enough certificates to advance to the next round.
         let self_ = self.clone();
+        let guard = self_.get_tracing_guard();
         self.spawn(async move {
+            let _guard = guard;
             loop {
                 // Sleep briefly.
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS)).await;
@@ -796,7 +827,9 @@ impl<N: Network> Primary<N> {
 
         // Process the unconfirmed solutions.
         let self_ = self.clone();
+        let guard = self_.get_tracing_guard();
         self.spawn(async move {
+            let _guard = guard;
             while let Some((solution_id, solution, callback)) = rx_unconfirmed_solution.recv().await {
                 // Compute the checksum for the solution.
                 let Ok(checksum) = solution.to_checksum::<N>() else {
@@ -822,7 +855,9 @@ impl<N: Network> Primary<N> {
 
         // Process the unconfirmed transactions.
         let self_ = self.clone();
+        let guard = self_.get_tracing_guard();
         self.spawn(async move {
+            let _guard = guard;
             while let Some((transaction_id, transaction, callback)) = rx_unconfirmed_transaction.recv().await {
                 trace!("Primary - Received an unconfirmed transaction '{}'", fmt_id(transaction_id));
                 // Compute the checksum for the transaction.
@@ -850,6 +885,8 @@ impl<N: Network> Primary<N> {
 
     /// Increments to the next round.
     async fn try_increment_to_the_next_round(&self, next_round: u64) -> Result<()> {
+        let _guard = self.get_tracing_guard();
+
         // If the next round is within GC range, then iterate to the penultimate round.
         if self.current_round() + self.storage.max_gc_rounds() >= next_round {
             let mut fast_forward_round = self.current_round();
@@ -900,6 +937,8 @@ impl<N: Network> Primary<N> {
 
     /// Increments to the next round.
     async fn try_increment_to_the_next_round_lite(&self, next_round: u64) -> Result<()> {
+        let _guard = self.get_tracing_guard();
+
         // If the next round is within GC range, then iterate to the penultimate round.
         if self.current_round() + self.storage.max_gc_rounds() >= next_round {
             let mut fast_forward_round = self.current_round();
@@ -975,6 +1014,8 @@ impl<N: Network> Primary<N> {
         proposal: &Proposal<N>,
         committee: &Committee<N>,
     ) -> Result<()> {
+        let _guard = self.get_tracing_guard();
+
         // Create the batch certificate and transmissions.
         let (certificate, transmissions) = tokio::task::block_in_place(|| proposal.to_certificate(committee))?;
         // Convert the transmissions into a HashMap.
@@ -1027,6 +1068,7 @@ impl<N: Network> Primary<N> {
         peer_ip: SocketAddr,
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
+        let _guard = self.get_tracing_guard();
         // Retrieve the batch header.
         let batch_header = certificate.batch_header();
         // Retrieve the batch round.
@@ -1131,6 +1173,7 @@ impl<N: Network> Primary<N> {
             return Ok(Default::default());
         }
 
+        let _guard = self.get_tracing_guard();
         // Ensure this batch ID is new, otherwise return early.
         if self.storage.contains_batch(batch_header.batch_id()) {
             trace!("Batch for round {} from peer has already been processed", batch_header.round());
@@ -1182,6 +1225,7 @@ impl<N: Network> Primary<N> {
 
     /// Shuts down the primary.
     pub async fn shut_down(&self) {
+        let _guard = self.get_tracing_guard();
         info!("Shutting down the primary...");
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
@@ -1196,7 +1240,7 @@ impl<N: Network> Primary<N> {
                 ProposalCache::new(latest_round, proposal, signed_proposals, pending_certificates)
             };
 
-            if let Err(err) = proposal_cache.store(self.keep_state, &self.storage_mode) {
+            if let Err(err) = proposal_cache.store(&self.storage_mode, self.tracing.clone()) {
                 error!("Failed to store the current proposal cache: {err}");
             }
         }
@@ -1242,10 +1286,10 @@ mod tests {
 
         let account = accounts.first().unwrap().1.clone();
         let ledger = Arc::new(MockLedgerService::new(committee));
-        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10);
+        let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10, None);
 
         // Initialize the primary.
-        let mut primary = Primary::new(account, storage, false, StorageMode::Development(0), ledger).unwrap();
+        let mut primary = Primary::new(account, storage, false, StorageMode::Development(0), ledger, None).unwrap();
 
         // Construct a worker instance.
         primary.workers = Arc::from([Worker::new(
@@ -1253,6 +1297,7 @@ mod tests {
             primary.storage.clone(),
             primary.ledger.clone(),
             primary.proposed_batch.clone(),
+            None,
         )
         .unwrap()]);
 

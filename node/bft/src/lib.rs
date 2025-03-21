@@ -48,6 +48,10 @@ pub const MAX_LEADER_CERTIFICATE_DELAY_IN_SECS: i64 = 2 * MAX_BATCH_DELAY_IN_MS 
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of workers that can be spawned.
 pub const MAX_WORKERS: u8 = 1; // worker(s)
+/// The development mode RNG seed.
+pub const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
+/// The development mode number of genesis committee members.
+pub const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
 
 /// A helper macro to spawn a blocking task.
 #[macro_export]
