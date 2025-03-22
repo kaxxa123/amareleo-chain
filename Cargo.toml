@@ -57,9 +57,9 @@ default-features = false
 
 [workspace.dependencies.snarkvm] # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
 #path = "../snarkVM"
-git = "https://github.com/ProvableHQ/snarkVM.git"
-rev = "c15997f"
-#version = "=1.3.0"
+#git = "https://github.com/ProvableHQ/snarkVM.git"
+#rev = "c15997f"
+version = "=1.4.0"
 features = [ "circuit", "console", "rocks" ]
 
 [dependencies.anyhow]
