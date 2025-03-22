@@ -23,13 +23,10 @@ use snarkvm::prelude::{Ledger, Network, block::Block, store::ConsensusStorage};
 
 use aleo_std::StorageMode;
 use anyhow::Result;
-use core::future::Future;
-use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
     sync::{Arc, atomic::AtomicBool},
 };
-use tokio::task::JoinHandle;
 use tracing::subscriber::DefaultGuard;
 
 /// A validator is a full node, capable of validating blocks.
@@ -41,8 +38,6 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     consensus: Consensus<N>,
     /// The REST server of the node.
     rest: Option<Rest<N, C>>,
-    /// The spawned handles.
-    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// Tracing handle
     tracing: Option<TracingHandler>,
     /// The shutdown signal.
@@ -80,16 +75,12 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             ledger: ledger.clone(),
             consensus: consensus.clone(),
             rest: None,
-            handles: Default::default(),
             tracing: tracing.clone(),
             shutdown,
         };
 
         // Initialize the REST server.
         node.rest = Some(Rest::start(rest_ip, rest_rps, Some(consensus), ledger.clone(), tracing.clone()).await?);
-
-        // Initialize the notification message loop.
-        node.handles.lock().push(crate::start_notification_message_loop());
 
         // Return the node.
         Ok(node)
@@ -103,13 +94,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Returns the REST server.
     pub fn rest(&self) -> &Option<Rest<N, C>> {
         &self.rest
-    }
-}
-
-impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
-    /// Spawns a task with the given future; it should only be used for long-running tasks.
-    pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
-        self.handles.lock().push(tokio::spawn(future));
     }
 }
 
@@ -134,10 +118,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Shut down the node.
         trace!("Shutting down the node...");
         self.shutdown.store(true, std::sync::atomic::Ordering::Release);
-
-        // Abort the tasks.
-        trace!("Shutting down the validator...");
-        self.handles.lock().iter().for_each(|handle| handle.abort());
 
         // Shut down consensus.
         trace!("Shutting down consensus...");
