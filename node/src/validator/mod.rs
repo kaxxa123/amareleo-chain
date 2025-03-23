@@ -56,34 +56,31 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         tracing: Option<TracingHandler>,
         shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
+        let _guard = tracing.clone().map(|trace_handle| trace_handle.subscribe_thread());
+
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, storage_mode.clone())?;
 
-        // Initialize the ledger service.
+        // Initialize and start the Consensus
+        info!("Starting Consensus...");
         let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone(), tracing.clone(), shutdown.clone()));
-
-        // Initialize the consensus.
         let mut consensus =
             Consensus::new(account.clone(), ledger_service.clone(), keep_state, storage_mode.clone(), tracing.clone())?;
-        // Initialize the primary channels.
+
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
-        // Start the consensus.
         consensus.run(primary_sender, primary_receiver).await?;
 
-        // Initialize the node.
-        let mut node = Self {
-            ledger: ledger.clone(),
-            consensus: consensus.clone(),
-            rest: None,
-            tracing: tracing.clone(),
-            shutdown,
-        };
-
         // Initialize the REST server.
-        node.rest = Some(Rest::start(rest_ip, rest_rps, Some(consensus), ledger.clone(), tracing.clone()).await?);
+        info!("Starting the REST server...");
+        let rest_srv = Rest::start(rest_ip, rest_rps, Some(consensus.clone()), ledger.clone(), tracing.clone()).await;
+        if let Err(err) = rest_srv {
+            error!("Failed to start REST server: {:?}", err);
+            consensus.shut_down().await;
+            return Err(err);
+        }
 
         // Return the node.
-        Ok(node)
+        Ok(Self { ledger, consensus, rest: Some(rest_srv.unwrap()), tracing, shutdown })
     }
 
     /// Returns the ledger.
