@@ -28,11 +28,6 @@ pub mod mock;
 #[cfg(feature = "mock")]
 pub use mock::*;
 
-#[cfg(feature = "prover")]
-pub mod prover;
-#[cfg(feature = "prover")]
-pub use prover::*;
-
 pub mod traits;
 pub use traits::*;
 
