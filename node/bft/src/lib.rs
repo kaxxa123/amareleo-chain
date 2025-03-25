@@ -20,7 +20,6 @@
 #[macro_use]
 extern crate tracing;
 
-pub use amareleo_node_bft_events as events;
 pub use amareleo_node_bft_ledger_service as ledger_service;
 pub use amareleo_node_bft_storage_service as storage_service;
 

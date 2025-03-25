@@ -737,14 +737,7 @@ impl<N: Network> Primary<N> {
 impl<N: Network> Primary<N> {
     /// Starts the primary handlers.
     fn start_handlers(&self, primary_receiver: PrimaryReceiver<N>) {
-        let PrimaryReceiver {
-            rx_batch_propose: _,
-            rx_batch_signature: _,
-            rx_batch_certified: _,
-            rx_primary_ping: _,
-            mut rx_unconfirmed_solution,
-            mut rx_unconfirmed_transaction,
-        } = primary_receiver;
+        let PrimaryReceiver { mut rx_unconfirmed_solution, mut rx_unconfirmed_transaction } = primary_receiver;
 
         // Start the batch proposer.
         let self_ = self.clone();

@@ -26,7 +26,6 @@ members = [
   "tracing",
   "node", 
   "node/bft",
-  "node/bft/events",
   "node/bft/ledger-service",
   "node/bft/storage-service",
   "node/consensus",
