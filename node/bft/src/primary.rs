@@ -63,7 +63,10 @@ use std::{
     collections::{HashMap, HashSet},
     future::Future,
     net::SocketAddr,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 use tokio::{
@@ -84,7 +87,7 @@ pub struct Primary<N: Network> {
     /// The storage.
     storage: Storage<N>,
     /// Preserve the chain state on shutdown
-    keep_state: bool,
+    keep_state: Arc<AtomicBool>,
     /// The storage mode.
     storage_mode: StorageMode,
     /// The ledger service.
@@ -128,7 +131,7 @@ impl<N: Network> Primary<N> {
             sync,
             account,
             storage,
-            keep_state,
+            keep_state: Arc::new(AtomicBool::new(keep_state)),
             storage_mode,
             ledger,
             workers: Arc::from(vec![]),
@@ -236,6 +239,7 @@ impl<N: Network> Primary<N> {
         self.load_proposal_cache().await?;
         // Next, run the sync module.
         self.sync.run().await?;
+
         // Lastly, start the primary handlers.
         // Note: This ensures the primary does not start communicating before syncing is complete.
         self.start_handlers(primary_receiver);
@@ -1212,12 +1216,20 @@ impl<N: Network> Primary<N> {
     /// Shuts down the primary.
     pub async fn shut_down(&self) {
         let _guard = self.get_tracing_guard();
-        info!("Shutting down the primary...");
-        // Abort the tasks.
-        self.handles.lock().iter().for_each(|handle| handle.abort());
 
-        // Save the current proposal cache to disk.
-        if self.keep_state {
+        info!("Shutting down the primary...");
+        {
+            // Abort all primary tasks and clear the handles.
+            let mut handles = self.handles.lock();
+            handles.iter().for_each(|handle| handle.abort());
+            handles.clear();
+        }
+
+        // Save the current proposal cache to disk,
+        // and clear the keep_state ensuring this
+        // operation is only ran once.
+        let keep_state = self.keep_state.swap(false, Ordering::AcqRel);
+        if keep_state {
             let proposal_cache = {
                 let proposal = self.proposed_batch.write().take();
                 let signed_proposals = self.signed_proposals.read().clone();
