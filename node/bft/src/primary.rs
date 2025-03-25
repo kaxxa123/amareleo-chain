@@ -272,16 +272,6 @@ impl<N: Network> Primary<N> {
     pub fn num_workers(&self) -> u8 {
         u8::try_from(self.workers.len()).expect("Too many workers")
     }
-
-    /// Returns the workers.
-    pub const fn workers(&self) -> &Arc<[Worker<N>]> {
-        &self.workers
-    }
-
-    /// Returns the batch proposal of our primary, if one currently exists.
-    pub fn proposed_batch(&self) -> &Arc<ProposedBatch<N>> {
-        &self.proposed_batch
-    }
 }
 
 impl<N: Network> Primary<N> {
@@ -841,15 +831,13 @@ impl<N: Network> Primary<N> {
                     error!("Unable to determine the worker ID for the unconfirmed solution");
                     continue;
                 };
-                let self_ = self_.clone();
-                tokio::spawn(async move {
-                    // Retrieve the worker.
-                    let worker = &self_.workers[worker_id as usize];
-                    // Process the unconfirmed solution.
-                    let result = worker.process_unconfirmed_solution(solution_id, solution).await;
-                    // Send the result to the callback.
-                    callback.send(result).ok();
-                });
+
+                // Retrieve the worker.
+                let worker = &self_.workers[worker_id as usize];
+                // Process the unconfirmed solution.
+                let result = worker.process_unconfirmed_solution(solution_id, solution).await;
+                // Send the result to the callback.
+                callback.send(result).ok();
             }
         });
 
@@ -870,15 +858,13 @@ impl<N: Network> Primary<N> {
                     error!("Unable to determine the worker ID for the unconfirmed transaction");
                     continue;
                 };
-                let self_ = self_.clone();
-                tokio::spawn(async move {
-                    // Retrieve the worker.
-                    let worker = &self_.workers[worker_id as usize];
-                    // Process the unconfirmed transaction.
-                    let result = worker.process_unconfirmed_transaction(transaction_id, transaction).await;
-                    // Send the result to the callback.
-                    callback.send(result).ok();
-                });
+
+                // Retrieve the worker.
+                let worker = &self_.workers[worker_id as usize];
+                // Process the unconfirmed transaction.
+                let result = worker.process_unconfirmed_transaction(transaction_id, transaction).await;
+                // Send the result to the callback.
+                callback.send(result).ok();
             }
         });
     }
