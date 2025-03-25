@@ -77,7 +77,7 @@ pub struct BFT<N: Network> {
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The BFT lock.
-    lock: Arc<TMutex<()>>,
+    bft_lock: Arc<TMutex<()>>,
 }
 
 impl<N: Network> BFT<N> {
@@ -98,7 +98,7 @@ impl<N: Network> BFT<N> {
             consensus_sender: Default::default(),
             tracing: tracing.clone(),
             handles: Default::default(),
-            lock: Default::default(),
+            bft_lock: Default::default(),
         })
     }
 
@@ -472,7 +472,7 @@ impl<N: Network> BFT<N> {
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
         // Acquire the BFT lock.
-        let _lock = self.lock.lock().await;
+        let _lock = self.bft_lock.lock().await;
         let _guard = self.get_tracing_guard();
 
         // Retrieve the certificate round.
@@ -906,13 +906,18 @@ impl<N: Network> BFT<N> {
     /// Shuts down the BFT.
     pub async fn shut_down(&self) {
         let _guard = self.get_tracing_guard();
+
         info!("Shutting down the BFT...");
         // Acquire the lock.
-        let _lock = self.lock.lock().await;
+        let _lock = self.bft_lock.lock().await;
+
         // Shut down the primary.
         self.primary.shut_down().await;
+
         // Abort the tasks.
-        self.handles.lock().iter().for_each(|handle| handle.abort());
+        let mut handles = self.handles.lock();
+        handles.iter().for_each(|handle| handle.abort());
+        handles.clear();
     }
 }
 
