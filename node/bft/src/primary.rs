@@ -211,7 +211,10 @@ impl<N: Network> Primary<N> {
         // Set the BFT sender.
         if let Some(bft_sender) = &bft_sender {
             // Set the BFT sender in the primary.
-            self.bft_sender.set(bft_sender.clone()).expect("BFT sender already set");
+            if self.bft_sender.set(bft_sender.clone()).is_err() {
+                error!("Unexpected: BFT sender already set");
+                bail!("Unexpected: BFT sender already set");
+            }
         }
 
         // Construct a map for the workers.
@@ -333,29 +336,26 @@ impl<N: Network> Primary<N> {
     pub async fn propose_batch(&self) -> Result<()> {
         let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
         let mut all_acc: Vec<Account<N>> = Vec::new();
-
         for _ in 0u64..4u64 {
             let private_key = PrivateKey::<N>::new(&mut rng)?;
-            let acc = Account::<N>::try_from(private_key).expect("Failed to initialize account with private key");
+            let acc = Account::<N>::try_from(private_key)?;
             all_acc.push(acc);
         }
 
         // Submit proposal for validator with id 0
-        let primary_addr = all_acc[0].address();
-        let other_acc: Vec<&Account<N>> = all_acc.iter().filter(|acc| acc.address() != primary_addr).collect();
-
+        let other_acc: Vec<&Account<N>> = all_acc.iter().skip(1).collect();
         let round = self.propose_batch_lite(&other_acc).await?;
         if round == 0u64 {
             return Ok(());
         }
 
         // Submit empty proposals for other validators
-        for vid in 1..all_acc.len() {
-            let primary_acc = &all_acc[vid];
+        for vid in 1u64..4u64 {
+            let primary_acc = &all_acc[vid as usize];
             let other_acc: Vec<&Account<N>> =
                 all_acc.iter().filter(|acc| acc.address() != primary_acc.address()).collect();
 
-            self.fake_proposal(vid.try_into().unwrap(), primary_acc, &other_acc, round).await?;
+            self.fake_proposal(vid, primary_acc, &other_acc, round).await?;
         }
         Ok(())
     }
