@@ -87,7 +87,9 @@ pub struct Primary<N: Network> {
     /// The storage.
     storage: Storage<N>,
     /// Preserve the chain state on shutdown
-    keep_state: Arc<AtomicBool>,
+    keep_state: bool,
+    /// Set if primary is initialized and requires saving state on shutdown
+    save_pending: Arc<AtomicBool>,
     /// The storage mode.
     storage_mode: StorageMode,
     /// The ledger service.
@@ -131,7 +133,8 @@ impl<N: Network> Primary<N> {
             sync,
             account,
             storage,
-            keep_state: Arc::new(AtomicBool::new(keep_state)),
+            keep_state,
+            save_pending: Arc::new(AtomicBool::new(false)),
             storage_mode,
             ledger,
             workers: Arc::from(vec![]),
@@ -246,6 +249,11 @@ impl<N: Network> Primary<N> {
         // Lastly, start the primary handlers.
         // Note: This ensures the primary does not start communicating before syncing is complete.
         self.start_handlers(primary_receiver);
+
+        // Once everything is initialized. Enable saving of state on shutdown.
+        if self.keep_state {
+            self.save_pending.store(true, Ordering::Relaxed);
+        }
 
         Ok(())
     }
@@ -1219,10 +1227,10 @@ impl<N: Network> Primary<N> {
         }
 
         // Save the current proposal cache to disk,
-        // and clear the keep_state ensuring this
+        // and clear save_pending ensuring this
         // operation is only ran once.
-        let keep_state = self.keep_state.swap(false, Ordering::AcqRel);
-        if keep_state {
+        let save_pending = self.save_pending.swap(false, Ordering::AcqRel);
+        if save_pending {
             let proposal_cache = {
                 let proposal = self.proposed_batch.write().take();
                 let signed_proposals = self.signed_proposals.read().clone();
