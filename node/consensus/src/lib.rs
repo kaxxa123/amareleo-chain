@@ -149,15 +149,27 @@ impl<N: Network> Consensus<N> {
     pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
         let _guard = self.get_tracing_guard();
         info!("Starting the consensus instance...");
-        // Set the primary sender.
-        self.primary_sender.set(primary_sender.clone()).expect("Primary sender already set");
 
-        // First, initialize the consensus channels.
+        // Set the primary sender.
+        let result = self.primary_sender.set(primary_sender.clone());
+        if result.is_err() {
+            bail!("Unexpected: Primary sender already set");
+        }
+
+        // Initialize communications between Consensus and BFT.
         let (consensus_sender, consensus_receiver) = init_consensus_channels();
-        // Then, start the consensus handlers.
+
+        // Start the Consensus handlers.
         self.start_handlers(consensus_receiver);
-        // Lastly, the consensus.
-        self.bft.run(Some(consensus_sender), primary_sender, primary_receiver).await?;
+
+        // Run the BFT.
+        let result = self.bft.run(Some(consensus_sender), primary_sender, primary_receiver).await;
+        if let Err(err) = result {
+            error!("Consensus failed to run the BFT instance - {err}");
+            self.shut_down().await;
+            return Err(err);
+        }
+
         Ok(())
     }
 
@@ -172,7 +184,7 @@ impl<N: Network> Consensus<N> {
     }
 
     /// Returns the primary sender.
-    pub fn primary_sender(&self) -> &PrimarySender<N> {
+    fn primary_sender(&self) -> &PrimarySender<N> {
         self.primary_sender.get().expect("Primary sender not set")
     }
 
@@ -634,9 +646,13 @@ impl<N: Network> Consensus<N> {
     pub async fn shut_down(&self) {
         let _guard = self.get_tracing_guard();
         info!("Shutting down consensus...");
+
         // Shut down the BFT.
         self.bft.shut_down().await;
-        // Abort the tasks.
-        self.handles.lock().iter().for_each(|handle| handle.abort());
+
+        // Abort Consensus tasks.
+        let mut handles = self.handles.lock();
+        handles.iter().for_each(|handle| handle.abort());
+        handles.clear();
     }
 }
