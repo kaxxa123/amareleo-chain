@@ -110,17 +110,33 @@ impl<N: Network> BFT<N> {
         primary_receiver: PrimaryReceiver<N>,
     ) -> Result<()> {
         let _guard = self.get_tracing_guard();
+
         info!("Starting the BFT instance...");
-        // Initialize the BFT channels.
+
+        // Initialize communications between BFT and Primary.
         let (bft_sender, bft_receiver) = init_bft_channels::<N>();
-        // First, start the BFT handlers.
+
+        // Start the BFT handlers.
         self.start_handlers(bft_receiver);
-        // Next, run the primary instance.
-        self.primary.run(Some(bft_sender), primary_sender, primary_receiver).await?;
+
+        // Run the primary instance.
+        let result = self.primary.run(Some(bft_sender), primary_sender, primary_receiver).await;
+        if let Err(err) = result {
+            error!("BFT failed to run the primary instance - {err}");
+            self.shut_down().await;
+            return Err(err);
+        }
+
         // Lastly, set the consensus sender.
-        // Note: This ensures during initial syncing, that the BFT does not advance the ledger.
+        // Note: This ensures that during initial syncing,
+        // the BFT does not advance the ledger.
         if let Some(consensus_sender) = consensus_sender {
-            self.consensus_sender.set(consensus_sender).expect("Consensus sender already set");
+            let result = self.consensus_sender.set(consensus_sender);
+            if result.is_err() {
+                self.shut_down().await;
+                error!("Consensus sender already set");
+                bail!("Consensus sender already set");
+            }
         }
         Ok(())
     }
@@ -898,7 +914,7 @@ impl<N: Network> BFT<N> {
         // Shut down the primary.
         self.primary.shut_down().await;
 
-        // Abort the tasks.
+        // Abort BFT tasks.
         let mut handles = self.handles.lock();
         handles.iter().for_each(|handle| handle.abort());
         handles.clear();
