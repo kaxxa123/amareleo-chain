@@ -46,10 +46,7 @@ use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
     net::TcpListener,
-    sync::{
-        oneshot,
-        oneshot::{Receiver, Sender},
-    },
+    sync::{oneshot, watch},
     task::JoinHandle,
 };
 use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
@@ -68,8 +65,10 @@ pub struct Rest<N: Network, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
     /// Tracing handle
     tracing: Option<TracingHandler>,
-    /// shutdown signal
-    shutdown_tx: Arc<Mutex<Option<Sender<()>>>>,
+    /// signal to initiate shutdown
+    shutdown_trigger_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>,
+    /// signal of completed shutdown
+    shutdown_complete_rx: Arc<Mutex<Option<watch::Receiver<bool>>>>,
     /// The server handles.
     rest_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
@@ -88,7 +87,8 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
             consensus,
             ledger,
             tracing,
-            shutdown_tx: Arc::new(Mutex::new(None)),
+            shutdown_trigger_tx: Arc::new(Mutex::new(None)),
+            shutdown_complete_rx: Arc::new(Mutex::new(None)),
             rest_handle: Arc::new(Mutex::new(None)),
         };
         // Spawn the server.
@@ -97,20 +97,51 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
         Ok(server)
     }
 
+    pub fn is_finished(&self) -> bool {
+        let lock = self.rest_handle.lock();
+        if let Some(handle) = lock.as_ref() { handle.is_finished() } else { true }
+    }
+
+    pub async fn wait_finish(&self) -> Result<()> {
+        let _guard = self.get_tracing_guard();
+
+        if self.is_finished() {
+            info!("REST server already shutdown.");
+            return Ok(());
+        }
+
+        // Clone the shutdown complete signal receiver
+        let rx_option = {
+            let lock = self.shutdown_complete_rx.lock();
+            lock.as_ref().map(|opt| opt.clone())
+        };
+
+        if let Some(mut rx) = rx_option {
+            // Wait for completion
+            while !*rx.borrow() {
+                if rx.changed().await.is_err() {
+                    bail!("REST shutdown completed signal errored!");
+                }
+            }
+
+            let _guard = self.get_tracing_guard();
+            info!("REST shutdown completed signal received.");
+        } else {
+            bail!("REST shutdown completed signal NOT found!");
+        }
+
+        Ok(())
+    }
+
     pub async fn shut_down(&self) {
         // Extract and replace with None
-        let shutdown_option = self.shutdown_tx.lock().take();
+        let shutdown_option = self.shutdown_trigger_tx.lock().take();
         if let Some(tx) = shutdown_option {
             let _ = tx.send(()); // Send shutdown signal
         }
 
-        // Extract and replace with None
-        let handle_option = self.rest_handle.lock().take();
-        if let Some(handle) = handle_option {
-            let _ = handle.await;
-        }
-
-        info!("REST server shutdown completed.");
+        // Await for the server to shutdown
+        let _ = self.wait_finish().await;
     }
 }
 
@@ -139,23 +170,24 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         debug!("REST rate limit per IP - {rest_rps} RPS");
 
         // Prepare the rate limiting setup.
-        let governor_config = Box::new(
-            GovernorConfigBuilder::default()
-                .per_nanosecond((1_000_000_000 / rest_rps) as u64)
-                .burst_size(rest_rps)
-                .error_handler(|error| {
-                    // Properly return a 429 Too Many Requests error
-                    let error_message = error.to_string();
-                    let mut response = Response::new(error_message.clone().into());
-                    *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-                    if error_message.contains("Too Many Requests") {
-                        *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
-                    }
-                    response
-                })
-                .finish()
-                .expect("Couldn't set up rate limiting for the REST server!"),
-        );
+        let governor_config = match GovernorConfigBuilder::default()
+            .per_nanosecond((1_000_000_000 / rest_rps) as u64)
+            .burst_size(rest_rps)
+            .error_handler(|error| {
+                // Properly return a 429 Too Many Requests error
+                let error_message = error.to_string();
+                let mut response = Response::new(error_message.clone().into());
+                *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                if error_message.contains("Too Many Requests") {
+                    *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
+                }
+                response
+            })
+            .finish()
+        {
+            Some(config) => Box::new(config),
+            None => bail!("Couldn't set up rate limiting for the REST server"),
+        };
 
         // Get the network being used.
         let network = match N::ID {
@@ -319,21 +351,31 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                 })
         };
 
-        // Create a oneshot channel to signal when the server is done
-        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+        // Create channels to signal the server to shutdown, and to signal when the server has shutdown.
+        let (shutdown_trigger_tx, shutdown_trigger_rx) = oneshot::channel::<()>();
+        let (shutdown_complete_tx, shutdown_complete_rx) = watch::channel::<bool>(false);
+        let tracing_ = self.tracing.clone();
 
+        // Bind the REST server and catch port conflict errors
         let rest_listener =
             TcpListener::bind(rest_ip).await.map_err(|err| anyhow!("Failed to bind to {}: {}", rest_ip, err))?;
 
         let serve_handle = tokio::spawn(async move {
-            axum::serve(rest_listener, router.into_make_service_with_connect_info::<SocketAddr>())
-                .with_graceful_shutdown(Self::shutdown_wait(shutdown_rx))
-                .await
-                .expect("couldn't start rest server");
+            let result = axum::serve(rest_listener, router.into_make_service_with_connect_info::<SocketAddr>())
+                .with_graceful_shutdown(Self::shutdown_wait(shutdown_trigger_rx))
+                .await;
+
+            if let Err(error) = result {
+                let _guard = tracing_.map(|trace_handle| trace_handle.subscribe_thread());
+                error!("Couldn't start REST server: {}", error);
+            }
+
+            let _ = shutdown_complete_tx.send(true);
         });
 
         *self.rest_handle.lock() = Some(serve_handle);
-        *self.shutdown_tx.lock() = Some(shutdown_tx);
+        *self.shutdown_trigger_tx.lock() = Some(shutdown_trigger_tx);
+        *self.shutdown_complete_rx.lock() = Some(shutdown_complete_rx);
 
         Ok(())
     }
@@ -350,7 +392,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         Ok(next.run(request).await)
     }
 
-    async fn shutdown_wait(shutdown_rx: Receiver<()>) {
+    async fn shutdown_wait(shutdown_rx: oneshot::Receiver<()>) {
         if let Err(error) = shutdown_rx.await {
             error!("REST server shutdown signaling error: {}", error);
         }
