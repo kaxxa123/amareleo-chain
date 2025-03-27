@@ -23,7 +23,6 @@ use std::{
     path::PathBuf,
     result::Result::Ok,
     sync::{Arc, atomic::AtomicBool},
-    time::Duration,
 };
 use tokio::runtime::{self, Runtime};
 
@@ -206,9 +205,9 @@ impl Start {
 
                     let term_msg = &r#"
 ==========================================================================================
-⚠️  Attention - Starting the graceful shutdown procedure (ETA: 30 seconds)...
+⚠️  Attention - Starting the graceful shutdown procedure...
 ⚠️  Attention - Avoid DATA CORRUPTION, do NOT interrupt amareleo (or press Ctrl+C again)
-⚠️  Attention - Please wait until the shutdown gracefully completes (ETA: 30 seconds)
+⚠️  Attention - Please wait until the shutdown gracefully completes.
 ==========================================================================================
 "#;
                     println!("{}", term_msg);
@@ -216,9 +215,6 @@ impl Start {
 
                     // Shut down the node.
                     node_api.end().await;
-
-                    // A best-effort attempt to let any ongoing activity conclude.
-                    tokio::time::sleep(Duration::from_secs(3)).await;
 
                     // Terminate the process.
                     std::process::exit(0);
