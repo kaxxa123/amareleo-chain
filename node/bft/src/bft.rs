@@ -30,7 +30,7 @@ use crate::{
 };
 use aleo_std::StorageMode;
 use amareleo_chain_account::Account;
-use amareleo_chain_tracing::TracingHandler;
+use amareleo_chain_tracing::{TracingHandler, TracingHandlerGuard};
 use amareleo_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::account::Address,
@@ -80,6 +80,13 @@ pub struct BFT<N: Network> {
     bft_lock: Arc<TMutex<()>>,
 }
 
+impl<N: Network> TracingHandlerGuard for BFT<N> {
+    /// Retruns tracing guard
+    fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.as_ref().and_then(|trace_handle| trace_handle.get_tracing_guard())
+    }
+}
+
 impl<N: Network> BFT<N> {
     /// Initializes a new instance of the BFT.
     pub fn new(
@@ -109,9 +116,7 @@ impl<N: Network> BFT<N> {
         primary_sender: PrimarySender<N>,
         primary_receiver: PrimaryReceiver<N>,
     ) -> Result<()> {
-        let _guard = self.get_tracing_guard();
-
-        info!("Starting the BFT instance...");
+        guard_info!(self, "Starting the BFT instance...");
 
         // Initialize communications between BFT and Primary.
         let (bft_sender, bft_receiver) = init_bft_channels::<N>();
@@ -122,7 +127,7 @@ impl<N: Network> BFT<N> {
         // Run the primary instance.
         let result = self.primary.run(Some(bft_sender), primary_sender, primary_receiver).await;
         if let Err(err) = result {
-            error!("BFT failed to run the primary instance - {err}");
+            guard_error!(self, "BFT failed to run the primary instance - {err}");
             self.shut_down().await;
             return Err(err);
         }
@@ -134,7 +139,7 @@ impl<N: Network> BFT<N> {
             let result = self.consensus_sender.set(consensus_sender);
             if result.is_err() {
                 self.shut_down().await;
-                error!("Consensus sender already set");
+                guard_error!(self, "Consensus sender already set");
                 bail!("Consensus sender already set");
             }
         }
@@ -169,11 +174,6 @@ impl<N: Network> BFT<N> {
     /// Returns the certificate of the leader from the current even round, if one was present.
     pub const fn leader_certificate(&self) -> &Arc<RwLock<Option<BatchCertificate<N>>>> {
         &self.leader_certificate
-    }
-
-    /// Retruns tracing guard
-    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
-        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
     }
 }
 
@@ -224,12 +224,11 @@ impl<N: Network> BFT<N> {
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
     fn update_to_next_round(&self, current_round: u64) -> bool {
-        let _guard = self.get_tracing_guard();
-
         // Ensure the current round is at least the storage round (this is a sanity check).
         let storage_round = self.storage().current_round();
         if current_round < storage_round {
-            debug!(
+            guard_debug!(
+                self,
                 "BFT is safely skipping an update for round {current_round}, as storage is at round {storage_round}"
             );
             return false;
@@ -258,22 +257,30 @@ impl<N: Network> BFT<N> {
             if let Some(leader_certificate) = self.leader_certificate.read().as_ref() {
                 // Ensure the state of the leader certificate is consistent with the BFT being ready.
                 if !is_ready {
-                    trace!(is_ready, "BFT - A leader certificate was found, but 'is_ready' is false");
+                    guard_trace!(self, is_ready, "BFT - A leader certificate was found, but 'is_ready' is false");
                 }
                 // Log the leader election.
                 let leader_round = leader_certificate.round();
                 match leader_round == current_round {
                     true => {
-                        info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author());
+                        guard_info!(
+                            self,
+                            "\n\nRound {current_round} elected a leader - {}\n",
+                            leader_certificate.author()
+                        );
                         #[cfg(feature = "metrics")]
                         metrics::increment_counter(metrics::bft::LEADERS_ELECTED);
                     }
-                    false => warn!("BFT failed to elect a leader for round {current_round} (!= {leader_round})"),
+                    false => {
+                        guard_warn!(self, "BFT failed to elect a leader for round {current_round} (!= {leader_round})")
+                    }
                 }
             } else {
                 match is_ready {
-                    true => info!("\n\nRound {current_round} reached quorum without a leader\n"),
-                    false => info!("{}", format!("\n\nRound {current_round} did not elect a leader\n").dimmed()),
+                    true => guard_info!(self, "\n\nRound {current_round} reached quorum without a leader\n"),
+                    false => {
+                        guard_info!(self, "{}", format!("\n\nRound {current_round} did not elect a leader\n").dimmed())
+                    }
                 }
             }
         }
@@ -282,7 +289,7 @@ impl<N: Network> BFT<N> {
         if is_ready {
             // Update to the next round in storage.
             if let Err(e) = self.storage().increment_to_next_round(current_round) {
-                warn!("BFT failed to increment to the next round from round {current_round} - {e}");
+                guard_warn!(self, "BFT failed to increment to the next round from round {current_round} - {e}");
                 return false;
             }
             // Update the timer for the leader certificate.
@@ -298,18 +305,20 @@ impl<N: Network> BFT<N> {
     /// This method runs on every even round, by determining the leader of the current even round,
     /// and setting the leader certificate to their certificate in the round, if they were present.
     fn update_leader_certificate_to_even_round(&self, even_round: u64) -> bool {
-        let _guard = self.get_tracing_guard();
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
         if current_round != even_round {
-            warn!("BFT storage (at round {current_round}) is out of sync with the current even round {even_round}");
+            guard_warn!(
+                self,
+                "BFT storage (at round {current_round}) is out of sync with the current even round {even_round}"
+            );
             return false;
         }
 
         // If the current round is odd, return false.
         if current_round % 2 != 0 || current_round < 2 {
-            error!("BFT cannot update the leader certificate in an odd round");
+            guard_error!(self, "BFT cannot update the leader certificate in an odd round");
             return false;
         }
 
@@ -326,7 +335,10 @@ impl<N: Network> BFT<N> {
         let committee_lookback = match self.ledger().get_committee_lookback_for_round(current_round) {
             Ok(committee) => committee,
             Err(e) => {
-                error!("BFT failed to retrieve the committee lookback for the even round {current_round} - {e}");
+                guard_error!(
+                    self,
+                    "BFT failed to retrieve the committee lookback for the even round {current_round} - {e}"
+                );
                 return false;
             }
         };
@@ -339,7 +351,7 @@ impl<N: Network> BFT<N> {
                 // let computed_leader = match committee_lookback.get_leader(current_round) {
                 //     Ok(leader) => leader,
                 //     Err(e) => {
-                //         error!("BFT failed to compute the leader for the even round {current_round} - {e}");
+                //         guard_error!(self, "BFT failed to compute the leader for the even round {current_round} - {e}");
                 //         return false;
                 //     }
                 // };
@@ -366,13 +378,11 @@ impl<N: Network> BFT<N> {
         committee: Committee<N>,
         current_round: u64,
     ) -> bool {
-        let _guard = self.get_tracing_guard();
-
         // Retrieve the authors for the current round.
         let authors = certificates.into_iter().map(|c| c.author()).collect();
         // Check if quorum threshold is reached.
         if !committee.is_quorum_threshold_reached(&authors) {
-            trace!("BFT failed to reach quorum threshold in even round {current_round}");
+            guard_trace!(self, "BFT failed to reach quorum threshold in even round {current_round}");
             return false;
         }
         // If the leader certificate is set for the current even round, return 'true'.
@@ -383,7 +393,10 @@ impl<N: Network> BFT<N> {
         }
         // If the timer has expired, and we can achieve quorum threshold (N - f) without the leader, return 'true'.
         if self.is_timer_expired() {
-            debug!("BFT (timer expired) - Advancing from round {current_round} to the next round (without the leader)");
+            guard_debug!(
+                self,
+                "BFT (timer expired) - Advancing from round {current_round} to the next round (without the leader)"
+            );
             return true;
         }
         // Otherwise, return 'false'.
@@ -400,18 +413,19 @@ impl<N: Network> BFT<N> {
     ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
     ///  - The leader certificate timer has expired.
     fn is_leader_quorum_or_nonleaders_available(&self, odd_round: u64) -> bool {
-        let _guard = self.get_tracing_guard();
-
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
         if current_round != odd_round {
-            warn!("BFT storage (at round {current_round}) is out of sync with the current odd round {odd_round}");
+            guard_warn!(
+                self,
+                "BFT storage (at round {current_round}) is out of sync with the current odd round {odd_round}"
+            );
             return false;
         }
         // If the current round is even, return false.
         if current_round % 2 != 1 {
-            error!("BFT does not compute stakes for the leader certificate in an even round");
+            guard_error!(self, "BFT does not compute stakes for the leader certificate in an even round");
             return false;
         }
         // Retrieve the certificates for the current round.
@@ -420,7 +434,10 @@ impl<N: Network> BFT<N> {
         let committee_lookback = match self.ledger().get_committee_lookback_for_round(current_round) {
             Ok(committee) => committee,
             Err(e) => {
-                error!("BFT failed to retrieve the committee lookback for the odd round {current_round} - {e}");
+                guard_error!(
+                    self,
+                    "BFT failed to retrieve the committee lookback for the odd round {current_round} - {e}"
+                );
                 return false;
             }
         };
@@ -428,7 +445,7 @@ impl<N: Network> BFT<N> {
         let authors = current_certificates.clone().into_iter().map(|c| c.author()).collect();
         // Check if quorum threshold is reached.
         if !committee_lookback.is_quorum_threshold_reached(&authors) {
-            trace!("BFT failed reach quorum threshold in odd round {current_round}. ");
+            guard_trace!(self, "BFT failed reach quorum threshold in odd round {current_round}. ");
             return false;
         }
         // Retrieve the leader certificate.
@@ -489,12 +506,10 @@ impl<N: Network> BFT<N> {
     ) -> Result<()> {
         // Acquire the BFT lock.
         let _lock = self.bft_lock.lock().await;
-        let _guard = self.get_tracing_guard();
-
         // Retrieve the certificate round.
         let certificate_round = certificate.round();
         // Insert the certificate into the DAG.
-        self.dag.write().insert(certificate, self.tracing.clone());
+        self.dag.write().insert(certificate, self);
 
         // Construct the commit round.
         let commit_round = certificate_round.saturating_sub(1);
@@ -508,7 +523,7 @@ impl<N: Network> BFT<N> {
         }
 
         /* Proceeding to check if the leader is ready to be committed. */
-        info!("Checking if the leader is ready to be committed for round {commit_round}...");
+        guard_info!(self, "Checking if the leader is ready to be committed for round {commit_round}...");
 
         // Retrieve the committee lookback for the commit round.
         let Ok(committee_lookback) = self.ledger().get_committee_lookback_for_round(commit_round) else {
@@ -535,7 +550,7 @@ impl<N: Network> BFT<N> {
         // Retrieve the leader certificate for the commit round.
         let Some(leader_certificate) = self.dag.read().get_certificate_for_round_with_author(commit_round, leader)
         else {
-            trace!("BFT did not find the leader certificate for commit round {commit_round} yet");
+            guard_trace!(self, "BFT did not find the leader certificate for commit round {commit_round} yet");
             return Ok(());
         };
         // Retrieve all of the certificates for the **certificate** round.
@@ -554,12 +569,12 @@ impl<N: Network> BFT<N> {
         // Check if the leader is ready to be committed.
         if !committee_lookback.is_availability_threshold_reached(&authors) {
             // If the leader is not ready to be committed, return early.
-            trace!("BFT is not ready to commit {commit_round}");
+            guard_trace!(self, "BFT is not ready to commit {commit_round}");
             return Ok(());
         }
 
         /* Proceeding to commit the leader. */
-        info!("Proceeding to commit round {commit_round} with leader '{}'", fmt_id(leader));
+        guard_info!(self, "Proceeding to commit round {commit_round} with leader '{}'", fmt_id(leader));
 
         // Commit the leader certificate, and all previous leader certificates since the last committed round.
         self.commit_leader_certificate::<ALLOW_LEDGER_ACCESS, IS_SYNCING>(leader_certificate).await
@@ -570,8 +585,6 @@ impl<N: Network> BFT<N> {
         &self,
         leader_certificate: BatchCertificate<N>,
     ) -> Result<()> {
-        let _guard = self.get_tracing_guard();
-
         // Fetch the leader round.
         let latest_leader_round = leader_certificate.round();
         // Determine the list of all previous leader certificates since the last committed round.
@@ -725,17 +738,18 @@ impl<N: Network> BFT<N> {
                     match callback_receiver.await {
                         Ok(Ok(())) => (), // continue
                         Ok(Err(e)) => {
-                            error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
+                            guard_error!(self, "BFT failed to advance the subdag for round {anchor_round} - {e}");
                             return Ok(());
                         }
                         Err(e) => {
-                            error!("BFT failed to receive the callback for round {anchor_round} - {e}");
+                            guard_error!(self, "BFT failed to receive the callback for round {anchor_round} - {e}");
                             return Ok(());
                         }
                     }
                 }
 
-                info!(
+                guard_info!(
+                    self,
                     "\n\nCommitting a subdag from round {anchor_round} with {num_transmissions} transmissions: {subdag_metadata:?}\n"
                 );
             }
@@ -905,9 +919,7 @@ impl<N: Network> BFT<N> {
 
     /// Shuts down the BFT.
     pub async fn shut_down(&self) {
-        let _guard = self.get_tracing_guard();
-
-        info!("Shutting down the BFT...");
+        guard_info!(self, "Shutting down the BFT...");
         // Acquire the lock.
         let _lock = self.bft_lock.lock().await;
 

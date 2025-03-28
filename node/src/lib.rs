@@ -20,6 +20,9 @@
 #[macro_use]
 extern crate tracing;
 
+#[macro_use]
+extern crate amareleo_chain_tracing;
+
 pub use amareleo_node_bft as bft;
 pub use amareleo_node_consensus as consensus;
 pub use amareleo_node_rest as rest;

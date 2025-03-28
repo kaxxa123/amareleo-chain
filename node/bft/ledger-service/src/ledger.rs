@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::{LedgerService, fmt_id, spawn_blocking};
-use amareleo_chain_tracing::TracingHandler;
+use amareleo_chain_tracing::{TracingHandler, TracingHandlerGuard};
 use snarkvm::{
     ledger::{
         Ledger,
@@ -60,17 +60,19 @@ pub struct CoreLedgerService<N: Network, C: ConsensusStorage<N>> {
     shutdown: Arc<AtomicBool>,
 }
 
+impl<N: Network, C: ConsensusStorage<N>> TracingHandlerGuard for CoreLedgerService<N, C> {
+    /// Retruns tracing guard
+    fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.as_ref().and_then(|trace_handle| trace_handle.get_tracing_guard())
+    }
+}
+
 impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     /// Initializes a new core ledger service.
     pub fn new(ledger: Ledger<N, C>, tracing: Option<TracingHandler>, shutdown: Arc<AtomicBool>) -> Self {
         let committee_cache = Arc::new(Mutex::new(LruCache::new(COMMITTEE_CACHE_SIZE.try_into().unwrap())));
         let block_cache = Arc::new(RwLock::new(BTreeMap::new()));
         Self { ledger, committee_cache, block_cache, latest_leader: Default::default(), tracing, shutdown }
-    }
-
-    /// Retruns tracing guard
-    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
-        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
     }
 }
 
@@ -384,8 +386,6 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
     /// Adds the given block as the next block in the ledger.
     #[cfg(feature = "ledger-write")]
     fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
-        let _guard = self.get_tracing_guard();
-
         // If the Ctrl-C handler registered the signal, then skip advancing to the next block.
         if self.shutdown.load(Ordering::Acquire) {
             bail!("Skipping advancing to block {} - The node is shutting down", block.height());
@@ -414,7 +414,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             metrics::update_block_metrics(block);
         }
 
-        tracing::info!("\n\nAdvanced to block {} at round {} - {}\n", block.height(), block.round(), block.hash());
+        guard_info!(self, "\n\nAdvanced to block {} at round {} - {}\n", block.height(), block.round(), block.hash());
         Ok(())
     }
 }

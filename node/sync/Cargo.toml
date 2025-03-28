@@ -27,6 +27,3 @@ version = "1"
 
 [dependencies.snarkvm]
 workspace = true
-
-[dependencies.tracing]
-version = "0.1"

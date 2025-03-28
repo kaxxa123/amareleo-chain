@@ -368,7 +368,6 @@ dependencies = [
  "indexmap 2.7.0",
  "serde",
  "snarkvm",
- "tracing",
 ]
 
 [[package]]

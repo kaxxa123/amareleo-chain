@@ -16,6 +16,12 @@
 #![forbid(unsafe_code)]
 
 #[macro_use]
+extern crate tracing;
+
+#[macro_use]
+extern crate amareleo_chain_tracing;
+
+#[macro_use]
 extern crate async_trait;
 
 #[cfg(feature = "ledger")]

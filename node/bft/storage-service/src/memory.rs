@@ -19,10 +19,10 @@ use snarkvm::{
     prelude::{Field, Network, Result, bail},
 };
 
+use amareleo_chain_tracing::{TracingHandler, TracingHandlerGuard};
 use indexmap::{IndexMap, IndexSet, indexset, map::Entry};
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet};
-use tracing::error;
 
 /// A BFT in-memory storage service.
 #[derive(Debug)]
@@ -124,7 +124,10 @@ impl<N: Network> StorageService<N> for BFTMemoryService<N> {
                         if !aborted_transmission_ids.contains(&transmission_id)
                             && !self.contains_transmission(transmission_id)
                         {
-                            error!("Failed to provide a missing transmission {transmission_id}");
+                            guard_error!(
+                                TracingHandler::new(),
+                                "Failed to provide a missing transmission {transmission_id}"
+                            );
                         }
                         continue 'outer;
                     };

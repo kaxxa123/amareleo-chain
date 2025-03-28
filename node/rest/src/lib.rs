@@ -18,12 +18,15 @@
 #[macro_use]
 extern crate tracing;
 
+#[macro_use]
+extern crate amareleo_chain_tracing;
+
 mod helpers;
 pub use helpers::*;
 
 mod routes;
 
-use amareleo_chain_tracing::TracingHandler;
+use amareleo_chain_tracing::{TracingHandler, TracingHandlerGuard};
 use amareleo_node_consensus::Consensus;
 use snarkvm::{
     console::{program::ProgramID, types::Field},
@@ -103,10 +106,8 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
     }
 
     pub async fn wait_finish(&self) -> Result<()> {
-        let _guard = self.get_tracing_guard();
-
         if self.is_finished() {
-            info!("REST server already shutdown.");
+            guard_info!(self, "REST server already shutdown.");
             return Ok(());
         }
 
@@ -124,8 +125,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
                 }
             }
 
-            let _guard = self.get_tracing_guard();
-            info!("REST shutdown completed signal received.");
+            guard_info!(self, "REST shutdown completed signal received.");
         } else {
             bail!("REST shutdown completed signal NOT found!");
         }
@@ -153,21 +153,19 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
 
     /// Retruns tracing guard
     pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
-        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
+        self.tracing.as_ref().and_then(|trace_handle| trace_handle.get_tracing_guard())
     }
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     async fn spawn_server(&mut self, rest_ip: SocketAddr, rest_rps: u32) -> Result<()> {
-        let _guard = self.get_tracing_guard();
-
         let cors = CorsLayer::new()
             .allow_origin(Any)
             .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers([CONTENT_TYPE]);
 
         // Log the REST rate limit per IP.
-        debug!("REST rate limit per IP - {rest_rps} RPS");
+        guard_debug!(self, "REST rate limit per IP - {rest_rps} RPS");
 
         // Prepare the rate limiting setup.
         let governor_config = match GovernorConfigBuilder::default()
@@ -354,7 +352,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         // Create channels to signal the server to shutdown, and to signal when the server has shutdown.
         let (shutdown_trigger_tx, shutdown_trigger_rx) = oneshot::channel::<()>();
         let (shutdown_complete_tx, shutdown_complete_rx) = watch::channel::<bool>(false);
-        let tracing_ = self.tracing.clone();
+        let tracing_: TracingHandler = self.tracing.clone().into();
 
         // Bind the REST server and catch port conflict errors
         let rest_listener =
@@ -362,12 +360,11 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
 
         let serve_handle = tokio::spawn(async move {
             let result = axum::serve(rest_listener, router.into_make_service_with_connect_info::<SocketAddr>())
-                .with_graceful_shutdown(Self::shutdown_wait(shutdown_trigger_rx))
+                .with_graceful_shutdown(Self::shutdown_wait(tracing_.clone(), shutdown_trigger_rx))
                 .await;
 
             if let Err(error) = result {
-                let _guard = tracing_.map(|trace_handle| trace_handle.subscribe_thread());
-                error!("Couldn't start REST server: {}", error);
+                guard_error!(tracing_, "Couldn't start REST server: {}", error);
             }
 
             let _ = shutdown_complete_tx.send(true);
@@ -386,18 +383,16 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         request: Request<Body>,
         next: Next,
     ) -> Result<Response, StatusCode> {
-        let _guard = rest.get_tracing_guard();
-        info!("Received '{} {}' from '{addr}'", request.method(), request.uri());
-
+        guard_info!(rest, "Received '{} {}' from '{addr}'", request.method(), request.uri());
         Ok(next.run(request).await)
     }
 
-    async fn shutdown_wait(shutdown_rx: oneshot::Receiver<()>) {
+    async fn shutdown_wait(tracing: TracingHandler, shutdown_rx: oneshot::Receiver<()>) {
         if let Err(error) = shutdown_rx.await {
-            error!("REST server shutdown signaling error: {}", error);
+            guard_error!(tracing, "REST server shutdown signaling error: {}", error);
         }
 
-        info!("REST server shutdown signal recieved...");
+        guard_info!(tracing, "REST server shutdown signal recieved...");
     }
 }
 
