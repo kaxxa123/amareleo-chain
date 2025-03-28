@@ -225,15 +225,6 @@ jobs:
           workspace_member: node/bft
           cache_key: v3.0.0-rust-1.83.0-node-bft-cache
 
-  node-bft-events:
-    docker:
-      - image: cimg/rust:1.83.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
-    resource_class: << pipeline.parameters.medium >>
-    steps:
-      - run_serial:
-          workspace_member: node/bft/events
-          cache_key: v3.0.0-rust-1.83.0-node-bft-events-cache
-
   node-bft-ledger-service:
     docker:
       - image: cimg/rust:1.83.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
@@ -351,10 +342,6 @@ workflows:
             branches:
               only: [main, develop]
       - node-bft:
-          filters: 
-            branches:
-              only: [main, develop]
-      - node-bft-events:
           filters: 
             branches:
               only: [main, develop]

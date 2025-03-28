@@ -18,7 +18,7 @@ use crate::{
     ProposedBatch,
     helpers::{Ready, Storage, fmt_id},
 };
-use amareleo_chain_tracing::TracingHandler;
+use amareleo_chain_tracing::{TracingHandler, TracingHandlerGuard};
 use amareleo_node_bft_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
@@ -48,6 +48,13 @@ pub struct Worker<N: Network> {
     tracing: Option<TracingHandler>,
     /// The ready queue.
     ready: Ready<N>,
+}
+
+impl<N: Network> TracingHandlerGuard for Worker<N> {
+    /// Retruns tracing guard
+    fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.as_ref().and_then(|trace_handle| trace_handle.get_tracing_guard())
+    }
 }
 
 impl<N: Network> Worker<N> {
@@ -131,11 +138,6 @@ impl<N: Network> Worker<N> {
 }
 
 impl<N: Network> Worker<N> {
-    /// Retruns tracing guard
-    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
-        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
-    }
-
     /// Returns `true` if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
     pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
         let transmission_id = transmission_id.into();
@@ -205,7 +207,6 @@ impl<N: Network> Worker<N> {
         solution_id: SolutionID<N>,
         solution: Data<Solution<N>>,
     ) -> Result<()> {
-        let _guard = self.get_tracing_guard();
         // Construct the transmission.
         let transmission = Transmission::Solution(solution.clone());
         // Compute the checksum.
@@ -220,7 +221,8 @@ impl<N: Network> Worker<N> {
         self.ledger.check_solution_basic(solution_id, solution).await?;
         // Adds the solution to the ready queue.
         if self.ready.insert(transmission_id, transmission) {
-            trace!(
+            guard_trace!(
+                self,
                 "Worker {} - Added unconfirmed solution '{}.{}'",
                 self.id,
                 fmt_id(solution_id),
@@ -236,7 +238,6 @@ impl<N: Network> Worker<N> {
         transaction_id: N::TransactionID,
         transaction: Data<Transaction<N>>,
     ) -> Result<()> {
-        let _guard = self.get_tracing_guard();
         // Construct the transmission.
         let transmission = Transmission::Transaction(transaction.clone());
         // Compute the checksum.
@@ -251,7 +252,8 @@ impl<N: Network> Worker<N> {
         self.ledger.check_transaction_basic(transaction_id, transaction).await?;
         // Adds the transaction to the ready queue.
         if self.ready.insert(transmission_id, transmission) {
-            trace!(
+            guard_trace!(
+                self,
                 "Worker {}.{} - Added unconfirmed transaction '{}'",
                 self.id,
                 fmt_id(transaction_id),
@@ -494,7 +496,7 @@ mod prop_tests {
             // Sample the address.
             let rng = &mut TestRng::fixed(i as u64);
             let address = Address::new(rng.gen());
-            info!("Validator {i}: {address}");
+            // guard_info!("Validator {i}: {address}");
             members.insert(address, (MIN_VALIDATOR_STAKE, false, rng.gen_range(0..100)));
         }
         // Initialize the committee.

@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::helpers::{check_timestamp_for_liveness, fmt_id};
-use amareleo_chain_tracing::TracingHandler;
+use amareleo_chain_tracing::{TracingHandler, TracingHandlerGuard};
 use amareleo_node_bft_ledger_service::LedgerService;
 use amareleo_node_bft_storage_service::StorageService;
 use snarkvm::{
@@ -46,6 +46,13 @@ impl<N: Network> std::ops::Deref for Storage<N> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<N: Network> TracingHandlerGuard for Storage<N> {
+    /// Retruns tracing guard
+    fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.as_ref().and_then(|trace_handle| trace_handle.get_tracing_guard())
     }
 }
 
@@ -156,16 +163,9 @@ impl<N: Network> Storage<N> {
         self.max_gc_rounds
     }
 
-    /// Retruns tracing guard
-    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
-        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
-    }
-
     /// Increments storage to the next round, updating the current round.
     /// Note: This method is only called once per round, upon certification of the primary's batch.
     pub fn increment_to_next_round(&self, current_round: u64) -> Result<u64> {
-        let _guard = self.get_tracing_guard();
-
         // Determine the next round.
         let next_round = current_round + 1;
 
@@ -188,7 +188,8 @@ impl<N: Network> Storage<N> {
             // Retrieve the latest block round.
             let latest_block_round = self.ledger.latest_round();
             // Log the round sync.
-            info!(
+            guard_info!(
+                self,
                 "Syncing primary round ({next_round}) with the current committee's starting round ({starting_round}). Syncing with the latest block round {latest_block_round}..."
             );
             // Sync the round with the latest block.
@@ -213,7 +214,7 @@ impl<N: Network> Storage<N> {
         ensure!(next_round >= gc_round, "The next round {next_round} is behind the GC round {gc_round}");
 
         // Log the updated round.
-        info!("Starting round {next_round}...");
+        guard_info!(self, "Starting round {next_round}...");
         Ok(next_round)
     }
 
@@ -634,10 +635,9 @@ impl<N: Network> Storage<N> {
     /// If the certificate was successfully removed, `true` is returned.
     /// If the certificate did not exist in storage, `false` is returned.
     fn remove_certificate(&self, certificate_id: Field<N>) -> bool {
-        let _guard = self.get_tracing_guard();
         // Retrieve the certificate.
         let Some(certificate) = self.get_certificate(certificate_id) else {
-            warn!("Certificate {certificate_id} does not exist in storage");
+            guard_warn!(self, "Certificate {certificate_id} does not exist in storage");
             return false;
         };
         // Retrieve the round.
@@ -686,7 +686,6 @@ impl<N: Network> Storage<N> {
 
     /// Syncs the current round with the block.
     pub(crate) fn sync_round_with_block(&self, next_round: u64) {
-        let _guard = self.get_tracing_guard();
         // Retrieve the current round in the block.
         let next_round = next_round.max(1);
         // If the round in the block is greater than the current round in storage, sync the round.
@@ -694,7 +693,7 @@ impl<N: Network> Storage<N> {
             // Update the current round in storage.
             self.update_current_round(next_round);
             // Log the updated round.
-            info!("Synced to round {next_round}...");
+            guard_info!(self, "Synced to round {next_round}...");
         }
     }
 
@@ -722,8 +721,6 @@ impl<N: Network> Storage<N> {
         // Track the block's aborted solutions and transactions.
         let aborted_solutions: IndexSet<_> = block.aborted_solution_ids().iter().collect();
         let aborted_transactions: IndexSet<_> = block.aborted_transaction_ids().iter().collect();
-
-        let _guard = self.get_tracing_guard();
 
         // Iterate over the transmission IDs.
         for transmission_id in certificate.transmission_ids() {
@@ -756,7 +753,9 @@ impl<N: Network> Storage<N> {
                                     true => {
                                         aborted_transmissions.insert(*transmission_id);
                                     }
-                                    false => error!("Missing solution {solution_id} in block {}", block.height()),
+                                    false => {
+                                        guard_error!(self, "Missing solution {solution_id} in block {}", block.height())
+                                    }
                                 }
                                 continue;
                             }
@@ -781,7 +780,11 @@ impl<N: Network> Storage<N> {
                                     true => {
                                         aborted_transmissions.insert(*transmission_id);
                                     }
-                                    false => warn!("Missing transaction {transaction_id} in block {}", block.height()),
+                                    false => guard_warn!(
+                                        self,
+                                        "Missing transaction {transaction_id} in block {}",
+                                        block.height()
+                                    ),
                                 }
                                 continue;
                             }
@@ -792,13 +795,18 @@ impl<N: Network> Storage<N> {
         }
         // Insert the batch certificate into storage.
         let certificate_id = fmt_id(certificate.id());
-        debug!(
+        guard_debug!(
+            self,
             "Syncing certificate '{certificate_id}' for round {} with {} transmissions",
             certificate.round(),
             certificate.transmission_ids().len()
         );
         if let Err(error) = self.insert_certificate(certificate, missing_transmissions, aborted_transmissions) {
-            error!("Failed to insert certificate '{certificate_id}' from block {} - {error}", block.height());
+            guard_error!(
+                self,
+                "Failed to insert certificate '{certificate_id}' from block {} - {error}",
+                block.height()
+            );
         }
     }
 }

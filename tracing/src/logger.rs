@@ -80,7 +80,5 @@ pub fn initialize_tracing(verbosity: u8, logfile_path: PathBuf) -> Result<Tracin
         .with_target(verbosity > 2)
         .with_filter(init_env_filter(verbosity)?);
 
-    let mut tracing = TracingHandler::new();
-    tracing.set_one_layer(trace_to_file)?;
-    Ok(tracing)
+    Ok(TracingHandler::set_one_layer(trace_to_file))
 }

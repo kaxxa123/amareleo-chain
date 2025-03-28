@@ -87,17 +87,17 @@ where
         }
 
         let date_time = OffsetDateTime::now_utc();
-        write!(writer, "{}  ", date_time.format(&self.fmt).map_err(|_| std::fmt::Error)?)?;
+        write!(writer, "{} ", date_time.format(&self.fmt).map_err(|_| std::fmt::Error)?)?;
 
         let meta = event.metadata();
         let fmt_level = match *meta.level() {
             tracing::Level::ERROR => "ERROR",
-            tracing::Level::WARN => "WARN ",
-            tracing::Level::INFO => "INFO ",
             tracing::Level::DEBUG => "DEBUG",
             tracing::Level::TRACE => "TRACE",
+            tracing::Level::WARN => "WARN",
+            tracing::Level::INFO => "INFO",
         };
-        write!(writer, "{}", fmt_level)?;
+        write!(writer, "{:>5} ", fmt_level)?;
 
         write!(writer, "{}: ", meta.target())?;
 

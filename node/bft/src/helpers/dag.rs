@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use amareleo_chain_tracing::TracingHandler;
+use amareleo_chain_tracing::TracingHandlerGuard;
 
 use snarkvm::{
     console::types::{Address, Field},
@@ -90,8 +90,7 @@ impl<N: Network> DAG<N> {
     }
 
     /// Inserts a certificate into the DAG.
-    pub fn insert(&mut self, certificate: BatchCertificate<N>, tracing: Option<TracingHandler>) {
-        let _guard = tracing.map(|trace_handle| trace_handle.subscribe_thread());
+    pub fn insert(&mut self, certificate: BatchCertificate<N>, _tracing: &dyn TracingHandlerGuard) {
         let round = certificate.round();
         let author = certificate.author();
 
@@ -102,7 +101,7 @@ impl<N: Network> DAG<N> {
             // If a previous certificate existed for the author, log it.
             #[cfg(debug_assertions)]
             if _previous.is_some() {
-                error!("A certificate for round {round} by author {author} already existed in the DAG");
+                guard_error!(_tracing, "A certificate for round {round} by author {author} already existed in the DAG");
             }
         }
     }
@@ -155,6 +154,8 @@ pub(crate) mod test_helpers {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use amareleo_chain_tracing::TracingHandler;
+
     use snarkvm::{
         prelude::{MainnetV0, narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round},
         utilities::TestRng,
@@ -177,7 +178,7 @@ mod tests {
 
         // Sample a certificate for round 2.
         let certificate = sample_batch_certificate_for_round(ROUND, rng);
-        dag.insert(certificate.clone(), None);
+        dag.insert(certificate.clone(), &TracingHandler::new());
         assert!(dag.contains_certificate_in_round(ROUND, certificate.id()));
         assert_eq!(dag.get_certificate_for_round_with_author(ROUND, certificate.author()), Some(certificate.clone()));
         assert_eq!(dag.get_certificate_for_round_with_id(ROUND, certificate.id()), Some(certificate.clone()));
@@ -198,7 +199,7 @@ mod tests {
         let certificate_3 = sample_batch_certificate_for_round(3, &mut TestRng::fixed(123456789));
 
         // Insert the certificate for round 2.
-        dag.insert(certificate_2.clone(), None);
+        dag.insert(certificate_2.clone(), &TracingHandler::new());
         assert!(dag.contains_certificate_in_round(2, certificate_2.id()));
         assert_eq!(dag.get_certificate_for_round_with_author(2, certificate_2.author()), Some(certificate_2.clone()));
         assert_eq!(dag.get_certificate_for_round_with_id(2, certificate_2.id()), Some(certificate_2.clone()));
@@ -209,7 +210,7 @@ mod tests {
         assert_eq!(dag.last_committed_round(), 0);
 
         // Insert the certificate for round 3.
-        dag.insert(certificate_3.clone(), None);
+        dag.insert(certificate_3.clone(), &TracingHandler::new());
         assert!(dag.contains_certificate_in_round(3, certificate_3.id()));
         assert_eq!(dag.get_certificate_for_round_with_author(3, certificate_3.author()), Some(certificate_3.clone()));
         assert_eq!(dag.get_certificate_for_round_with_id(3, certificate_3.id()), Some(certificate_3.clone()));
@@ -221,11 +222,11 @@ mod tests {
 
         // Add a lower certificate. As the author is random, it's probably going to be different.
         let lower = sample_batch_certificate_for_round(2, rng);
-        dag.insert(lower.clone(), None);
+        dag.insert(lower.clone(), &TracingHandler::new());
 
         // Add a higher certificate. As the author is random, it's probably going to be different.
         let higher = sample_batch_certificate_for_round(4, rng);
-        dag.insert(higher.clone(), None);
+        dag.insert(higher.clone(), &TracingHandler::new());
 
         // Now commit the certificate for round 3, this will trigger GC.
         dag.commit(&certificate_3, 10);
@@ -248,7 +249,7 @@ mod tests {
         /* Test normal case */
 
         // Insert the certificate for round 2.
-        dag.insert(certificate_2.clone(), None);
+        dag.insert(certificate_2.clone(), &TracingHandler::new());
         assert!(!dag.is_recently_committed(2, certificate_2.id()));
         assert!(!dag.is_recently_committed(3, certificate_3.id()));
 
@@ -258,7 +259,7 @@ mod tests {
         assert!(!dag.is_recently_committed(3, certificate_3.id()));
 
         // Insert the certificate for round 3.
-        dag.insert(certificate_3.clone(), None);
+        dag.insert(certificate_3.clone(), &TracingHandler::new());
         assert!(dag.is_recently_committed(2, certificate_2.id()));
         assert!(!dag.is_recently_committed(3, certificate_3.id()));
 
@@ -270,7 +271,7 @@ mod tests {
         /* Test GC case */
 
         // Insert the certificate for round 4.
-        dag.insert(certificate_4.clone(), None);
+        dag.insert(certificate_4.clone(), &TracingHandler::new());
         assert!(dag.is_recently_committed(2, certificate_2.id()));
         assert!(dag.is_recently_committed(3, certificate_3.id()));
         assert!(!dag.is_recently_committed(4, certificate_4.id()));

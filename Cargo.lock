@@ -213,7 +213,6 @@ dependencies = [
  "amareleo-node-rest",
  "amareleo-node-sync",
  "anyhow",
- "parking_lot",
  "rand",
  "rand_chacha",
  "rayon",
@@ -230,7 +229,6 @@ dependencies = [
  "aleo-std",
  "amareleo-chain-account",
  "amareleo-chain-tracing",
- "amareleo-node-bft-events",
  "amareleo-node-bft-ledger-service",
  "amareleo-node-bft-storage-service",
  "amareleo-node-metrics",
@@ -267,25 +265,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.19",
  "tracing-test 0.1.0",
-]
-
-[[package]]
-name = "amareleo-node-bft-events"
-version = "2.1.0"
-dependencies = [
- "amareleo-node-metrics",
- "amareleo-node-sync",
- "anyhow",
- "bytes",
- "indexmap 2.7.0",
- "proptest",
- "rayon",
- "serde",
- "snarkvm",
- "test-strategy",
- "time",
- "tokio-util",
- "tracing",
 ]
 
 [[package]]
@@ -389,7 +368,6 @@ dependencies = [
  "indexmap 2.7.0",
  "serde",
  "snarkvm",
- "tracing",
 ]
 
 [[package]]

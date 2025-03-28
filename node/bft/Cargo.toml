@@ -12,11 +12,7 @@ edition = "2021"
 
 [features]
 default = []
-metrics = [
-  "dep:metrics",
-  "amareleo-node-bft-events/metrics",
-  "amareleo-node-bft-ledger-service/metrics",
-]
+metrics = ["dep:metrics", "amareleo-node-bft-ledger-service/metrics"]
 test_targets = ["snarkvm/test_targets"]
 
 [dependencies.aleo-std]
@@ -73,10 +69,6 @@ version = "=2.1.0"
 
 [dependencies.amareleo-chain-account]
 path = "../../account"
-version = "=2.1.0"
-
-[dependencies.amareleo-node-bft-events]
-path = "./events"
 version = "=2.1.0"
 
 [dependencies.amareleo-node-bft-ledger-service]

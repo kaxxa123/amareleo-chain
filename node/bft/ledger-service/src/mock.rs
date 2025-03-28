@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::{LedgerService, fmt_id};
+use amareleo_chain_tracing::TracingHandlerGuard;
 use snarkvm::{
     ledger::{
         block::{Block, Transaction},
@@ -23,6 +24,7 @@ use snarkvm::{
     },
     prelude::{Address, Field, Network, Result, Zero, bail, ensure},
 };
+use tracing::subscriber::DefaultGuard;
 
 use indexmap::IndexMap;
 use parking_lot::Mutex;
@@ -34,6 +36,13 @@ use tracing::*;
 pub struct MockLedgerService<N: Network> {
     committee: Committee<N>,
     height_to_round_and_hash: Mutex<BTreeMap<u32, (u64, N::BlockHash)>>,
+}
+
+impl<N: Network> TracingHandlerGuard for MockLedgerService<N> {
+    /// Retruns tracing guard
+    fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        None
+    }
 }
 
 impl<N: Network> MockLedgerService<N> {
@@ -164,13 +173,14 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
 
     /// Returns `false` for all queries.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
-        trace!("[MockLedgerService] Contains certificate ID {} - false", fmt_id(certificate_id));
+        guard_trace!(self, "[MockLedgerService] Contains certificate ID {} - false", fmt_id(certificate_id));
         Ok(false)
     }
 
     /// Returns `false` for all queries.
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
-        trace!(
+        guard_trace!(
+            self,
             "[MockLedgerService] Contains transmission ID {}.{} - false",
             fmt_id(transmission_id),
             fmt_id(transmission_id.checksum().unwrap_or_default())
@@ -184,7 +194,8 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         transmission_id: TransmissionID<N>,
         _transmission: &mut Transmission<N>,
     ) -> Result<()> {
-        trace!(
+        guard_trace!(
+            self,
             "[MockLedgerService] Ensure transmission ID matches {}.{} - Ok",
             fmt_id(transmission_id),
             fmt_id(transmission_id.checksum().unwrap_or_default())
@@ -194,7 +205,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
 
     /// Checks the given solution is well-formed.
     async fn check_solution_basic(&self, solution_id: SolutionID<N>, _solution: Data<Solution<N>>) -> Result<()> {
-        trace!("[MockLedgerService] Check solution basic {:?} - Ok", fmt_id(solution_id));
+        guard_trace!(self, "[MockLedgerService] Check solution basic {:?} - Ok", fmt_id(solution_id));
         Ok(())
     }
 
@@ -204,7 +215,7 @@ impl<N: Network> LedgerService<N> for MockLedgerService<N> {
         transaction_id: N::TransactionID,
         _transaction: Data<Transaction<N>>,
     ) -> Result<()> {
-        trace!("[MockLedgerService] Check transaction basic {:?} - Ok", fmt_id(transaction_id));
+        guard_trace!(self, "[MockLedgerService] Check transaction basic {:?} - Ok", fmt_id(transaction_id));
         Ok(())
     }
 
