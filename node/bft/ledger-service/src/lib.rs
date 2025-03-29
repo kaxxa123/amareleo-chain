@@ -15,9 +15,11 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "tracing")]
 #[macro_use]
 extern crate tracing;
 
+#[cfg(feature = "tracing")]
 #[macro_use]
 extern crate amareleo_chain_tracing;
 
