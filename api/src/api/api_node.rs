@@ -9,6 +9,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use crate::{AmareleoLog, ValidatorApi};
 
 use std::{
     net::SocketAddr,
@@ -25,22 +26,17 @@ use snarkvm::{
     console::{
         account::{Address, PrivateKey},
         algorithms::Hash,
-        network::Network,
+        network::{CanaryV0, MainnetV0, Network, TestnetV0},
     },
     ledger::{
         block::Block,
         committee::{Committee, MIN_VALIDATOR_STAKE},
-        store::{
-            ConsensusStore,
-            helpers::{memory::ConsensusMemory, rocksdb::ConsensusDB},
-        },
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
     prelude::{FromBytes, ToBits, ToBytes},
     synthesizer::VM,
     utilities::to_bytes_le,
 };
-
-use crate::AmareleoLog;
 
 use amareleo_chain_account::Account;
 use amareleo_chain_resources::{
@@ -52,7 +48,6 @@ use amareleo_chain_resources::{
     BLOCK0_TESTNET_ID,
 };
 use amareleo_chain_tracing::{TracingHandler, initialize_tracing};
-use amareleo_node::Validator;
 use amareleo_node_bft::{
     DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
     DEVELOPMENT_MODE_RNG_SEED,
@@ -67,8 +62,8 @@ use amareleo_node_bft::{
 };
 
 /// Amareleo node object, for creating and managing a node instance
-#[derive(Clone)]
-pub struct AmareleoApi<N: Network> {
+pub struct AmareleoApi {
+    network_id: u16,
     rest_ip: SocketAddr,
     rest_rps: u32,
     keep_state: bool,
@@ -78,15 +73,20 @@ pub struct AmareleoApi<N: Network> {
     log_trace: Option<TracingHandler>,
     verbosity: u8,
     shutdown: Arc<AtomicBool>,
-    validator: Option<Arc<Validator<N, ConsensusDB<N>>>>,
+    validator: ValidatorApi,
 }
 
-impl<N: Network> Default for AmareleoApi<N> {
+impl Default for AmareleoApi {
     /// Create a node with default configuration.
-    /// Listenning to port 3030, with 10 requests per second limit.
-    /// No ledger state retenttion, default ledger folder naming, no logging.
+    /// - Testnet node
+    /// - Bound to localhost port 3030
+    /// - REST limited to 10 requests per second
+    /// - No ledger state retenttion
+    /// - Unique ledger folder naming
+    /// - Logging disabled
     fn default() -> Self {
         Self {
+            network_id: TestnetV0::ID,
             rest_ip: "0.0.0.0:3030".parse().unwrap(),
             rest_rps: 10u32,
             keep_state: false,
@@ -96,16 +96,44 @@ impl<N: Network> Default for AmareleoApi<N> {
             log_trace: None,
             verbosity: 1u8,
             shutdown: Default::default(),
-            validator: None,
+            validator: ValidatorApi::None,
         }
     }
 }
 
 // AmareleoApi configuration setters
-impl<N: Network> AmareleoApi<N> {
-    /// Configure REST server IP, port, and requests per second limit
-    /// ip_port: SocketAddr - IP and port to listen to
-    /// rps: u32 - requests per second limit
+impl AmareleoApi {
+    /// Configure network ID. Valid network values include:
+    /// - CanaryV0::ID
+    /// - TestnetV0::ID
+    /// - MainnetV0::ID
+    ///
+    /// Note: This method should be called before starting the node.<br>
+    /// If the node is already started, this method will have no effect.<br>
+    /// If the network ID is invalid, the value will be ignored.
+    ///
+    /// # Parameters
+    ///
+    /// * network_id: `u16` - network ID to use
+    pub fn cfg_network_id(&mut self, network_id: u16) -> &mut Self {
+        if !self.is_started()
+            && (network_id == CanaryV0::ID || network_id == TestnetV0::ID || network_id == MainnetV0::ID)
+        {
+            self.network_id = network_id;
+        }
+
+        self
+    }
+
+    /// Configure REST server IP, port, and requests per second limit.
+    ///
+    /// Note: This method should be called before starting the node.<br>
+    /// If the node is already started, this method will have no effect.<br>
+    ///
+    /// # Parameters
+    ///
+    /// * ip_port: `SocketAddr` - IP and port to listen to
+    /// * rps: `u32` - requests per second limit
     pub fn cfg_rest(&mut self, ip_port: SocketAddr, rps: u32) -> &mut Self {
         if !self.is_started() {
             self.rest_ip = ip_port;
@@ -115,10 +143,16 @@ impl<N: Network> AmareleoApi<N> {
         self
     }
 
-    /// Configure ledger storage properties
-    /// keep_state: bool - keep ledger state between restarts
-    /// base_path: Option<PathBuf> - custom ledger folder path
-    /// default_naming: bool - use default ledger folder naming, instead of deriving unique names from the rest IP:port configuration.
+    /// Configure ledger storage properties.
+    ///
+    /// Note: This method should be called before starting the node.<br>
+    /// If the node is already started, this method will have no effect.<br>
+    ///
+    /// # Parameters
+    ///
+    /// * keep_state: `bool` - keep ledger state between restarts
+    /// * base_path: `Option<PathBuf>` - custom ledger folder path
+    /// * default_naming: `bool` - use default ledger folder naming, instead of deriving unique names from the rest IP:port configuration.
     pub fn cfg_ledger(&mut self, keep_state: bool, base_path: Option<PathBuf>, default_naming: bool) -> &mut Self {
         if !self.is_started() {
             self.keep_state = keep_state;
@@ -129,9 +163,15 @@ impl<N: Network> AmareleoApi<N> {
         self
     }
 
-    /// Configure file logging path and verbosity level
-    /// log_file: Option<PathBuf> - custom log file path, or None for default path
-    /// verbosity: u8 - log verbosity level between 0 and 4, where 0 is the least verbose
+    /// Configure file logging path and verbosity level.
+    ///
+    /// Note: This method should be called before starting the node.<br>
+    /// If the node is already started, this method will have no effect.<br>
+    ///
+    /// # Parameters
+    ///
+    /// * log_file: `Option<PathBuf>` - custom log file path, or None for default path
+    /// * verbosity: `u8` - log verbosity level between 0 and 4, where 0 is the least verbose
     pub fn cfg_file_log(&mut self, log_file: Option<PathBuf>, verbosity: u8) -> &mut Self {
         if !self.is_started() {
             self.log_mode = AmareleoLog::File(log_file);
@@ -141,8 +181,14 @@ impl<N: Network> AmareleoApi<N> {
         self
     }
 
-    /// Configure custom logging
-    /// tracing: TracingHandler - custom tracing subscriber
+    /// Configure custom tracing subscribers.
+    ///
+    /// Note: This method should be called before starting the node.<br>
+    /// If the node is already started, this method will have no effect.<br>
+    ///
+    /// # Parameters
+    ///
+    /// * tracing: `TracingHandler` - custom tracing subscriber
     pub fn cfg_custom_log(&mut self, tracing: TracingHandler) -> &mut Self {
         if !self.is_started() {
             self.log_mode = AmareleoLog::Custom(tracing);
@@ -151,7 +197,10 @@ impl<N: Network> AmareleoApi<N> {
         self
     }
 
-    /// Disable logging
+    /// Disable logging.
+    ///
+    /// Note: This method should be called before starting the node.<br>
+    /// If the node is already started, this method will have no effect.<br>
     pub fn cfg_no_log(&mut self) -> &mut Self {
         if !self.is_started() {
             self.log_mode = AmareleoLog::None;
@@ -162,9 +211,14 @@ impl<N: Network> AmareleoApi<N> {
 }
 
 // AmareleoApi public getters
-impl<N: Network> AmareleoApi<N> {
-    /// Get well known development-mode node account, use the public and private credits to pay for transaction fees.
-    pub fn get_node_account() -> Result<Account<N>> {
+impl AmareleoApi {
+    /// Get the fixed node account, loaded with public
+    /// and private credits to pay for transaction fees.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Account<N>>` - the node primary account
+    pub fn get_node_account<N: Network>() -> Result<Account<N>> {
         Account::try_from({
             // Initialize the (fixed) RNG.
             let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
@@ -172,128 +226,12 @@ impl<N: Network> AmareleoApi<N> {
         })
     }
 
-    /// Get resultant log file path, based on current configuration.
-    /// Fails if file logging is not configured.
-    pub fn get_log_file(&self) -> Result<PathBuf> {
-        if !self.log_mode.is_file() {
-            bail!("Logging to file is disabled!");
-        }
-
-        let log_option = self.log_mode.get_path();
-        let log_path = match &log_option {
-            Some(path) => path.clone(),
-            None => {
-                let end_point_tag = endpoint_file_tag::<N>(false, &self.rest_ip)?;
-                amareleo_log_file(N::ID, self.keep_state, &end_point_tag)
-            }
-        };
-
-        Ok(log_path)
-    }
-
-    /// Get resultant ledger folder path, based on current configuration.
-    pub fn get_ledger_folder(&self) -> Result<PathBuf> {
-        let tag = endpoint_file_tag::<N>(self.ledger_default_naming, &self.rest_ip)?;
-        let ledger_path = match &self.ledger_base_path {
-            Some(base_path) => custom_ledger_dir(N::ID, self.keep_state, &tag, base_path.clone()),
-            None => default_ledger_dir(N::ID, self.keep_state, &tag),
-        };
-
-        Ok(ledger_path.to_path_buf())
-    }
-
-    /// Check if the node is started
-    pub fn is_started(&self) -> bool {
-        self.validator.is_some()
-    }
-}
-
-// AmareleoApi operations for public consumption
-impl<N: Network> AmareleoApi<N> {
-    /// Start a node instance
-    pub async fn start(&mut self) -> Result<()> {
-        if self.is_started() {
-            bail!("Node already started");
-        }
-
-        let genesis = Self::get_genesis()?;
-        let account = Self::get_node_account()?;
-        let ledger_path = self.get_ledger_folder()?;
-        let storage_mode = amareleo_storage_mode(ledger_path.clone());
-        if !self.keep_state {
-            // Clean the temporary ledger.
-            Self::clean_tmp_ledger(ledger_path)?;
-        }
-
-        self.trace_init()?;
-
-        // Initialize the validator.
-        let validator: Validator<N, ConsensusDB<N>> = Validator::new(
-            self.rest_ip,
-            self.rest_rps,
-            account,
-            genesis,
-            self.keep_state,
-            storage_mode,
-            self.log_trace.clone(),
-            self.shutdown.clone(),
-        )
-        .await?;
-
-        self.validator = Some(Arc::new(validator));
-
-        Ok(())
-    }
-
-    /// Stop the node instance
-    pub async fn end(&mut self) {
-        if let Some(validator) = &self.validator {
-            validator.shut_down().await;
-            self.validator = None;
-        }
-    }
-}
-
-// AmareleoApi private non-static helpers
-impl<N: Network> AmareleoApi<N> {
-    /// Initialze logging
-    fn trace_init(&mut self) -> Result<()> {
-        // Determine the effective TraceHandler
-        self.log_trace = match &self.log_mode {
-            AmareleoLog::File(_) => Some(initialize_tracing(self.verbosity, self.get_log_file()?)?),
-            AmareleoLog::Custom(tracing) => Some(tracing.clone()),
-            AmareleoLog::None => None,
-        };
-
-        Ok(())
-    }
-}
-
-// AmareleoApi private static helpers
-impl<N: Network> AmareleoApi<N> {
-    // Cleans the temporary ledger
-    fn clean_tmp_ledger(ledger_path: PathBuf) -> Result<()> {
-        // Remove the current proposal cache file, if it exists.
-        let storage_mode = amareleo_storage_mode(ledger_path.clone());
-        let cache_path = proposal_cache_path(&storage_mode)?;
-        if cache_path.exists() {
-            if let Err(err) = std::fs::remove_file(&cache_path) {
-                bail!("Failed on removing proposal cache file at {}: {err}", cache_path.display());
-            }
-        }
-
-        // Remove ledger
-        if ledger_path.exists() {
-            if let Err(err) = std::fs::remove_dir_all(&ledger_path) {
-                bail!("Failed on removing ledger folder {}: {err}", ledger_path.display());
-            }
-        }
-
-        Ok(())
-    }
-
-    // Returns genesis block for the development mode node.
-    fn get_genesis() -> Result<Block<N>> {
+    /// Get the genesis block.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Block<N>>` - genesis block
+    pub fn get_genesis<N: Network>() -> Result<Block<N>> {
         // Initialize the (fixed) RNG.
         let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
 
@@ -363,7 +301,7 @@ impl<N: Network> AmareleoApi<N> {
         }
 
         // Construct the genesis block.
-        Self::load_or_compute_genesis(
+        Self::load_or_compute_genesis::<N>(
             development_private_keys[0],
             committee,
             public_balances,
@@ -372,8 +310,144 @@ impl<N: Network> AmareleoApi<N> {
         )
     }
 
+    /// Get log file path, based on current configuration.
+    /// Fails if file logging is not configured.
+    ///
+    /// Note: Changes in configuration may cause the log file path to change.<br>
+    /// Properties that effect the log file path include:<br>
+    /// - REST endpont
+    /// - network ID
+    /// - ledger state retantion flag
+    ///
+    /// # Returns
+    ///
+    /// * `Result<PathBuf>` - log file path
+    pub fn get_log_file(&self) -> Result<PathBuf> {
+        if !self.log_mode.is_file() {
+            bail!("Logging to file is disabled!");
+        }
+
+        let log_option = self.log_mode.get_path();
+        let log_path = match &log_option {
+            Some(path) => path.clone(),
+            None => {
+                let end_point_tag = endpoint_file_tag(false, &self.rest_ip)?;
+                amareleo_log_file(self.network_id, self.keep_state, &end_point_tag)
+            }
+        };
+
+        Ok(log_path)
+    }
+
+    /// Get ledger folder path, based on the current configuration.
+    ///
+    /// Note: Changes in configuration may cause the ledger path to change.<br>
+    /// Properties that effect the ledger path include:<br>
+    /// - REST endpont
+    /// - network ID
+    /// - ledger state retantion flag
+    ///
+    /// # Returns
+    ///
+    /// * `Result<PathBuf>` - ledger file path
+    pub fn get_ledger_folder(&self) -> Result<PathBuf> {
+        let tag = endpoint_file_tag(self.ledger_default_naming, &self.rest_ip)?;
+        let ledger_path = match &self.ledger_base_path {
+            Some(base_path) => custom_ledger_dir(self.network_id, self.keep_state, &tag, base_path.clone()),
+            None => default_ledger_dir(self.network_id, self.keep_state, &tag),
+        };
+
+        Ok(ledger_path.to_path_buf())
+    }
+
+    /// Check if the node is started
+    ///
+    /// # Returns
+    ///
+    /// * `bool` - true if the node is running, false otherwise
+    pub fn is_started(&self) -> bool {
+        self.validator.is_started()
+    }
+}
+
+// AmareleoApi operations for public consumption
+impl AmareleoApi {
+    /// Start a node instance
+    pub async fn start(&mut self) -> Result<()> {
+        if self.is_started() {
+            bail!("Node already started");
+        }
+
+        let ledger_path = self.get_ledger_folder()?;
+        let storage_mode = amareleo_storage_mode(ledger_path.clone());
+        if !self.keep_state {
+            // Clean the temporary ledger.
+            Self::clean_tmp_ledger(ledger_path)?;
+        }
+
+        self.trace_init()?;
+
+        // Initialize the validator.
+        self.validator = ValidatorApi::new(
+            self.network_id,
+            self.rest_ip,
+            self.rest_rps,
+            self.keep_state,
+            storage_mode,
+            self.log_trace.clone(),
+            self.shutdown.clone(),
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    /// Stop the node instance
+    pub async fn end(&mut self) {
+        if self.is_started() {
+            self.validator.shut_down().await;
+            self.validator = ValidatorApi::None;
+        }
+    }
+}
+
+// AmareleoApi private helpers
+impl AmareleoApi {
+    // Initialze logging
+    fn trace_init(&mut self) -> Result<()> {
+        // Determine the effective TraceHandler
+        self.log_trace = match &self.log_mode {
+            AmareleoLog::File(_) => Some(initialize_tracing(self.verbosity, self.get_log_file()?)?),
+            AmareleoLog::Custom(tracing) => Some(tracing.clone()),
+            AmareleoLog::None => None,
+        };
+
+        Ok(())
+    }
+
+    // Cleans the temporary ledger
+    fn clean_tmp_ledger(ledger_path: PathBuf) -> Result<()> {
+        // Remove the current proposal cache file, if it exists.
+        let storage_mode = amareleo_storage_mode(ledger_path.clone());
+        let cache_path = proposal_cache_path(&storage_mode)?;
+        if cache_path.exists() {
+            if let Err(err) = std::fs::remove_file(&cache_path) {
+                bail!("Failed on removing proposal cache file at {}: {err}", cache_path.display());
+            }
+        }
+
+        // Remove ledger
+        if ledger_path.exists() {
+            if let Err(err) = std::fs::remove_dir_all(&ledger_path) {
+                bail!("Failed on removing ledger folder {}: {err}", ledger_path.display());
+            }
+        }
+
+        Ok(())
+    }
+
     // Loads or computes the genesis block.
-    fn load_or_compute_genesis(
+    fn load_or_compute_genesis<N: Network>(
         genesis_private_key: PrivateKey<N>,
         committee: Committee<N>,
         public_balances: IndexMap<Address<N>, u64>,
@@ -407,7 +481,7 @@ impl<N: Network> AmareleoApi<N> {
 
         // Input the parameters' metadata based on network
         match N::ID {
-            snarkvm::console::network::MainnetV0::ID => {
+            MainnetV0::ID => {
                 preimage.extend(snarkvm::parameters::mainnet::BondValidatorVerifier::METADATA.as_bytes());
                 preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
                 preimage.extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
@@ -423,7 +497,7 @@ impl<N: Network> AmareleoApi<N> {
                 raw_block0 = BLOCK0_MAINNET;
                 raw_blockid = BLOCK0_MAINNET_ID;
             }
-            snarkvm::console::network::TestnetV0::ID => {
+            TestnetV0::ID => {
                 preimage.extend(snarkvm::parameters::testnet::BondValidatorVerifier::METADATA.as_bytes());
                 preimage.extend(snarkvm::parameters::testnet::BondPublicVerifier::METADATA.as_bytes());
                 preimage.extend(snarkvm::parameters::testnet::UnbondPublicVerifier::METADATA.as_bytes());
@@ -439,7 +513,7 @@ impl<N: Network> AmareleoApi<N> {
                 raw_block0 = BLOCK0_TESTNET;
                 raw_blockid = BLOCK0_TESTNET_ID;
             }
-            snarkvm::console::network::CanaryV0::ID => {
+            CanaryV0::ID => {
                 preimage.extend(snarkvm::parameters::canary::BondValidatorVerifier::METADATA.as_bytes());
                 preimage.extend(snarkvm::parameters::canary::BondPublicVerifier::METADATA.as_bytes());
                 preimage.extend(snarkvm::parameters::canary::UnbondPublicVerifier::METADATA.as_bytes());

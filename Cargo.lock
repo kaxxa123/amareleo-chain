@@ -144,6 +144,7 @@ dependencies = [
 name = "amareleo-chain-api"
 version = "2.1.0"
 dependencies = [
+ "aleo-std",
  "amareleo-chain-account",
  "amareleo-chain-resources",
  "amareleo-chain-tracing",

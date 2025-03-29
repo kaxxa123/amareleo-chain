@@ -107,7 +107,7 @@ impl Start {
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
-    async fn start_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<AmareleoApi<N>> {
+    async fn start_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<AmareleoApi> {
 
         // Print the welcome.
         println!("{}", Self::welcome_message());
@@ -116,7 +116,7 @@ impl Start {
         let rest_ip_port = self.rest.as_ref().copied().unwrap_or_else(|| "0.0.0.0:3030".parse().unwrap());
 
         // Get the node account.
-        let account = AmareleoApi::<N>::get_node_account()?;
+        let account = AmareleoApi::get_node_account::<N>()?;
         println!("🔑 Your development private key for node 0 is {}.\n", account.private_key().to_string().bold());
         println!("👛 Your Aleo address is {}.\n", account.address().to_string().bold());
         println!("🧭 Starting node on {}.\n",N::NAME.bold());
@@ -132,12 +132,13 @@ impl Start {
             metrics::initialize_metrics(self.metrics_ip);
         }
 
-        let mut node_api: AmareleoApi<N> = AmareleoApi::default();
+        let mut node_api= AmareleoApi::default();
 
         // Configure the node api including file logging.
         // We only include file logging for us to easily get the log file path.
         // Ultimately we opt for custom logging.
         node_api
+        .cfg_network_id(N::ID)
         .cfg_ledger(self.keep_state, self.storage.clone(), self.keep_state)
         .cfg_rest(rest_ip_port, self.rest_rps)
         .cfg_file_log(self.logfile.clone(), self.verbosity);
@@ -160,7 +161,7 @@ impl Start {
     }
 
     /// Handles OS signals for intercept termination and performing a clean shutdown.
-    fn handle_termination<N: Network>(&self, mut node_api: AmareleoApi<N>, shutdown: Arc<AtomicBool>) {
+    fn handle_termination(&self, mut node_api: AmareleoApi, shutdown: Arc<AtomicBool>) {
         #[cfg(target_family = "unix")]
         fn signal_listener() -> impl Future<Output = std::io::Result<()>> {
             use tokio::signal::unix::{SignalKind, signal};

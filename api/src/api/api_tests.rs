@@ -12,11 +12,8 @@
 
 #[cfg(test)]
 mod tests {
-
     use crate::api_node::AmareleoApi;
     use serial_test::serial;
-    use snarkvm::prelude::TestnetV0;
-    type CurrentNetwork = TestnetV0;
 
     #[tokio::test]
     #[serial]
@@ -24,7 +21,7 @@ mod tests {
         let temp_path = std::env::temp_dir();
 
         // Configure first node on port 3030
-        let mut node1: AmareleoApi<CurrentNetwork> = AmareleoApi::default();
+        let mut node1 = AmareleoApi::default();
         node1.cfg_ledger(false, Some(temp_path.clone()), false).cfg_rest("127.0.0.1:3030".parse().unwrap(), 10);
 
         // Start and end the first node
@@ -32,7 +29,7 @@ mod tests {
         node1.end().await;
 
         // Configure second node on port 3031
-        let mut node2: AmareleoApi<CurrentNetwork> = AmareleoApi::default();
+        let mut node2 = AmareleoApi::default();
         node2.cfg_ledger(false, Some(temp_path.clone()), false).cfg_rest("127.0.0.1:3031".parse().unwrap(), 10);
 
         // Starting the node fails due to snarkVM restriction described here:
@@ -47,7 +44,7 @@ mod tests {
         let temp_path = std::env::temp_dir();
 
         // Configure node on port 3030
-        let mut node1: AmareleoApi<CurrentNetwork> = AmareleoApi::default();
+        let mut node1 = AmareleoApi::default();
         node1.cfg_ledger(false, Some(temp_path.clone()), false).cfg_rest("127.0.0.1:3030".parse().unwrap(), 10);
 
         // Start and end the node
@@ -55,7 +52,7 @@ mod tests {
         node1.end().await;
 
         // Restart the node with the exact same settings...
-        let mut node2: AmareleoApi<CurrentNetwork> = AmareleoApi::default();
+        let mut node2 = AmareleoApi::default();
         node2.cfg_ledger(false, Some(temp_path.clone()), false).cfg_rest("127.0.0.1:3030".parse().unwrap(), 10);
 
         // Start and end the node

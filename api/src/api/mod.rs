@@ -18,3 +18,6 @@ pub mod api_node;
 
 pub use api_logs::*;
 pub mod api_logs;
+
+pub(crate) use api_validator::*;
+pub(crate) mod api_validator;
