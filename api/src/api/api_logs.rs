@@ -17,14 +17,15 @@ use amareleo_chain_tracing::TracingHandler;
 /// Amareleo logging selection
 #[derive(Clone)]
 pub enum AmareleoLog {
-    /// Log to file
-    /// If Some, the specified path is used.
-    /// If None, the default log file path is used.
+    /// Log to file.
+    ///     - If Some, the specified path is used.
+    ///     - If None, the default log file path is used.
     File(Option<PathBuf>),
 
-    /// Custom log handler
-    /// Overrides the default log handler with your own
-    /// tracing subscribers.
+    /// Custom log handler.
+    ///
+    /// Overrides the default log handler by providing a
+    /// `TracingHandler` configured with tracing subscribers.
     Custom(TracingHandler),
 
     /// Disable logging
@@ -33,8 +34,11 @@ pub enum AmareleoLog {
 
 impl AmareleoLog {
     /// Get configured log file path
-    /// Returns Some when a custom log file path is configured.
-    /// Returns None when using the default path and when file logging is disabled.
+    ///
+    /// # Returns
+    ///
+    /// `Option<PathBuf>` - `Some(PathBuf)` when a custom log file path is configured.
+    /// `None` when using the default path and when file logging is disabled.
     pub fn get_path(&self) -> Option<PathBuf> {
         match self {
             Self::File(path) => path.clone(),
@@ -43,16 +47,28 @@ impl AmareleoLog {
     }
 
     /// Check if file logging is enabled
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when file logging is enabled, `false` otherwise.
     pub fn is_file(&self) -> bool {
         matches!(self, Self::File(_))
     }
 
     /// Check if custom logging is enabled
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when custom logging is enabled, `false` otherwise.
     pub fn is_custom(&self) -> bool {
         matches!(self, Self::Custom(_))
     }
 
     /// Check if logging is disabled altogether
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when logging is disabled, `false` otherwise.
     pub fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }

@@ -10,496 +10,428 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    net::SocketAddr,
-    path::PathBuf,
-    sync::{Arc, atomic::AtomicBool},
+use crate::{
+    AmareleoApiData,
+    AmareleoApiState,
+    AmareleoLog,
+    ValidatorApi,
+    ValidatorNewData,
+    clean_tmp_ledger,
+    is_valid_network_id,
 };
 
-use anyhow::{Result, bail, ensure};
-use indexmap::IndexMap;
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaChaRng;
+use std::{net::SocketAddr, path::PathBuf, sync::OnceLock};
 
-use snarkvm::{
-    console::{
-        account::{Address, PrivateKey},
-        algorithms::Hash,
-        network::Network,
-    },
-    ledger::{
-        block::Block,
-        committee::{Committee, MIN_VALIDATOR_STAKE},
-        store::{
-            ConsensusStore,
-            helpers::{memory::ConsensusMemory, rocksdb::ConsensusDB},
-        },
-    },
-    prelude::{FromBytes, ToBits, ToBytes},
-    synthesizer::VM,
-    utilities::to_bytes_le,
-};
+use anyhow::{Result, bail};
+use parking_lot::Mutex;
+use snarkvm::console::network::{Network, TestnetV0};
 
-use crate::AmareleoLog;
+use amareleo_chain_tracing::TracingHandler;
+use amareleo_node_bft::helpers::amareleo_storage_mode;
 
-use amareleo_chain_account::Account;
-use amareleo_chain_resources::{
-    BLOCK0_CANARY,
-    BLOCK0_CANARY_ID,
-    BLOCK0_MAINNET,
-    BLOCK0_MAINNET_ID,
-    BLOCK0_TESTNET,
-    BLOCK0_TESTNET_ID,
-};
-use amareleo_chain_tracing::{TracingHandler, initialize_tracing};
-use amareleo_node::Validator;
-use amareleo_node_bft::{
-    DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS,
-    DEVELOPMENT_MODE_RNG_SEED,
-    helpers::{
-        amareleo_log_file,
-        amareleo_storage_mode,
-        custom_ledger_dir,
-        default_ledger_dir,
-        endpoint_file_tag,
-        proposal_cache_path,
-    },
-};
+// ===================================================================
+// AmareleoApi is a simple thread-safe singleton.
+// There should be little scope for accessing this object
+// from concurrent threads. Thus we adopt a simple non-rentrant
+// Mutex that locks all data both on reading and writing.
+//
+// The non-rentrant Mutex, requires that functions acquiring
+// the Mutex lock do not call other functions that would also lock
+// the same Mutex. That would lead to a deadlock.
+//
+// The general rule is to only let public functions lock the Mutex,
+// such that private functions can be safely shared. However this
+// rule is not strictly followed. See the start(), end() and try_*()
+// functions for example.
+//
+// The AmareleoApiData struct is a lock-free private space most
+// appropriate for reusable code. This struct is private and has no
+// access to the Mutex.
+//
+// ===================================================================
 
 /// Amareleo node object, for creating and managing a node instance
-#[derive(Clone)]
-pub struct AmareleoApi<N: Network> {
-    rest_ip: SocketAddr,
-    rest_rps: u32,
-    keep_state: bool,
-    ledger_base_path: Option<PathBuf>,
-    ledger_default_naming: bool,
-    log_mode: AmareleoLog,
-    log_trace: Option<TracingHandler>,
-    verbosity: u8,
-    shutdown: Arc<AtomicBool>,
-    validator: Option<Arc<Validator<N, ConsensusDB<N>>>>,
+pub struct AmareleoApi {
+    data: Mutex<AmareleoApiData>,
 }
 
-impl<N: Network> Default for AmareleoApi<N> {
-    /// Create a node with default configuration.
-    /// Listenning to port 3030, with 10 requests per second limit.
-    /// No ledger state retenttion, default ledger folder naming, no logging.
-    fn default() -> Self {
-        Self {
-            rest_ip: "0.0.0.0:3030".parse().unwrap(),
-            rest_rps: 10u32,
-            keep_state: false,
-            ledger_base_path: None,
-            ledger_default_naming: false,
-            log_mode: AmareleoLog::None,
-            log_trace: None,
-            verbosity: 1u8,
-            shutdown: Default::default(),
-            validator: None,
-        }
+// Global storage for the singleton instance
+static INSTANCE: OnceLock<AmareleoApi> = OnceLock::new();
+
+impl AmareleoApi {
+    /// Create or return the singleton instance of AmareleoApi.
+    ///
+    /// When called for the first time the node is initialized with:
+    /// - Testnet network
+    /// - Bound to localhost port 3030
+    /// - REST limited to 10 requests per second
+    /// - No ledger state retenttion across runs
+    /// - Unique ledger folder naming
+    /// - Logging disabled
+    pub fn new() -> &'static Self {
+        INSTANCE.get_or_init(|| Self {
+            data: Mutex::new(AmareleoApiData {
+                state: AmareleoApiState::Init,
+                prev_state: AmareleoApiState::Init,
+                network_id: TestnetV0::ID,
+                rest_ip: "0.0.0.0:3030".parse().unwrap(),
+                rest_rps: 10u32,
+                keep_state: false,
+                ledger_base_path: None,
+                ledger_default_naming: false,
+                log_mode: AmareleoLog::None,
+                tracing: None,
+                verbosity: 1u8,
+                shutdown: Default::default(),
+                validator: ValidatorApi::None,
+            }),
+        })
     }
 }
 
 // AmareleoApi configuration setters
-impl<N: Network> AmareleoApi<N> {
-    /// Configure REST server IP, port, and requests per second limit
-    /// ip_port: SocketAddr - IP and port to listen to
-    /// rps: u32 - requests per second limit
-    pub fn cfg_rest(&mut self, ip_port: SocketAddr, rps: u32) -> &mut Self {
-        if !self.is_started() {
-            self.rest_ip = ip_port;
-            self.rest_rps = rps;
+impl AmareleoApi {
+    /// Configure network ID. Valid network values include:
+    /// - CanaryV0::ID
+    /// - TestnetV0::ID
+    /// - MainnetV0::ID
+    ///
+    /// # Parameters
+    ///
+    /// * network_id: `u16` - network ID to use.
+    ///
+    /// # Returns
+    ///
+    /// * `Err` if node is NOT in the `Init` state.
+    /// * `Err` if network_id is invalid.
+    pub fn cfg_network(&self, network_id: u16) -> Result<()> {
+        let mut data = self.data.lock();
+
+        if !data.is_state(AmareleoApiState::Init) {
+            bail!("Invalid node state {:?}", data.state);
         }
 
+        if !is_valid_network_id(network_id) {
+            bail!("Invalid network id {network_id}");
+        }
+        data.network_id = network_id;
+        Ok(())
+    }
+
+    /// Same as `cfg_network` but fails silently.
+    ///
+    /// # Returns
+    ///
+    /// `&Self` allowing for chaining `try_cfg_*()` calls
+    pub fn try_cfg_network(&self, network_id: u16) -> &Self {
+        let _ = self.cfg_network(network_id);
         self
     }
 
-    /// Configure ledger storage properties
-    /// keep_state: bool - keep ledger state between restarts
-    /// base_path: Option<PathBuf> - custom ledger folder path
-    /// default_naming: bool - use default ledger folder naming, instead of deriving unique names from the rest IP:port configuration.
-    pub fn cfg_ledger(&mut self, keep_state: bool, base_path: Option<PathBuf>, default_naming: bool) -> &mut Self {
-        if !self.is_started() {
-            self.keep_state = keep_state;
-            self.ledger_base_path = base_path;
-            self.ledger_default_naming = default_naming;
-        }
+    /// Configure REST server IP, port, and requests per second limit.
+    ///
+    /// # Parameters
+    ///
+    /// * ip_port: `SocketAddr` - IP and port to listen to
+    /// * rps: `u32` - requests per second limit
+    ///
+    /// # Returns
+    ///
+    /// * `Err` if node is NOT in the `Init` state.
+    pub fn cfg_rest(&self, ip_port: SocketAddr, rps: u32) -> Result<()> {
+        let mut data = self.data.lock();
 
+        if !data.is_state(AmareleoApiState::Init) {
+            bail!("Invalid node state {:?}", data.state);
+        }
+        data.rest_ip = ip_port;
+        data.rest_rps = rps;
+        Ok(())
+    }
+
+    /// Same as `cfg_rest` but fails silently.
+    ///
+    /// # Returns
+    ///
+    /// `&Self` allowing for chaining `try_cfg_*()` calls
+    pub fn try_cfg_rest(&self, ip_port: SocketAddr, rps: u32) -> &Self {
+        let _ = self.cfg_rest(ip_port, rps);
         self
     }
 
-    /// Configure file logging path and verbosity level
-    /// log_file: Option<PathBuf> - custom log file path, or None for default path
-    /// verbosity: u8 - log verbosity level between 0 and 4, where 0 is the least verbose
-    pub fn cfg_file_log(&mut self, log_file: Option<PathBuf>, verbosity: u8) -> &mut Self {
-        if !self.is_started() {
-            self.log_mode = AmareleoLog::File(log_file);
-            self.verbosity = verbosity;
-        }
+    /// Configure ledger storage properties.
+    ///
+    /// # Parameters
+    ///
+    /// * keep_state: `bool` - keep ledger state between restarts
+    /// * base_path: `Option<PathBuf>` - custom ledger folder path
+    /// * default_naming: `bool` - if `true` use fixed ledger folder naming, instead of deriving a unique name from the rest IP:port configuration.
+    ///
+    /// # Returns
+    ///
+    /// * `Err` if node is NOT in the `Init` state.
+    pub fn cfg_ledger(&self, keep_state: bool, base_path: Option<PathBuf>, default_naming: bool) -> Result<()> {
+        let mut data = self.data.lock();
 
+        if !data.is_state(AmareleoApiState::Init) {
+            bail!("Invalid node state {:?}", data.state);
+        }
+        data.keep_state = keep_state;
+        data.ledger_base_path = base_path;
+        data.ledger_default_naming = default_naming;
+        Ok(())
+    }
+
+    /// Same as `cfg_ledger` but fails silently.
+    ///
+    /// # Returns
+    ///
+    /// `&Self` allowing for chaining `try_cfg_*()` calls
+    pub fn try_cfg_ledger(&self, keep_state: bool, base_path: Option<PathBuf>, default_naming: bool) -> &Self {
+        let _ = self.cfg_ledger(keep_state, base_path, default_naming);
         self
     }
 
-    /// Configure custom logging
-    /// tracing: TracingHandler - custom tracing subscriber
-    pub fn cfg_custom_log(&mut self, tracing: TracingHandler) -> &mut Self {
-        if !self.is_started() {
-            self.log_mode = AmareleoLog::Custom(tracing);
-        }
+    /// Configure file logging path and verbosity level.
+    ///
+    /// # Parameters
+    ///
+    /// * log_file: `Option<PathBuf>` - custom log file path, or None for default path
+    /// * verbosity: `u8` - log verbosity level between 0 and 4, where 0 is the least verbose
+    ///
+    /// # Returns
+    ///
+    /// * `Err` if node is NOT in the `Init` or `Stopped` state.
+    pub fn cfg_file_log(&self, log_file: Option<PathBuf>, verbosity: u8) -> Result<()> {
+        let mut data = self.data.lock();
 
+        if !data.is_state(AmareleoApiState::Init) && !data.is_state(AmareleoApiState::Stopped) {
+            bail!("Invalid node state {:?}", data.state);
+        }
+        data.log_mode = AmareleoLog::File(log_file);
+        data.verbosity = verbosity;
+        Ok(())
+    }
+
+    /// Same as `cfg_file_log` but fails silently.
+    ///
+    /// # Returns
+    ///
+    /// `&Self` allowing for chaining `try_cfg_*()` calls
+    pub fn try_cfg_file_log(&self, log_file: Option<PathBuf>, verbosity: u8) -> &Self {
+        let _ = self.cfg_file_log(log_file, verbosity);
         self
     }
 
-    /// Disable logging
-    pub fn cfg_no_log(&mut self) -> &mut Self {
-        if !self.is_started() {
-            self.log_mode = AmareleoLog::None;
-        }
+    /// Configure custom tracing subscribers.
+    ///
+    /// # Parameters
+    ///
+    /// * tracing: `TracingHandler` - custom tracing subscriber
+    ///
+    /// # Returns
+    ///
+    /// * `Err` if node is NOT in the `Init` or `Stopped` state.
+    pub fn cfg_custom_log(&self, tracing: TracingHandler) -> Result<()> {
+        let mut data = self.data.lock();
 
+        if !data.is_state(AmareleoApiState::Init) && !data.is_state(AmareleoApiState::Stopped) {
+            bail!("Invalid node state {:?}", data.state);
+        }
+        data.log_mode = AmareleoLog::Custom(tracing);
+        Ok(())
+    }
+
+    /// Same as `cfg_custom_log` but fails silently.
+    ///
+    /// # Returns
+    ///
+    /// `&Self` allowing for chaining `try_cfg_*()` calls
+    pub fn try_cfg_custom_log(&self, tracing: TracingHandler) -> &Self {
+        let _ = self.cfg_custom_log(tracing);
+        self
+    }
+
+    /// Disable logging.
+    ///
+    /// # Returns
+    ///
+    /// * `Err` if node is NOT in the `Init` or `Stopped` state.
+    pub fn cfg_no_log(&self) -> Result<()> {
+        let mut data = self.data.lock();
+
+        if !data.is_state(AmareleoApiState::Init) && !data.is_state(AmareleoApiState::Stopped) {
+            bail!("Invalid node state {:?}", data.state);
+        }
+        data.log_mode = AmareleoLog::None;
+        Ok(())
+    }
+
+    /// Same as `cfg_no_log` but fails silently.
+    ///
+    /// # Returns
+    ///
+    /// `&Self` allowing for chaining `try_cfg_*()` calls
+    pub fn try_cfg_no_log(&self) -> &Self {
+        let _ = self.cfg_no_log();
         self
     }
 }
 
 // AmareleoApi public getters
-impl<N: Network> AmareleoApi<N> {
-    /// Get well known development-mode node account, use the public and private credits to pay for transaction fees.
-    pub fn get_node_account() -> Result<Account<N>> {
-        Account::try_from({
-            // Initialize the (fixed) RNG.
-            let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
-            PrivateKey::<N>::new(&mut rng)?
-        })
-    }
-
-    /// Get resultant log file path, based on current configuration.
-    /// Fails if file logging is not configured.
-    pub fn get_log_file(&self) -> Result<PathBuf> {
-        if !self.log_mode.is_file() {
-            bail!("Logging to file is disabled!");
-        }
-
-        let log_option = self.log_mode.get_path();
-        let log_path = match &log_option {
-            Some(path) => path.clone(),
-            None => {
-                let end_point_tag = endpoint_file_tag::<N>(false, &self.rest_ip)?;
-                amareleo_log_file(N::ID, self.keep_state, &end_point_tag)
-            }
-        };
-
-        Ok(log_path)
-    }
-
-    /// Get resultant ledger folder path, based on current configuration.
-    pub fn get_ledger_folder(&self) -> Result<PathBuf> {
-        let tag = endpoint_file_tag::<N>(self.ledger_default_naming, &self.rest_ip)?;
-        let ledger_path = match &self.ledger_base_path {
-            Some(base_path) => custom_ledger_dir(N::ID, self.keep_state, &tag, base_path.clone()),
-            None => default_ledger_dir(N::ID, self.keep_state, &tag),
-        };
-
-        Ok(ledger_path.to_path_buf())
+impl AmareleoApi {
+    /// Get the node object state
+    ///
+    /// # Returns
+    ///
+    /// * `AmareleoApiState` - one of the enum state values.
+    pub fn get_state(&self) -> AmareleoApiState {
+        self.data.lock().state
     }
 
     /// Check if the node is started
+    ///
+    /// # Returns
+    ///
+    /// * `bool` - `true` if the node is running, `false` otherwise
     pub fn is_started(&self) -> bool {
-        self.validator.is_some()
+        self.data.lock().is_state(AmareleoApiState::Started)
+    }
+
+    /// Get log file path, based on current configuration.
+    /// Fails if file logging is not configured.
+    ///
+    /// Note: Changes in configuration may cause the log file path to change.<br>
+    /// Properties that effect the log file path include:<br>
+    /// - REST endpont
+    /// - network ID
+    /// - ledger state retention flag
+    ///
+    /// # Returns
+    ///
+    /// * `Result<PathBuf>` - log file path
+    pub fn get_log_file(&self) -> Result<PathBuf> {
+        self.data.lock().get_log_file()
+    }
+
+    /// Get ledger folder path, based on the current configuration.
+    ///
+    /// Note: Changes in configuration may cause the ledger path to change.<br>
+    /// Properties that effect the ledger path include:<br>
+    /// - REST endpont (if default naming is disabled)
+    /// - network ID
+    /// - ledger state retention flag
+    ///
+    /// # Returns
+    ///
+    /// * `Result<PathBuf>` - ledger file path
+    pub fn get_ledger_folder(&self) -> Result<PathBuf> {
+        self.data.lock().get_ledger_folder()
     }
 }
 
-// AmareleoApi operations for public consumption
-impl<N: Network> AmareleoApi<N> {
-    /// Start a node instance
-    pub async fn start(&mut self) -> Result<()> {
-        if self.is_started() {
-            bail!("Node already started");
+// AmareleoApi node start operation
+impl AmareleoApi {
+    /// Start node instance
+    ///
+    /// Method should be called when node is in the `Init` or `Stopped` state.<br>
+    /// If the node is in any other state, the method fails.
+    pub async fn start(&self) -> Result<()> {
+        // The state rules are enforced within start_prep/start_complete
+        // Sandwiching validator::new between them, secures against
+        // concurrency.
+        let validator_data = self.start_prep()?;
+        let res = ValidatorApi::new(validator_data).await;
+
+        match res {
+            Ok(vapi) => {
+                self.start_complete(vapi);
+            }
+            Err(error) => {
+                self.start_revert();
+                return Err(error);
+            }
+        };
+
+        Ok(())
+    }
+
+    fn start_prep(&self) -> Result<ValidatorNewData> {
+        let mut data = self.data.lock();
+
+        if !data.is_state(AmareleoApiState::Init) && !data.is_state(AmareleoApiState::Stopped) {
+            bail!("Invalid node state {:?}", data.state);
         }
 
-        let genesis = Self::get_genesis()?;
-        let account = Self::get_node_account()?;
-        let ledger_path = self.get_ledger_folder()?;
+        let ledger_path = data.get_ledger_folder()?;
         let storage_mode = amareleo_storage_mode(ledger_path.clone());
-        if !self.keep_state {
+
+        data.trace_init()?;
+
+        if !data.keep_state {
             // Clean the temporary ledger.
-            Self::clean_tmp_ledger(ledger_path)?;
+            clean_tmp_ledger(ledger_path)?;
         }
+        data.prev_state = data.state;
+        data.state = AmareleoApiState::StartPending;
 
-        self.trace_init()?;
-
-        // Initialize the validator.
-        let validator: Validator<N, ConsensusDB<N>> = Validator::new(
-            self.rest_ip,
-            self.rest_rps,
-            account,
-            genesis,
-            self.keep_state,
-            storage_mode,
-            self.log_trace.clone(),
-            self.shutdown.clone(),
-        )
-        .await?;
-
-        self.validator = Some(Arc::new(validator));
-
-        Ok(())
+        Ok(ValidatorNewData {
+            network_id: data.network_id,
+            rest_ip: data.rest_ip,
+            rest_rps: data.rest_rps,
+            keep_state: data.keep_state,
+            storage_mode: storage_mode.clone(),
+            tracing: data.tracing.clone(),
+            shutdown: data.shutdown.clone(),
+        })
     }
 
-    /// Stop the node instance
-    pub async fn end(&mut self) {
-        if let Some(validator) = &self.validator {
-            validator.shut_down().await;
-            self.validator = None;
-        }
+    fn start_complete(&self, validator: ValidatorApi) {
+        let mut data = self.data.lock();
+        data.validator = validator;
+        data.prev_state = data.state;
+        data.state = AmareleoApiState::Started;
+    }
+
+    fn start_revert(&self) {
+        let mut data = self.data.lock();
+        data.state = data.prev_state;
     }
 }
 
-// AmareleoApi private non-static helpers
-impl<N: Network> AmareleoApi<N> {
-    /// Initialze logging
-    fn trace_init(&mut self) -> Result<()> {
-        // Determine the effective TraceHandler
-        self.log_trace = match &self.log_mode {
-            AmareleoLog::File(_) => Some(initialize_tracing(self.verbosity, self.get_log_file()?)?),
-            AmareleoLog::Custom(tracing) => Some(tracing.clone()),
-            AmareleoLog::None => None,
-        };
-
-        Ok(())
-    }
-}
-
-// AmareleoApi private static helpers
-impl<N: Network> AmareleoApi<N> {
-    // Cleans the temporary ledger
-    fn clean_tmp_ledger(ledger_path: PathBuf) -> Result<()> {
-        // Remove the current proposal cache file, if it exists.
-        let storage_mode = amareleo_storage_mode(ledger_path.clone());
-        let cache_path = proposal_cache_path(&storage_mode)?;
-        if cache_path.exists() {
-            if let Err(err) = std::fs::remove_file(&cache_path) {
-                bail!("Failed on removing proposal cache file at {}: {err}", cache_path.display());
-            }
-        }
-
-        // Remove ledger
-        if ledger_path.exists() {
-            if let Err(err) = std::fs::remove_dir_all(&ledger_path) {
-                bail!("Failed on removing ledger folder {}: {err}", ledger_path.display());
-            }
-        }
-
+// AmareleoApi node stop operation
+impl AmareleoApi {
+    /// Stop node instance
+    ///
+    /// Method should be called when node is in the `Started` state.<br>
+    /// If the node is in any other state, the method fails.
+    pub async fn end(&self) -> Result<()> {
+        // The state rules are enforced within end_prep/end_complete
+        // Sandwiching validator::shut_down between them, secures
+        // against concurrency.
+        let validator_ = self.end_prep()?;
+        validator_.shut_down().await;
+        self.end_complete();
         Ok(())
     }
 
-    // Returns genesis block for the development mode node.
-    fn get_genesis() -> Result<Block<N>> {
-        // Initialize the (fixed) RNG.
-        let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
+    fn end_prep(&self) -> Result<ValidatorApi> {
+        let mut data = self.data.lock();
 
-        // Initialize the development private keys.
-        let development_private_keys = (0..DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS)
-            .map(|_| PrivateKey::<N>::new(&mut rng))
-            .collect::<Result<Vec<_>>>()?;
-        // Initialize the development addresses.
-        let development_addresses =
-            development_private_keys.iter().map(Address::<N>::try_from).collect::<Result<Vec<_>>>()?;
-
-        let (committee, bonded_balances) = {
-            // Calculate the committee stake per member.
-            let stake_per_member = N::STARTING_SUPPLY
-                .saturating_div(2)
-                .saturating_div(DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64);
-            ensure!(stake_per_member >= MIN_VALIDATOR_STAKE, "Committee stake per member is too low");
-
-            // Construct the committee members and distribute stakes evenly among committee members.
-            let members = development_addresses
-                .iter()
-                .map(|address| (*address, (stake_per_member, true, rng.gen_range(0..100))))
-                .collect::<IndexMap<_, _>>();
-
-            // Construct the bonded balances.
-            // Note: The withdrawal address is set to the staker address.
-            let bonded_balances = members
-                .iter()
-                .map(|(address, (stake, _, _))| (*address, (*address, *address, *stake)))
-                .collect::<IndexMap<_, _>>();
-
-            // Construct the committee.
-            let committee = Committee::<N>::new(0u64, members)?;
-            (committee, bonded_balances)
-        };
-
-        // Ensure that the number of committee members is correct.
-        ensure!(
-            committee.members().len() == DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as usize,
-            "Number of committee members {} does not match the expected number of members {DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS}",
-            committee.members().len()
-        );
-
-        // Calculate the public balance per validator.
-        let remaining_balance = N::STARTING_SUPPLY.saturating_sub(committee.total_stake());
-        let public_balance_per_validator =
-            remaining_balance.saturating_div(DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64);
-
-        // Construct the public balances with fairly equal distribution.
-        let mut public_balances = development_private_keys
-            .iter()
-            .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
-            .collect::<Result<IndexMap<_, _>>>()?;
-
-        // If there is some leftover balance, add it to the 0-th validator.
-        let leftover = remaining_balance
-            .saturating_sub(public_balance_per_validator * DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS as u64);
-        if leftover > 0 {
-            let (_, balance) = public_balances.get_index_mut(0).unwrap();
-            *balance += leftover;
+        if !data.is_state(AmareleoApiState::Started) {
+            bail!("Invalid node state {:?}", data.state);
         }
+        data.prev_state = data.state;
+        data.state = AmareleoApiState::StopPending;
 
-        // Check if the sum of committee stakes and public balances equals the total starting supply.
-        let public_balances_sum: u64 = public_balances.values().copied().sum();
-        if committee.total_stake() + public_balances_sum != N::STARTING_SUPPLY {
-            bail!("Sum of committee stakes and public balances does not equal total starting supply.");
-        }
-
-        // Construct the genesis block.
-        Self::load_or_compute_genesis(
-            development_private_keys[0],
-            committee,
-            public_balances,
-            bonded_balances,
-            &mut rng,
-        )
+        Ok(data.validator.clone())
     }
 
-    // Loads or computes the genesis block.
-    fn load_or_compute_genesis(
-        genesis_private_key: PrivateKey<N>,
-        committee: Committee<N>,
-        public_balances: IndexMap<Address<N>, u64>,
-        bonded_balances: IndexMap<Address<N>, (Address<N>, Address<N>, u64)>,
-        rng: &mut ChaChaRng,
-    ) -> Result<Block<N>> {
-        // Construct the preimage.
-        let mut preimage = Vec::new();
-        let raw_block0: &[u8];
-        let raw_blockid: &str;
+    fn end_complete(&self) {
+        let mut data = self.data.lock();
 
-        // Input the network ID.
-        preimage.extend(&N::ID.to_le_bytes());
-        // Input the genesis coinbase target.
-        preimage.extend(&to_bytes_le![N::GENESIS_COINBASE_TARGET]?);
-        // Input the genesis proof target.
-        preimage.extend(&to_bytes_le![N::GENESIS_PROOF_TARGET]?);
-
-        // Input the genesis private key, committee, and public balances.
-        preimage.extend(genesis_private_key.to_bytes_le()?);
-        preimage.extend(committee.to_bytes_le()?);
-        preimage.extend(&to_bytes_le![public_balances.iter().collect::<Vec<(_, _)>>()]?);
-        preimage.extend(&to_bytes_le![
-            bonded_balances
-                .iter()
-                .flat_map(|(staker, (validator, withdrawal, amount))| to_bytes_le![
-                    staker, validator, withdrawal, amount
-                ])
-                .collect::<Vec<_>>()
-        ]?);
-
-        // Input the parameters' metadata based on network
-        match N::ID {
-            snarkvm::console::network::MainnetV0::ID => {
-                preimage.extend(snarkvm::parameters::mainnet::BondValidatorVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::mainnet::BondPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::mainnet::UnbondPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::mainnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::mainnet::SetValidatorStateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::mainnet::TransferPrivateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::mainnet::TransferPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::mainnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::mainnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::mainnet::FeePrivateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::mainnet::FeePublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::mainnet::InclusionVerifier::METADATA.as_bytes());
-                raw_block0 = BLOCK0_MAINNET;
-                raw_blockid = BLOCK0_MAINNET_ID;
-            }
-            snarkvm::console::network::TestnetV0::ID => {
-                preimage.extend(snarkvm::parameters::testnet::BondValidatorVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::testnet::BondPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::testnet::UnbondPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::testnet::ClaimUnbondPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::testnet::SetValidatorStateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::testnet::TransferPrivateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::testnet::TransferPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::testnet::TransferPrivateToPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::testnet::TransferPublicToPrivateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::testnet::FeePrivateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::testnet::FeePublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::testnet::InclusionVerifier::METADATA.as_bytes());
-                raw_block0 = BLOCK0_TESTNET;
-                raw_blockid = BLOCK0_TESTNET_ID;
-            }
-            snarkvm::console::network::CanaryV0::ID => {
-                preimage.extend(snarkvm::parameters::canary::BondValidatorVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::canary::BondPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::canary::UnbondPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::canary::ClaimUnbondPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::canary::SetValidatorStateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::canary::TransferPrivateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::canary::TransferPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::canary::TransferPrivateToPublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::canary::TransferPublicToPrivateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::canary::FeePrivateVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::canary::FeePublicVerifier::METADATA.as_bytes());
-                preimage.extend(snarkvm::parameters::canary::InclusionVerifier::METADATA.as_bytes());
-                raw_block0 = BLOCK0_CANARY;
-                raw_blockid = BLOCK0_CANARY_ID;
-            }
-            _ => {
-                // Unrecognized Network ID
-                bail!("Unrecognized Network ID: {}", N::ID);
-            }
-        }
-
-        // Initialize the hasher.
-        let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
-        // Compute the hash.
-        // NOTE: this is a fast-to-compute but *IMPERFECT* identifier for the genesis block;
-        //       to know the actual genesis block hash, you need to compute the block itself.
-        let hash = hasher.hash(&preimage.to_bits_le())?.to_string();
-        if hash == raw_blockid {
-            let block = Block::from_bytes_le(raw_block0)?;
-            return Ok(block);
-        }
-
-        // A closure to load the block.
-        let load_block = |file_path| -> Result<Block<N>> {
-            // Attempts to load the genesis block file locally.
-            let buffer = std::fs::read(file_path)?;
-            // Return the genesis block.
-            Block::from_bytes_le(&buffer)
-        };
-
-        // Construct the file path.
-        let file_path = std::env::temp_dir().join(hash);
-
-        // Check if the genesis block exists.
-        if file_path.exists() {
-            // If the block loads successfully, return it.
-            if let Ok(block) = load_block(&file_path) {
-                return Ok(block);
-            }
-        }
-
-        /* Otherwise, compute the genesis block and store it. */
-
-        // Initialize a new VM.
-        let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(0u16)?)?;
-        // Initialize the genesis block.
-        let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng)?;
-        // Write the genesis block to the file.
-        std::fs::write(&file_path, block.to_bytes_le()?)?;
-        // Return the genesis block.
-        Ok(block)
+        data.validator = ValidatorApi::None;
+        data.prev_state = data.state;
+        data.state = AmareleoApiState::Stopped;
     }
 }

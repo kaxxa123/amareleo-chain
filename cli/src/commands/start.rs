@@ -29,7 +29,7 @@ use tokio::runtime::{self, Runtime};
 use snarkvm::console::network::{CanaryV0, MainnetV0, Network, TestnetV0};
 
 use crate::helpers::initialize_custom_tracing;
-use amareleo_chain_api::AmareleoApi;
+use amareleo_chain_api::{AmareleoApi, get_node_account};
 
 /// Starts the node.
 #[derive(Clone, Debug, Parser)]
@@ -81,19 +81,16 @@ impl Start {
             // Parse the network.
             match cli.network {
                 MainnetV0::ID => {
-                    let node_api =
-                        cli.start_node::<MainnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
-                    cli.handle_termination(node_api, shutdown);
+                    cli.start_node::<MainnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    cli.handle_termination(shutdown);
                 }
                 TestnetV0::ID => {
-                    let node_api =
-                        cli.start_node::<TestnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
-                    cli.handle_termination(node_api, shutdown);
+                    cli.start_node::<TestnetV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    cli.handle_termination(shutdown);
                 }
                 CanaryV0::ID => {
-                    let node_api =
-                        cli.start_node::<CanaryV0>(shutdown.clone()).await.expect("Failed to parse the node");
-                    cli.handle_termination(node_api, shutdown);
+                    cli.start_node::<CanaryV0>(shutdown.clone()).await.expect("Failed to parse the node");
+                    cli.handle_termination(shutdown);
                 }
                 _ => panic!("Invalid network ID specified"),
             };
@@ -107,7 +104,7 @@ impl Start {
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
-    async fn start_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<AmareleoApi<N>> {
+    async fn start_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<()> {
 
         // Print the welcome.
         println!("{}", Self::welcome_message());
@@ -116,7 +113,7 @@ impl Start {
         let rest_ip_port = self.rest.as_ref().copied().unwrap_or_else(|| "0.0.0.0:3030".parse().unwrap());
 
         // Get the node account.
-        let account = AmareleoApi::<N>::get_node_account()?;
+        let account = get_node_account::<N>()?;
         println!("🔑 Your development private key for node 0 is {}.\n", account.private_key().to_string().bold());
         println!("👛 Your Aleo address is {}.\n", account.address().to_string().bold());
         println!("🧭 Starting node on {}.\n",N::NAME.bold());
@@ -132,15 +129,16 @@ impl Start {
             metrics::initialize_metrics(self.metrics_ip);
         }
 
-        let mut node_api: AmareleoApi<N> = AmareleoApi::default();
+        let node_api= AmareleoApi::new();
 
         // Configure the node api including file logging.
         // We only include file logging for us to easily get the log file path.
         // Ultimately we opt for custom logging.
         node_api
-        .cfg_ledger(self.keep_state, self.storage.clone(), self.keep_state)
-        .cfg_rest(rest_ip_port, self.rest_rps)
-        .cfg_file_log(self.logfile.clone(), self.verbosity);
+        .try_cfg_network(N::ID)
+        .try_cfg_ledger(self.keep_state, self.storage.clone(), self.keep_state)
+        .try_cfg_rest(rest_ip_port, self.rest_rps)
+        .cfg_file_log(self.logfile.clone(), self.verbosity)?;
 
         // Get the log file path and setup custom logging.
         let logfile_path = node_api.get_log_file()?;
@@ -149,18 +147,18 @@ impl Start {
             logfile_path.clone(),
             shutdown)?;
 
-        node_api.cfg_custom_log(tracing);
+        node_api.cfg_custom_log(tracing)?;
 
         println!("📝 Log file path: {}\n", logfile_path.to_string_lossy());
         println!("📁 Ledger folder path: {}\n", node_api.get_ledger_folder()?.to_string_lossy());
 
-        // Initialize the node.
+        // Start the node.
         node_api.start().await?;
-        Ok(node_api)
+        Ok(())
     }
 
     /// Handles OS signals for intercept termination and performing a clean shutdown.
-    fn handle_termination<N: Network>(&self, mut node_api: AmareleoApi<N>, shutdown: Arc<AtomicBool>) {
+    fn handle_termination(&self, shutdown: Arc<AtomicBool>) {
         #[cfg(target_family = "unix")]
         fn signal_listener() -> impl Future<Output = std::io::Result<()>> {
             use tokio::signal::unix::{SignalKind, signal};
@@ -188,7 +186,6 @@ impl Start {
         }
 
         let keep_state = self.keep_state;
-
         tokio::task::spawn(async move {
             match signal_listener().await {
                 Ok(()) => {
@@ -214,7 +211,8 @@ impl Start {
                     shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
 
                     // Shut down the node.
-                    node_api.end().await;
+                    // AmareleoApi is a sigleton, so we can grab a reference to it with new()
+                    let _ = AmareleoApi::new().end().await;
 
                     // Terminate the process.
                     std::process::exit(0);

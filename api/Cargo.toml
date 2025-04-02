@@ -33,6 +33,9 @@ default-features = false
 version = "1.28"
 features = ["rt", "rt-multi-thread"]
 
+[dependencies.parking_lot]
+version = "0.12"
+
 [dependencies.tracing]
 version = "0.1"
 
@@ -61,6 +64,9 @@ path = "../resources"
 version = "=2.1.0"
 
 [dependencies.snarkvm]
+workspace = true
+
+[dependencies.aleo-std]
 workspace = true
 
 [dev-dependencies.serial_test]

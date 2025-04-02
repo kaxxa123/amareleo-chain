@@ -144,6 +144,7 @@ dependencies = [
 name = "amareleo-chain-api"
 version = "2.1.0"
 dependencies = [
+ "aleo-std",
  "amareleo-chain-account",
  "amareleo-chain-resources",
  "amareleo-chain-tracing",
@@ -151,6 +152,7 @@ dependencies = [
  "amareleo-node-bft",
  "anyhow",
  "indexmap 2.7.0",
+ "parking_lot",
  "rand",
  "rand_chacha",
  "serial_test",
