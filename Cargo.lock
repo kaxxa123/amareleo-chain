@@ -152,6 +152,7 @@ dependencies = [
  "amareleo-node-bft",
  "anyhow",
  "indexmap 2.7.0",
+ "parking_lot",
  "rand",
  "rand_chacha",
  "serial_test",
