@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain-resources"
-version = "2.1.0"
+version = "2.2.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "Resources for a lite Aleo development node"
 homepage = "https://amareleo.com"

@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node"
-version = "2.1.0"
+version = "2.2.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A node for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -31,7 +31,7 @@ version = "1.0.79"
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "./metrics"
-version = "=2.1.0"
+version = "=2.2.0"
 optional = true
 
 [dependencies.rand]
@@ -44,27 +44,27 @@ optional = true
 
 [dependencies.amareleo-chain-tracing]
 path = "../tracing"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-chain-account]
 path = "../account"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-node-bft]
 path = "./bft"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-node-consensus]
 path = "./consensus"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-node-rest]
 path = "./rest"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-node-sync]
 path = "./sync"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.snarkvm]
 workspace = true
