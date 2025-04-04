@@ -206,6 +206,7 @@ jobs:
       - run_serial:
           workspace_member: api
           cache_key: v3.0.0-rust-1.83.0-api-cache
+          flags: "--release --lib"
 
   node:
     docker:
