@@ -14,8 +14,10 @@
 // limitations under the License.
 
 use crate::helpers::{BFTSender, Storage};
+use amareleo_chain_tracing::TracingHandlerGuard;
 use amareleo_node_bft_ledger_service::LedgerService;
 use amareleo_node_sync::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
+
 use snarkvm::{
     console::network::Network,
     ledger::authority::Authority,
@@ -51,14 +53,12 @@ impl<N: Network> Sync<N> {
 
     /// Initializes the sync module and sync the storage with the ledger at bootup.
     pub async fn initialize(&self, bft_sender: Option<BFTSender<N>>) -> Result<()> {
-        let _guard = self.storage.get_tracing_guard();
-
         // If a BFT sender was provided, set it.
         if let Some(bft_sender) = bft_sender {
             self.bft_sender.set(bft_sender).expect("BFT sender already set in gateway");
         }
 
-        info!("Syncing storage with the ledger...");
+        guard_info!(&self.storage, "Syncing storage with the ledger...");
 
         // Sync the storage with the ledger.
         self.sync_storage_with_ledger_at_bootup().await
@@ -66,8 +66,7 @@ impl<N: Network> Sync<N> {
 
     /// Starts the sync module.
     pub async fn run(&self) -> Result<()> {
-        let _guard = self.storage.get_tracing_guard();
-        info!("Starting the sync module...");
+        guard_info!(&self.storage, "Starting the sync module...");
 
         // Update the sync status.
         self.is_block_synced.store(true, Ordering::SeqCst);
@@ -84,7 +83,6 @@ impl<N: Network> Sync<N> {
 impl<N: Network> Sync<N> {
     /// Syncs the storage with the ledger at bootup.
     async fn sync_storage_with_ledger_at_bootup(&self) -> Result<()> {
-        let _guard = self.storage.get_tracing_guard();
         // Retrieve the latest block in the ledger.
         let latest_block = self.ledger.latest_block();
 
@@ -102,7 +100,12 @@ impl<N: Network> Sync<N> {
         // Retrieve the blocks.
         let blocks = self.ledger.get_blocks(gc_height..block_height.saturating_add(1))?;
 
-        debug!("Syncing storage with the ledger from block {} to {}...", gc_height, block_height.saturating_add(1));
+        guard_debug!(
+            &self.storage,
+            "Syncing storage with the ledger from block {} to {}...",
+            gc_height,
+            block_height.saturating_add(1)
+        );
 
         /* Sync storage */
 

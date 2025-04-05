@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain"
-version = "2.1.0"
+version = "2.2.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -26,7 +26,6 @@ members = [
   "tracing",
   "node", 
   "node/bft",
-  "node/bft/events",
   "node/bft/ledger-service",
   "node/bft/storage-service",
   "node/consensus",
@@ -59,7 +58,7 @@ default-features = false
 #path = "../snarkVM"
 #git = "https://github.com/ProvableHQ/snarkVM.git"
 #rev = "c15997f"
-version = "=1.4.0"
+version = "=1.5.0"
 features = [ "circuit", "console", "rocks" ]
 
 [dependencies.anyhow]
@@ -71,44 +70,44 @@ features = [ "derive" ]
 
 [dependencies.amareleo-chain-account]
 path = "./account"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-chain-cli]
 path = "./cli"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-chain-tracing]
 path = "./tracing"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-chain-api]
 path = "./api"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-node]
 path = "./node"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-node-bft]
 path = "./node/bft"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-node-consensus]
 path = "./node/consensus"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-node-metrics]
 path = "./node/metrics"
-version = "=2.1.0"
+version = "=2.2.0"
 optional = true
 
 [dependencies.amareleo-node-rest]
 path = "./node/rest"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-node-sync]
 path = "./node/sync"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 tikv-jemallocator = "0.5"

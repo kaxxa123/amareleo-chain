@@ -18,8 +18,11 @@
 #[macro_use]
 extern crate tracing;
 
+#[macro_use]
+extern crate amareleo_chain_tracing;
+
 use amareleo_chain_account::Account;
-use amareleo_chain_tracing::TracingHandler;
+use amareleo_chain_tracing::{TracingHandler, TracingHandlerGuard};
 use amareleo_node_bft::{
     BFT,
     MAX_BATCH_DELAY_IN_MS,
@@ -113,6 +116,13 @@ pub struct Consensus<N: Network> {
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
+impl<N: Network> TracingHandlerGuard for Consensus<N> {
+    /// Retruns tracing guard
+    fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.as_ref().and_then(|trace_handle| trace_handle.get_tracing_guard())
+    }
+}
+
 impl<N: Network> Consensus<N> {
     /// Initializes a new instance of consensus.
     pub fn new(
@@ -147,17 +157,28 @@ impl<N: Network> Consensus<N> {
 
     /// Run the consensus instance.
     pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
-        let _guard = self.get_tracing_guard();
-        info!("Starting the consensus instance...");
-        // Set the primary sender.
-        self.primary_sender.set(primary_sender.clone()).expect("Primary sender already set");
+        guard_info!(self, "Starting the consensus instance...");
 
-        // First, initialize the consensus channels.
+        // Set the primary sender.
+        let result = self.primary_sender.set(primary_sender.clone());
+        if result.is_err() {
+            bail!("Unexpected: Primary sender already set");
+        }
+
+        // Initialize communications between Consensus and BFT.
         let (consensus_sender, consensus_receiver) = init_consensus_channels();
-        // Then, start the consensus handlers.
+
+        // Start the Consensus handlers.
         self.start_handlers(consensus_receiver);
-        // Lastly, the consensus.
-        self.bft.run(Some(consensus_sender), primary_sender, primary_receiver).await?;
+
+        // Run the BFT.
+        let result = self.bft.run(Some(consensus_sender), primary_sender, primary_receiver).await;
+        if let Err(err) = result {
+            guard_error!(self, "Consensus failed to run the BFT instance - {err}");
+            self.shut_down().await;
+            return Err(err);
+        }
+
         Ok(())
     }
 
@@ -172,13 +193,8 @@ impl<N: Network> Consensus<N> {
     }
 
     /// Returns the primary sender.
-    pub fn primary_sender(&self) -> &PrimarySender<N> {
+    fn primary_sender(&self) -> &PrimarySender<N> {
         self.primary_sender.get().expect("Primary sender not set")
-    }
-
-    /// Retruns tracing guard
-    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
-        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
     }
 }
 
@@ -294,8 +310,6 @@ impl<N: Network> Consensus<N> {
 impl<N: Network> Consensus<N> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: Solution<N>) -> Result<()> {
-        let _guard = self.get_tracing_guard();
-
         // Calculate the transmission checksum.
         let checksum = Data::<Solution<N>>::Buffer(solution.to_bytes_le()?.into()).to_checksum::<N>()?;
         #[cfg(feature = "metrics")]
@@ -320,7 +334,7 @@ impl<N: Network> Consensus<N> {
                 bail!("Solution '{}' exists in the ledger {}", fmt_id(solution_id), "(skipping)".dimmed());
             }
             // Add the solution to the memory pool.
-            trace!("Received unconfirmed solution '{}' in the queue", fmt_id(solution_id));
+            guard_trace!(self, "Received unconfirmed solution '{}' in the queue", fmt_id(solution_id));
             if self.solutions_queue.lock().put(solution_id, solution).is_some() {
                 bail!("Solution '{}' exists in the memory pool", fmt_id(solution_id));
             }
@@ -332,8 +346,6 @@ impl<N: Network> Consensus<N> {
 
     /// Processes unconfirmed transactions in the memory pool.
     pub async fn process_unconfirmed_solutions(&self) -> Result<()> {
-        let _guard = self.get_tracing_guard();
-
         // If the memory pool of this node is full, return early.
         let num_unconfirmed_solutions = self.num_unconfirmed_solutions();
         let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
@@ -356,14 +368,18 @@ impl<N: Network> Consensus<N> {
         // Iterate over the solutions.
         for solution in solutions.into_iter() {
             let solution_id = solution.id();
-            trace!("Adding unconfirmed solution '{}' to the memory pool...", fmt_id(solution_id));
+            guard_trace!(self, "Adding unconfirmed solution '{}' to the memory pool...", fmt_id(solution_id));
             // Send the unconfirmed solution to the primary.
             if let Err(e) = self.primary_sender().send_unconfirmed_solution(solution_id, Data::Object(solution)).await {
                 // If the BFT is synced, then log the warning.
                 if self.bft.is_synced() {
                     // If error occurs after the first 10 blocks of the epoch, log it as a warning, otherwise ignore.
                     if self.ledger().latest_block_height() % N::NUM_BLOCKS_PER_EPOCH > 10 {
-                        warn!("Failed to add unconfirmed solution '{}' to the memory pool - {e}", fmt_id(solution_id))
+                        guard_warn!(
+                            self,
+                            "Failed to add unconfirmed solution '{}' to the memory pool - {e}",
+                            fmt_id(solution_id)
+                        )
                     };
                 }
             }
@@ -373,8 +389,6 @@ impl<N: Network> Consensus<N> {
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
-        let _guard = self.get_tracing_guard();
-
         // Calculate the transmission checksum.
         let checksum = Data::<Transaction<N>>::Buffer(transaction.to_bytes_le()?.into()).to_checksum::<N>()?;
         #[cfg(feature = "metrics")]
@@ -403,7 +417,7 @@ impl<N: Network> Consensus<N> {
                 bail!("Transaction '{}' exists in the ledger {}", fmt_id(transaction_id), "(skipping)".dimmed());
             }
             // Add the transaction to the memory pool.
-            trace!("Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
+            guard_trace!(self, "Received unconfirmed transaction '{}' in the queue", fmt_id(transaction_id));
             if transaction.is_deploy() {
                 if self.transactions_queue.lock().deployments.put(transaction_id, transaction).is_some() {
                     bail!("Transaction '{}' exists in the memory pool", fmt_id(transaction_id));
@@ -419,8 +433,6 @@ impl<N: Network> Consensus<N> {
 
     /// Processes unconfirmed transactions in the memory pool.
     pub async fn process_unconfirmed_transactions(&self) -> Result<()> {
-        let _guard = self.get_tracing_guard();
-
         // If the memory pool of this node is full, return early.
         let num_unconfirmed_transmissions = self.num_unconfirmed_transmissions();
         if num_unconfirmed_transmissions >= Primary::<N>::MAX_TRANSMISSIONS_TOLERANCE {
@@ -453,14 +465,15 @@ impl<N: Network> Consensus<N> {
         // Iterate over the transactions.
         for transaction in transactions.into_iter() {
             let transaction_id = transaction.id();
-            trace!("Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
+            guard_trace!(self, "Adding unconfirmed transaction '{}' to the memory pool...", fmt_id(transaction_id));
             // Send the unconfirmed transaction to the primary.
             if let Err(e) =
                 self.primary_sender().send_unconfirmed_transaction(transaction_id, Data::Object(transaction)).await
             {
                 // If the BFT is synced, then log the warning.
                 if self.bft.is_synced() {
-                    warn!(
+                    guard_warn!(
+                        self,
                         "Failed to add unconfirmed transaction '{}' to the memory pool - {e}",
                         fmt_id(transaction_id)
                     );
@@ -486,19 +499,17 @@ impl<N: Network> Consensus<N> {
 
         // Process the unconfirmed transactions in the memory pool.
         let self_ = self.clone();
-        let trace_guard = self.get_tracing_guard();
         self.spawn(async move {
-            let _guard = trace_guard;
             loop {
                 // Sleep briefly.
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY_IN_MS)).await;
                 // Process the unconfirmed transactions in the memory pool.
                 if let Err(e) = self_.process_unconfirmed_transactions().await {
-                    warn!("Cannot process unconfirmed transactions - {e}");
+                    guard_warn!(self_, "Cannot process unconfirmed transactions - {e}");
                 }
                 // Process the unconfirmed solutions in the memory pool.
                 if let Err(e) = self_.process_unconfirmed_solutions().await {
-                    warn!("Cannot process unconfirmed solutions - {e}");
+                    guard_warn!(self_, "Cannot process unconfirmed solutions - {e}");
                 }
             }
         });
@@ -511,8 +522,6 @@ impl<N: Network> Consensus<N> {
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
         callback: oneshot::Sender<Result<()>>,
     ) {
-        let _guard = self.get_tracing_guard();
-
         // Try to advance to the next block.
         let self_ = self.clone();
         let transmissions_ = transmissions.clone();
@@ -520,7 +529,7 @@ impl<N: Network> Consensus<N> {
 
         // If the block failed to advance, reinsert the transmissions into the memory pool.
         if let Err(e) = &result {
-            error!("Unable to advance to the next block - {e}");
+            guard_error!(self, "Unable to advance to the next block - {e}");
             // On failure, reinsert the transmissions into the memory pool.
             self.reinsert_transmissions(transmissions).await;
         }
@@ -585,13 +594,12 @@ impl<N: Network> Consensus<N> {
 
     /// Reinserts the given transmissions into the memory pool.
     async fn reinsert_transmissions(&self, transmissions: IndexMap<TransmissionID<N>, Transmission<N>>) {
-        let _guard = self.get_tracing_guard();
-
         // Iterate over the transmissions.
         for (transmission_id, transmission) in transmissions.into_iter() {
             // Reinsert the transmission into the memory pool.
             if let Err(e) = self.reinsert_transmission(transmission_id, transmission).await {
-                warn!(
+                guard_warn!(
+                    self,
                     "Unable to reinsert transmission {}.{} into the memory pool - {e}",
                     fmt_id(transmission_id),
                     fmt_id(transmission_id.checksum().unwrap_or_default()).dimmed()
@@ -632,11 +640,14 @@ impl<N: Network> Consensus<N> {
 
     /// Shuts down the BFT.
     pub async fn shut_down(&self) {
-        let _guard = self.get_tracing_guard();
-        info!("Shutting down consensus...");
+        guard_info!(self, "Shutting down consensus...");
+
         // Shut down the BFT.
         self.bft.shut_down().await;
-        // Abort the tasks.
-        self.handles.lock().iter().for_each(|handle| handle.abort());
+
+        // Abort Consensus tasks.
+        let mut handles = self.handles.lock();
+        handles.iter().for_each(|handle| handle.abort());
+        handles.clear();
     }
 }

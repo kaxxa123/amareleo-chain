@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-bft-ledger-service"
-version = "2.1.0"
+version = "2.2.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A ledger service for the memory pool in a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -34,7 +34,7 @@ optional = true
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "../../metrics"
-version = "=2.1.0"
+version = "=2.2.0"
 optional = true
 
 [dependencies.parking_lot]
@@ -63,4 +63,4 @@ optional = true
 
 [dependencies.amareleo-chain-tracing]
 path = "../../../tracing"
-version = "=2.1.0"
+version = "=2.2.0"

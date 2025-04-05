@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use amareleo_chain_account::Account;
-use amareleo_chain_tracing::TracingHandler;
+use amareleo_chain_tracing::{TracingHandler, TracingHandlerGuard};
 use amareleo_node_bft::{helpers::init_primary_channels, ledger_service::CoreLedgerService};
 use amareleo_node_consensus::Consensus;
 use amareleo_node_rest::Rest;
@@ -23,13 +23,10 @@ use snarkvm::prelude::{Ledger, Network, block::Block, store::ConsensusStorage};
 
 use aleo_std::StorageMode;
 use anyhow::Result;
-use core::future::Future;
-use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
     sync::{Arc, atomic::AtomicBool},
 };
-use tokio::task::JoinHandle;
 use tracing::subscriber::DefaultGuard;
 
 /// A validator is a full node, capable of validating blocks.
@@ -41,12 +38,17 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     consensus: Consensus<N>,
     /// The REST server of the node.
     rest: Option<Rest<N, C>>,
-    /// The spawned handles.
-    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// Tracing handle
     tracing: Option<TracingHandler>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
+}
+
+impl<N: Network, C: ConsensusStorage<N>> TracingHandlerGuard for Validator<N, C> {
+    /// Retruns tracing guard
+    fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.as_ref().and_then(|trace_handle| trace_handle.get_tracing_guard())
+    }
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
@@ -63,36 +65,28 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     ) -> Result<Self> {
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, storage_mode.clone())?;
+        let tracing_: TracingHandler = tracing.clone().into();
 
-        // Initialize the ledger service.
+        // Initialize and start the Consensus
+        guard_info!(tracing_, "Starting Consensus...");
         let ledger_service = Arc::new(CoreLedgerService::new(ledger.clone(), tracing.clone(), shutdown.clone()));
-
-        // Initialize the consensus.
         let mut consensus =
             Consensus::new(account.clone(), ledger_service.clone(), keep_state, storage_mode.clone(), tracing.clone())?;
-        // Initialize the primary channels.
+
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
-        // Start the consensus.
         consensus.run(primary_sender, primary_receiver).await?;
 
-        // Initialize the node.
-        let mut node = Self {
-            ledger: ledger.clone(),
-            consensus: consensus.clone(),
-            rest: None,
-            handles: Default::default(),
-            tracing: tracing.clone(),
-            shutdown,
-        };
-
         // Initialize the REST server.
-        node.rest = Some(Rest::start(rest_ip, rest_rps, Some(consensus), ledger.clone(), tracing.clone()).await?);
-
-        // Initialize the notification message loop.
-        node.handles.lock().push(crate::start_notification_message_loop());
+        guard_info!(tracing_, "Starting the REST server...");
+        let rest_srv = Rest::start(rest_ip, rest_rps, Some(consensus.clone()), ledger.clone(), tracing.clone()).await;
+        if let Err(err) = rest_srv {
+            guard_error!(tracing_, "Failed to start REST server: {:?}", err);
+            consensus.shut_down().await;
+            return Err(err);
+        }
 
         // Return the node.
-        Ok(node)
+        Ok(Self { ledger, consensus, rest: Some(rest_srv.unwrap()), tracing, shutdown })
     }
 
     /// Returns the ledger.
@@ -107,44 +101,25 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
-    /// Spawns a task with the given future; it should only be used for long-running tasks.
-    pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
-        self.handles.lock().push(tokio::spawn(future));
-    }
-}
-
-impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
-    /// Retruns tracing guard
-    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
-        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
-    }
-
     /// Shuts down the node.
     pub async fn shut_down(&self) {
-        let _guard = self.get_tracing_guard();
-
-        info!("Shutting down...");
+        // Flag that we are shutting down.
+        // This will prevent adding further blocks to the ledger.
+        guard_info!(self, "Shutting down...");
+        self.shutdown.store(true, std::sync::atomic::Ordering::Release);
 
         // Shut down rest server.
         if let Some(rest) = &self.rest {
-            trace!("Shutting down the REST server...");
+            guard_trace!(self, "Shutting down the REST server...");
             rest.shut_down().await;
         }
 
-        // Shut down the node.
-        trace!("Shutting down the node...");
-        self.shutdown.store(true, std::sync::atomic::Ordering::Release);
-
-        // Abort the tasks.
-        trace!("Shutting down the validator...");
-        self.handles.lock().iter().for_each(|handle| handle.abort());
-
         // Shut down consensus.
-        trace!("Shutting down consensus...");
+        guard_trace!(self, "Shutting down consensus...");
         self.consensus.shut_down().await;
 
-        info!("Node has shut down.");
-        info!("");
+        guard_info!(self, "Node has shut down.");
+        guard_info!(self, "");
     }
 }
 

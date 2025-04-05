@@ -18,3 +18,58 @@ pub use trace_layers::*;
 
 mod logger;
 pub use logger::*;
+
+/// macro to setup info tracing subscribers for structs implementing TracingHandlerGuard
+#[macro_export]
+macro_rules! guard_info {
+    ($guard_expr:expr, $($args:tt)*) => {
+        {
+            let _guard = (&$guard_expr).get_tracing_guard();
+            info!($($args)*);
+        }
+    };
+}
+
+/// macro to setup warn tracing subscribers for structs implementing TracingHandlerGuard
+#[macro_export]
+macro_rules! guard_warn {
+    ($guard_expr:expr, $($args:tt)*) => {
+        {
+            let _guard = (&$guard_expr).get_tracing_guard();
+            warn!($($args)*);
+        }
+    };
+}
+
+/// macro to setup error tracing subscribers for structs implementing TracingHandlerGuard
+#[macro_export]
+macro_rules! guard_error {
+    ($guard_expr:expr, $($args:tt)*) => {
+        {
+            let _guard = (&$guard_expr).get_tracing_guard();
+            error!($($args)*);
+        }
+    };
+}
+
+/// macro to setup debug tracing subscribers for structs implementing TracingHandlerGuard
+#[macro_export]
+macro_rules! guard_debug {
+    ($guard_expr:expr, $($args:tt)*) => {
+        {
+            let _guard = (&$guard_expr).get_tracing_guard();
+            debug!($($args)*);
+        }
+    };
+}
+
+/// macro to setup trace tracing subscribers for structs implementing TracingHandlerGuard
+#[macro_export]
+macro_rules! guard_trace {
+    ($guard_expr:expr, $($args:tt)*) => {
+        {
+            let _guard = (&$guard_expr).get_tracing_guard();
+            trace!($($args)*);
+        }
+    };
+}

@@ -16,6 +16,14 @@
 #![forbid(unsafe_code)]
 #![allow(clippy::type_complexity)]
 
+#[cfg(feature = "tracing")]
+#[macro_use]
+extern crate tracing;
+
+#[cfg(feature = "tracing")]
+#[macro_use]
+extern crate amareleo_chain_tracing;
+
 #[cfg(feature = "memory")]
 pub mod memory;
 #[cfg(feature = "memory")]

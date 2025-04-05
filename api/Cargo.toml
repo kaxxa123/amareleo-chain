@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain-api"
-version = "2.1.0"
+version = "2.2.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "API for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -33,6 +33,9 @@ default-features = false
 version = "1.28"
 features = ["rt", "rt-multi-thread"]
 
+[dependencies.parking_lot]
+version = "0.12"
+
 [dependencies.tracing]
 version = "0.1"
 
@@ -42,25 +45,28 @@ features = ["env-filter"]
 
 [dependencies.amareleo-chain-account]
 path = "../account"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-chain-tracing]
 path = "../tracing"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-node]
 path = "../node"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-node-bft]
 path = "../node/bft"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.amareleo-chain-resources]
 path = "../resources"
-version = "=2.1.0"
+version = "=2.2.0"
 
 [dependencies.snarkvm]
+workspace = true
+
+[dependencies.aleo-std]
 workspace = true
 
 [dev-dependencies.serial_test]

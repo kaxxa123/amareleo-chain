@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::StorageService;
-use amareleo_chain_tracing::TracingHandler;
+use amareleo_chain_tracing::{TracingHandler, TracingHandlerGuard};
 use snarkvm::{
     ledger::{
         committee::Committee,
@@ -45,7 +45,6 @@ use std::{
     collections::{HashMap, HashSet},
     num::NonZeroUsize,
 };
-use tracing::error;
 
 /// A BFT persistent storage service.
 #[derive(Debug)]
@@ -60,6 +59,13 @@ pub struct BFTPersistentStorage<N: Network> {
     cache_aborted_transmission_ids: Mutex<LruCache<TransmissionID<N>, IndexSet<Field<N>>>>,
     /// Tracing handle
     tracing: Option<TracingHandler>,
+}
+
+impl<N: Network> TracingHandlerGuard for BFTPersistentStorage<N> {
+    /// Retruns tracing guard
+    fn get_tracing_guard(&self) -> Option<DefaultGuard> {
+        self.tracing.as_ref().and_then(|trace_handle| trace_handle.get_tracing_guard())
+    }
 }
 
 impl<N: Network> BFTPersistentStorage<N> {
@@ -81,11 +87,6 @@ impl<N: Network> BFTPersistentStorage<N> {
             cache_aborted_transmission_ids: Mutex::new(LruCache::new(capacity)),
             tracing,
         })
-    }
-
-    /// Retruns tracing guard
-    pub fn get_tracing_guard(&self) -> Option<DefaultGuard> {
-        self.tracing.clone().map(|trace_handle| trace_handle.subscribe_thread())
     }
 
     /// Initializes a new BFT persistent storage service for testing.
@@ -117,18 +118,19 @@ impl<N: Network> BFTPersistentStorage<N> {
 impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     /// Returns `true` if the storage contains the specified `transmission ID`.
     fn contains_transmission(&self, transmission_id: TransmissionID<N>) -> bool {
-        let _guard = self.get_tracing_guard();
         // Check if the transmission ID exists in storage.
         match self.transmissions.contains_key_confirmed(&transmission_id) {
             Ok(true) => return true,
             Ok(false) => (),
-            Err(error) => error!("Failed to check if transmission ID exists in confirmed storage - {error}"),
+            Err(error) => {
+                guard_error!(self, "Failed to check if transmission ID exists in confirmed storage - {error}")
+            }
         }
         // Check if the transmission ID is in aborted storage.
         match self.aborted_transmission_ids.contains_key_confirmed(&transmission_id) {
             Ok(result) => result,
             Err(error) => {
-                error!("Failed to check if aborted transmission ID exists in storage - {error}");
+                guard_error!(self, "Failed to check if aborted transmission ID exists in storage - {error}");
                 false
             }
         }
@@ -137,7 +139,6 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     /// Returns the transmission for the given `transmission ID`.
     /// If the transmission ID does not exist in storage, `None` is returned.
     fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>> {
-        let _guard = self.get_tracing_guard();
         // Try to get the transmission from the cache first.
         if let Some((transmission, _)) = self.cache_transmissions.lock().get_mut(&transmission_id) {
             return Some(transmission.clone());
@@ -149,7 +150,7 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
             Ok(Some(Cow::Borrowed((transmission, _)))) => Some(transmission.clone()),
             Ok(None) => None,
             Err(error) => {
-                error!("Failed to get transmission from storage - {error}");
+                guard_error!(self, "Failed to get transmission from storage - {error}");
                 None
             }
         }
@@ -194,7 +195,6 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
         aborted_transmission_ids: HashSet<TransmissionID<N>>,
         mut missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
-        let _guard = self.get_tracing_guard();
         // First, handle the non-aborted transmissions.
         'outer: for transmission_id in transmission_ids {
             // Try to fetch from the persistent storage.
@@ -212,7 +212,7 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                         if !aborted_transmission_ids.contains(&transmission_id)
                             && !self.contains_transmission(transmission_id)
                         {
-                            error!("Failed to provide a missing transmission {transmission_id}");
+                            guard_error!(self, "Failed to provide a missing transmission {transmission_id}");
                         }
                         continue 'outer;
                     };
@@ -222,14 +222,17 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                 }
                 Err(e) => {
                     // Handle any errors during the retrieval.
-                    error!("Failed to process the 'insert' for transmission {transmission_id} into storage - {e}");
+                    guard_error!(
+                        self,
+                        "Failed to process the 'insert' for transmission {transmission_id} into storage - {e}"
+                    );
                     continue;
                 }
             };
             // Insert the transmission into persistent storage.
             if let Err(e) = self.transmissions.insert(transmission_id, (transmission.clone(), certificate_ids.clone()))
             {
-                error!("Failed to insert transmission {transmission_id} into storage - {e}");
+                guard_error!(self, "Failed to insert transmission {transmission_id} into storage - {e}");
             }
             // Insert the transmission into the cache.
             self.cache_transmissions.lock().put(transmission_id, (transmission, certificate_ids));
@@ -246,7 +249,8 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                 }
                 Ok(None) => indexset! { certificate_id },
                 Err(e) => {
-                    error!(
+                    guard_error!(
+                        self,
                         "Failed to process the 'insert' for aborted transmission ID {aborted_transmission_id} into storage - {e}"
                     );
                     continue;
@@ -254,7 +258,10 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
             };
             // Insert the certificate IDs into the persistent storage.
             if let Err(e) = self.aborted_transmission_ids.insert(aborted_transmission_id, certificate_ids.clone()) {
-                error!("Failed to insert aborted transmission ID {aborted_transmission_id} into storage - {e}");
+                guard_error!(
+                    self,
+                    "Failed to insert aborted transmission ID {aborted_transmission_id} into storage - {e}"
+                );
             }
             // Insert the certificate IDs into the cache.
             self.cache_aborted_transmission_ids.lock().put(aborted_transmission_id, certificate_ids);
@@ -265,7 +272,6 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
     ///
     /// If the transmission no longer references any certificate IDs, the entry is removed from storage.
     fn remove_transmissions(&self, certificate_id: &Field<N>, transmission_ids: &IndexSet<TransmissionID<N>>) {
-        let _guard = self.get_tracing_guard();
         // If this is the last certificate ID for the transmission ID, remove the transmission.
         for transmission_id in transmission_ids {
             // Retrieve the transmission entry.
@@ -278,14 +284,18 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                     if certificate_ids.is_empty() {
                         // Remove the transmission entry.
                         if let Err(e) = self.transmissions.remove(transmission_id) {
-                            error!("Failed to remove transmission {transmission_id} (now empty) from storage - {e}");
+                            guard_error!(
+                                self,
+                                "Failed to remove transmission {transmission_id} (now empty) from storage - {e}"
+                            );
                         }
                     }
                     // Otherwise, update the transmission entry.
                     else {
                         // Update the transmission entry.
                         if let Err(e) = self.transmissions.insert(*transmission_id, (transmission, certificate_ids)) {
-                            error!(
+                            guard_error!(
+                                self,
                                 "Failed to remove transmission {transmission_id} for certificate {certificate_id} from storage - {e}"
                             );
                         }
@@ -293,7 +303,10 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                 }
                 Ok(None) => { /* no-op */ }
                 Err(e) => {
-                    error!("Failed to process the 'remove' for transmission {transmission_id} from storage - {e}");
+                    guard_error!(
+                        self,
+                        "Failed to process the 'remove' for transmission {transmission_id} from storage - {e}"
+                    );
                 }
             }
             // Retrieve the aborted transmission ID entry.
@@ -306,7 +319,8 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                     if certificate_ids.is_empty() {
                         // Remove the transmission entry.
                         if let Err(e) = self.aborted_transmission_ids.remove(transmission_id) {
-                            error!(
+                            guard_error!(
+                                self,
                                 "Failed to remove aborted transmission ID {transmission_id} (now empty) from storage - {e}"
                             );
                         }
@@ -315,7 +329,8 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                     else {
                         // Update the transmission entry.
                         if let Err(e) = self.aborted_transmission_ids.insert(*transmission_id, certificate_ids) {
-                            error!(
+                            guard_error!(
+                                self,
                                 "Failed to remove aborted transmission ID {transmission_id} for certificate {certificate_id} from storage - {e}"
                             );
                         }
@@ -323,7 +338,8 @@ impl<N: Network> StorageService<N> for BFTPersistentStorage<N> {
                 }
                 Ok(None) => { /* no-op */ }
                 Err(e) => {
-                    error!(
+                    guard_error!(
+                        self,
                         "Failed to process the 'remove' for aborted transmission ID {transmission_id} from storage - {e}"
                     );
                 }

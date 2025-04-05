@@ -20,6 +20,9 @@
 #[macro_use]
 extern crate tracing;
 
+#[macro_use]
+extern crate amareleo_chain_tracing;
+
 pub use amareleo_node_bft as bft;
 pub use amareleo_node_consensus as consensus;
 pub use amareleo_node_rest as rest;
@@ -28,15 +31,3 @@ pub use snarkvm;
 
 mod validator;
 pub use validator::*;
-
-/// Starts the notification message loop.
-pub fn start_notification_message_loop() -> tokio::task::JoinHandle<()> {
-    // let mut interval = tokio::time::interval(std::time::Duration::from_secs(180));
-    tokio::spawn(async move {
-        //     loop {
-        //         interval.tick().await;
-        //         // TODO (howardwu): Swap this with the official message for announcements.
-        //         // info!("{}", notification_message());
-        //     }
-    })
-}

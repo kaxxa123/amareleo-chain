@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use snarkvm::{
-    console::{algorithms::Hash, network::Network},
+    console::{algorithms::Hash, network::MainnetV0},
     prelude::{Result, ToBits, ToBytes, anyhow, bail},
 };
 
@@ -31,7 +31,7 @@ const LOG_TMP_FILE: &str = "amareleo-chain-tmp";
 pub const DEFAULT_FILE_TAG: &str = "0";
 
 /// A string derived from the hash of the REST endpoint, giving us a unique filename per endpoint.
-pub fn endpoint_file_tag<N: Network>(force_default: bool, endpoint: &SocketAddr) -> Result<String> {
+pub fn endpoint_file_tag(force_default: bool, endpoint: &SocketAddr) -> Result<String> {
     if force_default {
         return Ok(DEFAULT_FILE_TAG.to_string());
     }
@@ -42,7 +42,7 @@ pub fn endpoint_file_tag<N: Network>(force_default: bool, endpoint: &SocketAddr)
     }
 
     // Initialize the hasher.
-    let hasher = snarkvm::console::algorithms::BHP256::<N>::setup("aleo.dev.block")?;
+    let hasher = snarkvm::console::algorithms::BHP256::<MainnetV0>::setup("aleo.dev.block")?;
     let endpoint_str = endpoint.to_string();
     let bits = endpoint_str.to_bits_le();
     let hash = hasher.hash(&bits)?.to_bytes_le()?;

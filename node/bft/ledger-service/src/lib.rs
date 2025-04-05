@@ -15,6 +15,14 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "tracing")]
+#[macro_use]
+extern crate tracing;
+
+#[cfg(feature = "tracing")]
+#[macro_use]
+extern crate amareleo_chain_tracing;
+
 #[macro_use]
 extern crate async_trait;
 
@@ -27,11 +35,6 @@ pub use ledger::*;
 pub mod mock;
 #[cfg(feature = "mock")]
 pub use mock::*;
-
-#[cfg(feature = "prover")]
-pub mod prover;
-#[cfg(feature = "prover")]
-pub use prover::*;
 
 pub mod traits;
 pub use traits::*;

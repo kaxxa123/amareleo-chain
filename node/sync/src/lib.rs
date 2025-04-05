@@ -15,9 +15,6 @@
 
 #![forbid(unsafe_code)]
 
-#[macro_use]
-extern crate tracing;
-
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 /// This is a dummy IP address that is used to represent the local node.
