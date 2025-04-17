@@ -12,9 +12,15 @@ edition = "2021"
 
 [features]
 default = ["rayon", "snarkvm/metrics"]
+locktick = ["dep:locktick", "snarkvm/locktick"]
 metrics = ["snarkvm/metrics"]
 serial = ["snarkvm/metrics"]
 test_targets = ["snarkvm/test_targets"]
+
+[dependencies.locktick]
+version = "0.3"
+features = ["parking_lot"]
+optional = true
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.13"

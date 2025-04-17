@@ -11,6 +11,12 @@ license = "Apache-2.0"
 edition = "2021"
 
 [features]
+locktick = [
+    "dep:locktick",
+    "amareleo-node/locktick",
+    "amareleo-node-bft/locktick",
+    "snarkvm/locktick",
+]
 metrics = ["amareleo-node/metrics"]
 test_targets = ["snarkvm/test_targets"]
 
@@ -32,6 +38,11 @@ default-features = false
 [dependencies.tokio]
 version = "1.28"
 features = ["rt", "rt-multi-thread"]
+
+[dependencies.locktick]
+version = "0.3"
+features = ["parking_lot"]
+optional = true
 
 [dependencies.parking_lot]
 version = "0.12"

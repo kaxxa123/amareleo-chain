@@ -23,6 +23,9 @@ use crate::{
 use std::{net::SocketAddr, path::PathBuf, sync::OnceLock};
 
 use anyhow::{Result, bail};
+#[cfg(feature = "locktick")]
+use locktick::parking_lot::Mutex;
+#[cfg(not(feature = "locktick"))]
 use parking_lot::Mutex;
 use snarkvm::console::network::{Network, TestnetV0};
 

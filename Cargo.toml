@@ -46,19 +46,29 @@ test = false
 [features]
 default = [ "amareleo-node-metrics", "amareleo-node/metrics", "amareleo-chain-cli/metrics" ]
 history = [ "amareleo-node/history" ]
+locktick = [
+  "dep:locktick",
+  "dep:tracing",
+  "amareleo-node/locktick",
+  "amareleo-node-bft/locktick",
+  "amareleo-node-consensus/locktick",
+  "amareleo-node-metrics/locktick",
+  "amareleo-node-rest/locktick",
+  "amareleo-node-sync/locktick"
+]
 test_targets = [ "amareleo-chain-cli/test_targets" ]
 
 [dependencies]
 
 [workspace.dependencies.aleo-std]
-version = "=0.1.24"
+version = "1.0.1"
 default-features = false
 
 [workspace.dependencies.snarkvm] # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
 #path = "../snarkVM"
-#git = "https://github.com/ProvableHQ/snarkVM.git"
-#rev = "c15997f"
-version = "=1.5.0"
+git = "https://github.com/ProvableHQ/snarkVM.git"
+rev = "0face8c"
+#version = "=1.5.0"
 features = [ "circuit", "console", "rocks" ]
 
 [dependencies.anyhow]
@@ -67,6 +77,10 @@ version = "1.0.79"
 [dependencies.clap]
 version = "4.4"
 features = [ "derive" ]
+
+[dependencies.locktick]
+version = "0.3"
+optional = true
 
 [dependencies.amareleo-chain-account]
 path = "./account"
@@ -112,6 +126,10 @@ version = "=2.2.0"
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 tikv-jemallocator = "0.5"
 
+[dependencies.tracing]
+version = "0.1"
+optional = true
+
 [dev-dependencies.rusty-hook]
 version = "0.11.2"
 
@@ -126,6 +144,9 @@ version = "2"
 opt-level = 3
 lto = "thin"
 incremental = true
+# uncomment the 2 lines below when building with the locktick feature
+# debug = "line-tables-only"
+# strip = "none"
 
 [profile.bench]
 opt-level = 3

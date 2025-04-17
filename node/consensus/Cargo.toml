@@ -12,6 +12,13 @@ edition = "2021"
 
 [features]
 default = []
+locktick = [
+    "dep:locktick",
+    "amareleo-node-bft/locktick",
+    "amareleo-node-bft-ledger-service/locktick",
+    "amareleo-node-bft-storage-service/locktick",
+    "snarkvm/locktick",
+]
 metrics = ["dep:metrics"]
 test_targets = ["snarkvm/test_targets"]
 
@@ -27,6 +34,11 @@ version = "2"
 [dependencies.indexmap]
 version = "2.1"
 features = ["serde", "rayon"]
+
+[dependencies.locktick]
+version = "0.3"
+features = ["parking_lot"]
+optional = true
 
 [dependencies.lru]
 version = "0.12.1"

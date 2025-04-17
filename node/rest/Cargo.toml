@@ -14,6 +14,11 @@ edition = "2021"
 default = ["parallel"]
 parallel = ["rayon"]
 history = ["snarkvm-synthesizer/history"]
+locktick = [
+    "dep:locktick",
+    "amareleo-node-consensus/locktick",
+    "snarkvm-synthesizer/locktick",
+]
 test_targets = ["snarkvm/test_targets"]
 
 [dependencies.anyhow]
@@ -35,6 +40,11 @@ features = ["serde", "rayon"]
 
 [dependencies.jsonwebtoken]
 version = "9.2"
+
+[dependencies.locktick]
+version = "0.3"
+features = ["parking_lot"]
+optional = true
 
 [dependencies.once_cell]
 version = "1.19"
@@ -61,9 +71,9 @@ version = "=2.2.0"
 
 [dependencies.snarkvm-synthesizer]
 #path = "../../../snarkVM/synthesizer"
-#git = "https://github.com/ProvableHQ/snarkVM.git"
-#rev = "c15997f"
-version = "=1.5.0"
+git = "https://github.com/ProvableHQ/snarkVM.git"
+rev = "0face8c"
+#version = "=1.5.0"
 default-features = false
 optional = true
 

@@ -12,13 +12,17 @@ edition = "2021"
 
 [features]
 default = []
-ledger = ["lru", "parking_lot", "rand", "rayon", "tokio", "tracing"]
+ledger = ["parking_lot", "rand", "rayon", "tokio", "tracing"]
 ledger-write = []
+locktick = ["dep:locktick", "snarkvm/locktick"]
 metrics = ["dep:metrics", "snarkvm/metrics"]
 mock = ["parking_lot", "tracing"]
 prover = []
 test = ["mock"]
 test_targets = ["snarkvm/test_targets"]
+
+[dependencies.anyhow]
+version = "1.0"
 
 [dependencies.async-trait]
 version = "0.1"
@@ -27,8 +31,9 @@ version = "0.1"
 version = "2.1"
 features = ["serde", "rayon"]
 
-[dependencies.lru]
-version = "0.12"
+[dependencies.locktick]
+version = "0.3"
+features = ["parking_lot"]
 optional = true
 
 [dependencies.metrics]

@@ -45,6 +45,9 @@ use axum::{
     routing::{get, post},
 };
 use axum_extra::response::ErasedJson;
+#[cfg(feature = "locktick")]
+use locktick::parking_lot::Mutex;
+#[cfg(not(feature = "locktick"))]
 use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{

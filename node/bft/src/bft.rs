@@ -45,6 +45,12 @@ use snarkvm::{
 
 use colored::Colorize;
 use indexmap::{IndexMap, IndexSet};
+#[cfg(feature = "locktick")]
+use locktick::{
+    parking_lot::{Mutex, RwLock},
+    tokio::Mutex as TMutex,
+};
+#[cfg(not(feature = "locktick"))]
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -54,8 +60,10 @@ use std::{
         atomic::{AtomicI64, Ordering},
     },
 };
+#[cfg(not(feature = "locktick"))]
+use tokio::sync::Mutex as TMutex;
 use tokio::{
-    sync::{Mutex as TMutex, OnceCell, oneshot},
+    sync::{OnceCell, oneshot},
     task::JoinHandle,
 };
 use tracing::subscriber::DefaultGuard;
@@ -526,7 +534,7 @@ impl<N: Network> BFT<N> {
         guard_info!(self, "Checking if the leader is ready to be committed for round {commit_round}...");
 
         // Retrieve the committee lookback for the commit round.
-        let Ok(committee_lookback) = self.ledger().get_committee_lookback_for_round(commit_round) else {
+        let Ok(_committee_lookback) = self.ledger().get_committee_lookback_for_round(commit_round) else {
             bail!("BFT failed to retrieve the committee with lag for commit round {commit_round}");
         };
 
@@ -558,6 +566,11 @@ impl<N: Network> BFT<N> {
             // TODO (howardwu): Investigate how many certificates we should have at this point.
             bail!("BFT failed to retrieve the certificates for certificate round {certificate_round}");
         };
+        // Retrieve the committee lookback for the certificate round (i.e. the round just after the commit round).
+        let Ok(certificate_committee_lookback) = self.ledger().get_committee_lookback_for_round(certificate_round)
+        else {
+            bail!("BFT failed to retrieve the committee lookback for certificate round {certificate_round}");
+        };
         // Construct a set over the authors who included the leader's certificate in the certificate round.
         let authors = certificates
             .values()
@@ -567,7 +580,7 @@ impl<N: Network> BFT<N> {
             })
             .collect();
         // Check if the leader is ready to be committed.
-        if !committee_lookback.is_availability_threshold_reached(&authors) {
+        if !certificate_committee_lookback.is_availability_threshold_reached(&authors) {
             // If the leader is not ready to be committed, return early.
             guard_trace!(self, "BFT is not ready to commit {commit_round}");
             return Ok(());
