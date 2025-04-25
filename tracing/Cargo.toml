@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain-tracing"
-version = "2.2.0"
+version = "2.3.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "Tracing for a lite Aleo development node"
 homepage = "https://amareleo.com"
