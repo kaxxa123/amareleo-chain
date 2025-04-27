@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-bft"
-version = "2.2.0"
+version = "2.3.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A memory pool for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -12,6 +12,13 @@ edition = "2021"
 
 [features]
 default = []
+locktick = [
+    "dep:locktick",
+    "amareleo-node-bft-ledger-service/locktick",
+    "amareleo-node-bft-storage-service/locktick",
+    "amareleo-node-sync/locktick",
+    "snarkvm/locktick",
+]
 metrics = ["dep:metrics", "amareleo-node-bft-ledger-service/metrics"]
 test_targets = ["snarkvm/test_targets"]
 
@@ -44,10 +51,15 @@ features = ["thread-pool"]
 version = "2.1"
 features = ["serde", "rayon"]
 
+[dependencies.locktick]
+version = "0.3"
+features = ["parking_lot", "tokio"]
+optional = true
+
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "../metrics"
-version = "=2.2.0"
+version = "=2.3.0"
 optional = true
 
 [dependencies.parking_lot]
@@ -65,25 +77,25 @@ default-features = false
 
 [dependencies.amareleo-chain-tracing]
 path = "../../tracing"
-version = "=2.2.0"
+version = "=2.3.0"
 
 [dependencies.amareleo-chain-account]
 path = "../../account"
-version = "=2.2.0"
+version = "=2.3.0"
 
 [dependencies.amareleo-node-bft-ledger-service]
 path = "./ledger-service"
-version = "=2.2.0"
+version = "=2.3.0"
 features = ["ledger", "prover"]
 
 [dependencies.amareleo-node-bft-storage-service]
 path = "./storage-service"
-version = "=2.2.0"
+version = "=2.3.0"
 features = ["memory"]
 
 [dependencies.amareleo-node-sync]
 path = "../sync"
-version = "=2.2.0"
+version = "=2.3.0"
 
 [dependencies.snarkvm]
 workspace = true

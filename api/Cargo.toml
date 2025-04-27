@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain-api"
-version = "2.2.0"
+version = "2.3.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "API for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -11,6 +11,12 @@ license = "Apache-2.0"
 edition = "2021"
 
 [features]
+locktick = [
+    "dep:locktick",
+    "amareleo-node/locktick",
+    "amareleo-node-bft/locktick",
+    "snarkvm/locktick",
+]
 metrics = ["amareleo-node/metrics"]
 test_targets = ["snarkvm/test_targets"]
 
@@ -33,6 +39,11 @@ default-features = false
 version = "1.28"
 features = ["rt", "rt-multi-thread"]
 
+[dependencies.locktick]
+version = "0.3"
+features = ["parking_lot"]
+optional = true
+
 [dependencies.parking_lot]
 version = "0.12"
 
@@ -45,23 +56,23 @@ features = ["env-filter"]
 
 [dependencies.amareleo-chain-account]
 path = "../account"
-version = "=2.2.0"
+version = "=2.3.0"
 
 [dependencies.amareleo-chain-tracing]
 path = "../tracing"
-version = "=2.2.0"
+version = "=2.3.0"
 
 [dependencies.amareleo-node]
 path = "../node"
-version = "=2.2.0"
+version = "=2.3.0"
 
 [dependencies.amareleo-node-bft]
 path = "../node/bft"
-version = "=2.2.0"
+version = "=2.3.0"
 
 [dependencies.amareleo-chain-resources]
 path = "../resources"
-version = "=2.2.0"
+version = "=2.3.0"
 
 [dependencies.snarkvm]
 workspace = true

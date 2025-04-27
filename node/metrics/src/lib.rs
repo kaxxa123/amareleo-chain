@@ -24,6 +24,9 @@ pub use snarkvm::metrics::*;
 #[cfg(not(feature = "serial"))]
 use rayon::prelude::*;
 
+#[cfg(feature = "locktick")]
+use locktick::parking_lot::Mutex;
+#[cfg(not(feature = "locktick"))]
 use parking_lot::Mutex;
 use snarkvm::{
     ledger::narwhal::TransmissionID,

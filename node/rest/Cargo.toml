@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-rest"
-version = "2.2.0"
+version = "2.3.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A REST API server for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -14,6 +14,11 @@ edition = "2021"
 default = ["parallel"]
 parallel = ["rayon"]
 history = ["snarkvm-synthesizer/history"]
+locktick = [
+    "dep:locktick",
+    "amareleo-node-consensus/locktick",
+    "snarkvm-synthesizer/locktick",
+]
 test_targets = ["snarkvm/test_targets"]
 
 [dependencies.anyhow]
@@ -36,6 +41,11 @@ features = ["serde", "rayon"]
 [dependencies.jsonwebtoken]
 version = "9.2"
 
+[dependencies.locktick]
+version = "0.3"
+features = ["parking_lot"]
+optional = true
+
 [dependencies.once_cell]
 version = "1.19"
 
@@ -53,17 +63,17 @@ features = ["preserve_order"]
 
 [dependencies.amareleo-chain-tracing]
 path = "../../tracing"
-version = "=2.2.0"
+version = "=2.3.0"
 
 [dependencies.amareleo-node-consensus]
 path = "../consensus"
-version = "=2.2.0"
+version = "=2.3.0"
 
 [dependencies.snarkvm-synthesizer]
 #path = "../../../snarkVM/synthesizer"
 #git = "https://github.com/ProvableHQ/snarkVM.git"
-#rev = "c15997f"
-version = "=1.5.0"
+#rev = "e319a75"
+version = "=1.6.0"
 default-features = false
 optional = true
 

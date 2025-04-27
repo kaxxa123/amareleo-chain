@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-bft-ledger-service"
-version = "2.2.0"
+version = "2.3.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A ledger service for the memory pool in a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -12,13 +12,17 @@ edition = "2021"
 
 [features]
 default = []
-ledger = ["lru", "parking_lot", "rand", "rayon", "tokio", "tracing"]
+ledger = ["parking_lot", "rand", "rayon", "tokio", "tracing"]
 ledger-write = []
+locktick = ["dep:locktick", "snarkvm/locktick"]
 metrics = ["dep:metrics", "snarkvm/metrics"]
 mock = ["parking_lot", "tracing"]
 prover = []
 test = ["mock"]
 test_targets = ["snarkvm/test_targets"]
+
+[dependencies.anyhow]
+version = "1.0"
 
 [dependencies.async-trait]
 version = "0.1"
@@ -27,14 +31,15 @@ version = "0.1"
 version = "2.1"
 features = ["serde", "rayon"]
 
-[dependencies.lru]
-version = "0.12"
+[dependencies.locktick]
+version = "0.3"
+features = ["parking_lot"]
 optional = true
 
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "../../metrics"
-version = "=2.2.0"
+version = "=2.3.0"
 optional = true
 
 [dependencies.parking_lot]
@@ -63,4 +68,4 @@ optional = true
 
 [dependencies.amareleo-chain-tracing]
 path = "../../../tracing"
-version = "=2.2.0"
+version = "=2.3.0"

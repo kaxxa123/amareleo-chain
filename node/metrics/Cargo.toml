@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-metrics"
-version = "2.2.0"
+version = "2.3.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A node for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -12,9 +12,15 @@ edition = "2021"
 
 [features]
 default = ["rayon", "snarkvm/metrics"]
+locktick = ["dep:locktick", "snarkvm/locktick"]
 metrics = ["snarkvm/metrics"]
 serial = ["snarkvm/metrics"]
 test_targets = ["snarkvm/test_targets"]
+
+[dependencies.locktick]
+version = "0.3"
+features = ["parking_lot"]
+optional = true
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.13"
