@@ -49,6 +49,8 @@ history = [ "amareleo-node/history" ]
 locktick = [
   "dep:locktick",
   "dep:tracing",
+  "amareleo-chain-api/locktick",
+  "amareleo-chain-cli/locktick",
   "amareleo-node/locktick",
   "amareleo-node-bft/locktick",
   "amareleo-node-consensus/locktick",
