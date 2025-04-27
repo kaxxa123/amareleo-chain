@@ -419,7 +419,7 @@ workflows:
           filters: 
             branches:
               only: [main, develop]
-      - devnet-test
+      - devnet-test:
           filters: 
             branches:
               only: [main, develop]
