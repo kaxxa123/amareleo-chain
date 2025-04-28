@@ -342,7 +342,7 @@ impl<N: Network> Primary<N> {
 }
 
 impl<N: Network> Primary<N> {
-    pub async fn propose_batch(&self) -> Result<()> {
+    pub async fn propose_batch(&self, complete: bool) -> Result<()> {
         let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
         let mut all_acc: Vec<Account<N>> = Vec::new();
         for _ in 0u64..4u64 {
@@ -353,8 +353,8 @@ impl<N: Network> Primary<N> {
 
         // Submit proposal for validator with id 0
         let other_acc: Vec<&Account<N>> = all_acc.iter().skip(1).collect();
-        let round = self.propose_batch_lite(&other_acc).await?;
-        if round == 0u64 {
+        let round = self.propose_batch_lite(&other_acc, complete).await?;
+        if !complete || round == 0u64 {
             return Ok(());
         }
 
@@ -369,7 +369,7 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
-    pub async fn propose_batch_lite(&self, other_acc: &[&Account<N>]) -> Result<u64> {
+    pub async fn propose_batch_lite(&self, other_acc: &[&Account<N>], complete: bool) -> Result<u64> {
         // This function isn't re-entrant.
         let mut lock_guard = self.propose_lock.lock().await;
 
@@ -645,7 +645,7 @@ impl<N: Network> Primary<N> {
         // Prepare the previous batch certificate IDs.
         let previous_certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
         // Sign the batch header and construct the proposal.
-        let (batch_header, mut proposal) = spawn_blocking!(BatchHeader::new(
+        let (batch_header, proposal) = spawn_blocking!(BatchHeader::new(
             &private_key,
             round,
             current_timestamp,
@@ -670,9 +670,22 @@ impl<N: Network> Primary<N> {
         // // Set the proposed batch.
         // *self.proposed_batch.write() = Some(proposal);
 
-        //===============================================================================
         // Processing proposal
+        if complete {
+            self.complete_batch_lite(other_acc, round, batch_header, proposal, committee_lookback).await?;
+        }
 
+        Ok(round)
+    }
+
+    pub async fn complete_batch_lite(
+        &self,
+        other_acc: &[&Account<N>],
+        round: u64,
+        batch_header: BatchHeader<N>,
+        mut proposal: Proposal<N>,
+        committee_lookback: Committee<N>,
+    ) -> Result<()> {
         guard_info!(self, "Quorum threshold reached - Preparing to certify our batch for round {round}...");
 
         // Retrieve the batch ID.
@@ -699,7 +712,7 @@ impl<N: Network> Primary<N> {
 
         #[cfg(feature = "metrics")]
         metrics::increment_gauge(metrics::bft::CERTIFIED_BATCHES, 1.0);
-        Ok(round)
+        Ok(())
     }
 
     pub async fn fake_proposal(
@@ -841,7 +854,7 @@ impl<N: Network> Primary<N> {
                 // If there is no proposed batch, attempt to propose a batch.
                 // Note: Do NOT spawn a task around this function call. Proposing a batch is a critical path,
                 // and only one batch needs be proposed at a time.
-                if let Err(e) = self_.propose_batch().await {
+                if let Err(e) = self_.propose_batch(true).await {
                     guard_warn!(self_, "Cannot propose a batch - {e}");
                 }
             }
@@ -980,7 +993,7 @@ impl<N: Network> Primary<N> {
 
             // If the node is ready, propose a batch for the next round.
             if is_ready {
-                self.propose_batch().await?;
+                self.propose_batch(true).await?;
             }
         }
         Ok(())
@@ -1030,7 +1043,7 @@ impl<N: Network> Primary<N> {
 
             // // If the node is ready, propose a batch for the next round.
             // if is_ready {
-            //     self.propose_batch().await?;
+            //     self.propose_batch(true).await?;
             // }
         }
         Ok(())
@@ -1321,12 +1334,13 @@ mod tests {
     fn sample_committee(rng: &mut TestRng) -> (Vec<(SocketAddr, Account<CurrentNetwork>)>, Committee<CurrentNetwork>) {
         // Create a committee containing the primary's account.
         const COMMITTEE_SIZE: usize = 4;
+        let mut rng_validator = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
         let mut accounts = Vec::with_capacity(COMMITTEE_SIZE);
         let mut members = IndexMap::new();
 
         for i in 0..COMMITTEE_SIZE {
             let socket_addr = format!("127.0.0.1:{}", 5000 + i).parse().unwrap();
-            let account = Account::new(rng).unwrap();
+            let account = Account::new(&mut rng_validator).unwrap();
 
             members.insert(account.address(), (MIN_VALIDATOR_STAKE, true, rng.gen_range(0..100)));
             accounts.push((socket_addr, account));
@@ -1556,7 +1570,7 @@ mod tests {
         primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
 
         // Try to propose a batch again. This time, it should succeed.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
 
         // AlexZ: proposed_batch is no longer written to when processing new batches...
         // assert!(primary.proposed_batch.read().is_some());
@@ -1571,7 +1585,7 @@ mod tests {
         assert!(primary.proposed_batch.read().is_none());
 
         // Try to propose a batch with no transmissions.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
 
         // AlexZ: proposed_batch is no longer written to when processing new batches...
         // assert!(primary.proposed_batch.read().is_some());
@@ -1598,7 +1612,7 @@ mod tests {
         primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
 
         // Propose a batch again. This time, it should succeed.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
 
         // AlexZ: proposed_batch is no longer written to when processing new batches...
         // assert!(primary.proposed_batch.read().is_some());
@@ -1632,9 +1646,12 @@ mod tests {
         }
 
         // Try to propose a batch again. This time, it should succeed.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
+
+        // AlexZ: proposed_batch is no longer written to when processing new batches...
         // Expect 2/5 transactions to be included in the proposal in addition to the solution.
-        assert_eq!(primary.proposed_batch.read().as_ref().unwrap().transmissions().len(), 3);
+        // assert_eq!(primary.proposed_batch.read().as_ref().unwrap().transmissions().len(), 3);
+
         // Check the transmissions were correctly drained from the workers.
         assert_eq!(primary.workers.iter().map(|worker| worker.transmissions().len()).sum::<usize>(), 3);
     }
@@ -1661,14 +1678,14 @@ mod tests {
         *primary.propose_lock.lock().await = round + 1;
 
         // Propose a batch and enforce that it fails.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
         assert!(primary.proposed_batch.read().is_none());
 
         // Set the proposal lock back to the old round.
         *primary.propose_lock.lock().await = old_proposal_lock_round;
 
         // Try to propose a batch again. This time, it should succeed.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
 
         // AlexZ: proposed_batch is no longer written to when processing new batches...
         // assert!(primary.proposed_batch.read().is_some());
@@ -1699,7 +1716,7 @@ mod tests {
         *primary.proposed_batch.write() = Some(proposal);
 
         // Try to propose a batch will terminate early because the storage is behind the proposal.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
         assert!(primary.proposed_batch.read().is_some());
         assert!(primary.proposed_batch.read().as_ref().unwrap().round() > primary.current_round());
     }

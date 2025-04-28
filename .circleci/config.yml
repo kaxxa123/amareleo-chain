@@ -60,7 +60,7 @@ commands:
     parameters:
       cache_key:
         type: string
-        default: v3.3.1-rust-1.83.0-snarkos-stable-cache
+        default: v3.3.1-rust-1.83.0-amareleo-stable-cache
     steps:
       - run: set -e
       - run:
@@ -88,7 +88,7 @@ commands:
     parameters:
       cache_key:
         type: string
-        default: v3.3.1-rust-1.83.0-snarkos-stable-cache
+        default: v3.3.1-rust-1.83.0-amareleo-stable-cache
     steps:
       - run: (sccache -s||true)
       - run: set +e
@@ -189,7 +189,8 @@ commands:
       - setup_environment:
           cache_key: << parameters.cache_key >>
       - run:
-          name: "Install snarkos"
+          name: "Install amareleo"
+          no_output_timeout: 35m  # Allow 20 minutes total
           command: |
             cargo install --locked --path .
       - run:
