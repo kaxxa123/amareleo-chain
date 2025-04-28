@@ -60,7 +60,7 @@ commands:
     parameters:
       cache_key:
         type: string
-        default: v3.0.0-rust-1.83.0-snarkos-stable-cache
+        default: v3.3.1-rust-1.83.0-amareleo-stable-cache
     steps:
       - run: set -e
       - run:
@@ -88,7 +88,7 @@ commands:
     parameters:
       cache_key:
         type: string
-        default: v3.0.0-rust-1.83.0-snarkos-stable-cache
+        default: v3.3.1-rust-1.83.0-amareleo-stable-cache
     steps:
       - run: (sccache -s||true)
       - run: set +e
@@ -165,6 +165,43 @@ commands:
       - clear_environment:
           cache_key: << parameters.cache_key >>
 
+  run_devnet:
+    description: "Run devnet for integration testing"
+    parameters:
+      workspace_member:
+        type: string
+      cache_key:
+        type: string
+      validators:
+        type: integer
+        default: 4
+      clients:
+        type: integer
+        default: 2
+      network_id:
+        type: integer
+        default: 0
+      min_height:
+        type: integer
+        default: 45
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: << parameters.cache_key >>
+      - run:
+          name: "Install amareleo"
+          no_output_timeout: 35m  # Allow 20 minutes total
+          command: |
+            cargo install --locked --path .
+      - run:
+          name: "Run devnet test"
+          no_output_timeout: 20m  # Allow 20 minutes total
+          command: |
+            chmod +x .circleci/devnet_ci.sh
+            ./.circleci/devnet_ci.sh << parameters.validators >> << parameters.clients >> << parameters.network_id >> << parameters.min_height >>
+      - clear_environment:
+          cache_key: << parameters.cache_key >>
+
   install_rust_nightly:
     description: "Install Rust nightly toolchain"
     steps:
@@ -178,7 +215,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: .
-          cache_key: v3.0.0-rust-1.83.0-stable-cache
+          cache_key: v3.3.1-rust-1.83.0-stable-cache
 
   account:
     docker:
@@ -187,7 +224,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: account
-          cache_key: v3.0.0-rust-1.83.0-account-cache
+          cache_key: v3.3.1-rust-1.83.0-account-cache
 
   cli:
     docker:
@@ -196,7 +233,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: cli
-          cache_key: v3.0.0-rust-1.83.0-cli-cache
+          cache_key: v3.3.1-rust-1.83.0-cli-cache
 
   api:
     docker:
@@ -205,7 +242,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: api
-          cache_key: v3.0.0-rust-1.83.0-api-cache
+          cache_key: v3.3.1-rust-1.83.0-api-cache
           flags: "--release --lib"
 
   node:
@@ -215,7 +252,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node
-          cache_key: v3.0.0-rust-1.83.0-node-cache
+          cache_key: v3.3.1-rust-1.83.0-node-cache
 
   node-bft:
     docker:
@@ -224,7 +261,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/bft
-          cache_key: v3.0.0-rust-1.83.0-node-bft-cache
+          cache_key: v3.3.1-rust-1.83.0-node-bft-cache
 
   node-bft-ledger-service:
     docker:
@@ -233,7 +270,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/bft/ledger-service
-          cache_key: v3.0.0-rust-1.83.0-node-bft-ledger-service-cache
+          cache_key: v3.3.1-rust-1.83.0-node-bft-ledger-service-cache
 
   node-bft-storage-service:
     docker:
@@ -242,7 +279,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/bft/storage-service
-          cache_key: v3.0.0-rust-1.83.0-node-bft-storage-service-cache
+          cache_key: v3.3.1-rust-1.83.0-node-bft-storage-service-cache
 
   node-consensus:
     docker:
@@ -251,7 +288,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/consensus
-          cache_key: v3.0.0-rust-1.83.0-node-consensus-cache
+          cache_key: v3.3.1-rust-1.83.0-node-consensus-cache
 
   node-rest:
     docker:
@@ -260,7 +297,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/rest
-          cache_key: v3.0.0-rust-1.83.0-node-rest-cache
+          cache_key: v3.3.1-rust-1.83.0-node-rest-cache
 
   node-sync:
     docker:
@@ -269,7 +306,16 @@ jobs:
     steps:
       - run_serial:
           workspace_member: node/sync
-          cache_key: v3.0.0-rust-1.83.0-node-sync-cache
+          cache_key: v3.3.1-rust-1.83.0-node-sync-cache
+
+  devnet-test:
+    docker:
+      - image: cimg/rust:1.83.0 # Attention - Change the MSRV in Cargo.toml and rust-toolchain as well
+    resource_class: << pipeline.parameters.medium >>
+    steps:
+      - run_devnet:
+          workspace_member: .
+          cache_key: v3.3.1-rust-1.83.0-devnet-test-cache
 
   check-fmt:
     docker:
@@ -279,13 +325,13 @@ jobs:
       - checkout
       - install_rust_nightly
       - setup_environment:
-          cache_key: v3.0.0-rust-1.83.0-fmt-cache
+          cache_key: v3.3.1-rust-1.83.0-fmt-cache
       - run:
           name: Check style
           no_output_timeout: 35m
           command: cargo +nightly fmt --all -- --check
       - clear_environment:
-          cache_key: v3.0.0-rust-1.83.0-fmt-cache
+          cache_key: v3.3.1-rust-1.83.0-fmt-cache
 
   check-clippy:
     docker:
@@ -294,7 +340,7 @@ jobs:
     steps:
       - checkout
       - setup_environment:
-          cache_key: v3.0.0-rust-1.83.0-clippy-cache
+          cache_key: v3.3.1-rust-1.83.0-clippy-cache
       - run:
           name: Check lint
           no_output_timeout: 35m
@@ -302,7 +348,7 @@ jobs:
             cargo clippy --workspace --all-targets -- -D warnings
             cargo clippy --workspace --all-targets --all-features -- -D warnings
       - clear_environment:
-          cache_key: v3.0.0-rust-1.83.0-clippy-cache
+          cache_key: v3.3.1-rust-1.83.0-clippy-cache
 
   verify-windows:
     executor:
@@ -371,6 +417,10 @@ workflows:
             branches:
               only: [main, develop]
       - check-clippy:
+          filters: 
+            branches:
+              only: [main, develop]
+      - devnet-test:
           filters: 
             branches:
               only: [main, develop]

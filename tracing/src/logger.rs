@@ -36,7 +36,7 @@ pub fn init_env_filter(verbosity: u8) -> Result<EnvFilter> {
         .add_directive("hyper=off".parse()?)
         .add_directive("reqwest=off".parse()?)
         .add_directive("want=off".parse()?)
-        .add_directive("warp=off".parse()?);
+        .add_directive("h2=off".parse()?);
 
     let filter = if verbosity >= 2 {
         filter.add_directive("amareleo_node_sync=trace".parse()?)
@@ -57,7 +57,7 @@ pub fn init_file_writer(logfile_path: PathBuf) -> Result<File> {
     match logfile_path.parent() {
         Some(logfile_dir) => {
             if !logfile_dir.exists() && std::fs::create_dir_all(logfile_dir).is_err() {
-                bail!("Failed to create directories, check user has permissions: {}", logfile_dir.to_string_lossy());
+                bail!("Failed to create directories, check user has permissions: {}", logfile_dir.display());
             }
         }
 

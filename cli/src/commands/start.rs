@@ -26,6 +26,11 @@ use std::{
 };
 use tokio::runtime::{self, Runtime};
 
+#[cfg(feature = "locktick")]
+use amareleo_chain_tracing::{TracingHandler, TracingHandlerGuard};
+#[cfg(feature = "locktick")]
+use locktick::lock_snapshots;
+
 use snarkvm::console::network::{CanaryV0, MainnetV0, Network, TestnetV0};
 
 use crate::helpers::initialize_custom_tracing;
@@ -147,14 +152,52 @@ impl Start {
             logfile_path.clone(),
             shutdown)?;
 
-        node_api.cfg_custom_log(tracing)?;
+        node_api.cfg_custom_log(tracing.clone())?;
 
         println!("📝 Log file path: {}\n", logfile_path.to_string_lossy());
         println!("📁 Ledger folder path: {}\n", node_api.get_ledger_folder()?.to_string_lossy());
 
+        // Start thread for logging active lock guards.
+        #[cfg(feature = "locktick")]
+        Self::locktick_tracing(tracing.clone());
+
         // Start the node.
         node_api.start().await?;
         Ok(())
+    }
+
+    #[cfg(feature = "locktick")]
+    fn locktick_tracing(tracing: TracingHandler) {
+        std::thread::spawn(move || {
+            loop {
+                guard_info!(tracing, "[locktick] checking for active lock guards");
+                let mut infos = lock_snapshots();
+                infos.sort_unstable_by(|l1, l2| l1.location.cmp(&l2.location));
+
+                for lock in infos {
+                    let mut guards = lock.known_guards.values().collect::<Vec<_>>();
+                    guards.sort_unstable_by(|g1, g2| g1.location.cmp(&g2.location));
+
+                    for guard in guards.iter().filter(|g| g.num_active_uses() != 0) {
+                        let location = &guard.location;
+                        let kind = guard.kind;
+                        let num_uses = guard.num_uses;
+                        let active_users = guard.num_active_uses();
+                        let avg_duration = guard.avg_duration();
+                        let avg_wait_time = guard.avg_wait_time();
+                        guard_info!(tracing, "[locktick] {location}");
+                        guard_info!(
+                            tracing,
+                            "[locktick] ({:?}): {num_uses}; {active_users} active; avg d: {:?}; avg w: {:?}",
+                            kind,
+                            avg_duration,
+                            avg_wait_time
+                        );
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(3));
+            }
+        });
     }
 
     /// Handles OS signals for intercept termination and performing a clean shutdown.

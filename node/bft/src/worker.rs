@@ -17,6 +17,7 @@ use crate::{
     MAX_WORKERS,
     ProposedBatch,
     helpers::{Ready, Storage, fmt_id},
+    spawn_blocking,
 };
 use amareleo_chain_tracing::{TracingHandler, TracingHandlerGuard};
 use amareleo_node_bft_ledger_service::LedgerService;
@@ -31,6 +32,10 @@ use snarkvm::{
 
 use colored::Colorize;
 use indexmap::{IndexMap, IndexSet};
+#[cfg(feature = "locktick")]
+use locktick::parking_lot::RwLock;
+#[cfg(not(feature = "locktick"))]
+use parking_lot::RwLock;
 use std::sync::Arc;
 use tracing::subscriber::DefaultGuard;
 
@@ -47,7 +52,7 @@ pub struct Worker<N: Network> {
     /// Tracing handle
     tracing: Option<TracingHandler>,
     /// The ready queue.
-    ready: Ready<N>,
+    ready: Arc<RwLock<Ready<N>>>,
 }
 
 impl<N: Network> TracingHandlerGuard for Worker<N> {
@@ -89,51 +94,51 @@ impl<N: Network> Worker<N> {
 
     /// Returns the number of transmissions in the ready queue.
     pub fn num_transmissions(&self) -> usize {
-        self.ready.num_transmissions()
+        self.ready.read().num_transmissions()
     }
 
     /// Returns the number of ratifications in the ready queue.
     pub fn num_ratifications(&self) -> usize {
-        self.ready.num_ratifications()
+        self.ready.read().num_ratifications()
     }
 
     /// Returns the number of solutions in the ready queue.
     pub fn num_solutions(&self) -> usize {
-        self.ready.num_solutions()
+        self.ready.read().num_solutions()
     }
 
     /// Returns the number of transactions in the ready queue.
     pub fn num_transactions(&self) -> usize {
-        self.ready.num_transactions()
+        self.ready.read().num_transactions()
     }
 }
 
 impl<N: Network> Worker<N> {
     /// Returns the transmission IDs in the ready queue.
     pub fn transmission_ids(&self) -> IndexSet<TransmissionID<N>> {
-        self.ready.transmission_ids()
+        self.ready.read().transmission_ids()
     }
 
     /// Returns the transmissions in the ready queue.
     pub fn transmissions(&self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
-        self.ready.transmissions()
+        self.ready.read().transmissions()
     }
 
     /// Returns the solutions in the ready queue.
     pub fn solutions(&self) -> impl '_ + Iterator<Item = (SolutionID<N>, Data<Solution<N>>)> {
-        self.ready.solutions()
+        self.ready.read().solutions().into_iter()
     }
 
     /// Returns the transactions in the ready queue.
     pub fn transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
-        self.ready.transactions()
+        self.ready.read().transactions().into_iter()
     }
 }
 
 impl<N: Network> Worker<N> {
     /// Clears the solutions from the ready queue.
     pub(super) fn clear_solutions(&self) {
-        self.ready.clear_solutions()
+        self.ready.write().clear_solutions()
     }
 }
 
@@ -142,7 +147,7 @@ impl<N: Network> Worker<N> {
     pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
         let transmission_id = transmission_id.into();
         // Check if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
-        self.ready.contains(transmission_id)
+        self.ready.read().contains(transmission_id)
             || self.proposed_batch.read().as_ref().map_or(false, |p| p.contains_transmission(transmission_id))
             || self.storage.contains_transmission(transmission_id)
             || self.ledger.contains_transmission(&transmission_id).unwrap_or(false)
@@ -154,7 +159,7 @@ impl<N: Network> Worker<N> {
     /// in the ledger are not guaranteed to be invalid for the current batch.
     pub fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>> {
         // Check if the transmission ID exists in the ready queue.
-        if let Some(transmission) = self.ready.get(transmission_id) {
+        if let Some(transmission) = self.ready.read().get(transmission_id) {
             return Some(transmission);
         }
         // Check if the transmission ID exists in storage.
@@ -183,9 +188,14 @@ impl<N: Network> Worker<N> {
         bail!("Unable to fetch transmission");
     }
 
-    /// Removes up to the specified number of transmissions from the ready queue, and returns them.
-    pub(crate) fn drain(&self, num_transmissions: usize) -> impl Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
-        self.ready.drain(num_transmissions).into_iter()
+    /// Inserts the transmission at the front of the ready queue.
+    pub(crate) fn insert_front(&self, key: TransmissionID<N>, value: Transmission<N>) {
+        self.ready.write().insert_front(key, value);
+    }
+
+    /// Removes and returns the transmission at the front of the ready queue.
+    pub(crate) fn remove_front(&self) -> Option<(TransmissionID<N>, Transmission<N>)> {
+        self.ready.write().remove_front()
     }
 
     /// Reinserts the specified transmission into the ready queue.
@@ -193,7 +203,7 @@ impl<N: Network> Worker<N> {
         // Check if the transmission ID exists.
         if !self.contains_transmission(transmission_id) {
             // Insert the transmission into the ready queue.
-            return self.ready.insert(transmission_id, transmission);
+            return self.ready.write().insert(transmission_id, transmission);
         }
         false
     }
@@ -220,7 +230,7 @@ impl<N: Network> Worker<N> {
         // Check that the solution is well-formed and unique.
         self.ledger.check_solution_basic(solution_id, solution).await?;
         // Adds the solution to the ready queue.
-        if self.ready.insert(transmission_id, transmission) {
+        if self.ready.write().insert(transmission_id, transmission) {
             guard_trace!(
                 self,
                 "Worker {} - Added unconfirmed solution '{}.{}'",
@@ -248,10 +258,18 @@ impl<N: Network> Worker<N> {
         if self.contains_transmission(transmission_id) {
             bail!("Transaction '{}.{}' already exists.", fmt_id(transaction_id), fmt_id(checksum).dimmed());
         }
+        // Deserialize the transaction. If the transaction exceeds the maximum size, then return an error.
+        let transaction = spawn_blocking!({
+            match transaction {
+                Data::Object(transaction) => Ok(transaction),
+                Data::Buffer(bytes) => Ok(Transaction::<N>::read_le(&mut bytes.take(N::MAX_TRANSACTION_SIZE as u64))?),
+            }
+        })?;
+
         // Check that the transaction is well-formed and unique.
         self.ledger.check_transaction_basic(transaction_id, transaction).await?;
         // Adds the transaction to the ready queue.
-        if self.ready.insert(transmission_id, transmission) {
+        if self.ready.write().insert(transmission_id, transmission) {
             guard_trace!(
                 self,
                 "Worker {}.{} - Added unconfirmed transaction '{}'",
@@ -275,6 +293,7 @@ mod tests {
         ledger::{
             block::Block,
             committee::Committee,
+            ledger_test_helpers::sample_execution_transaction_with_fee,
             narwhal::{BatchCertificate, Subdag, Transmission, TransmissionID},
         },
         prelude::Address,
@@ -328,7 +347,7 @@ mod tests {
             async fn check_transaction_basic(
                 &self,
                 transaction_id: N::TransactionID,
-                transaction: Data<Transaction<N>>,
+                transaction: Transaction<N>,
             ) -> Result<()>;
             fn check_next_block(&self, block: &Block<N>) -> Result<()>;
             fn prepare_advance_to_next_quorum_block(
@@ -337,6 +356,7 @@ mod tests {
                 transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
             ) -> Result<Block<N>>;
             fn advance_to_next_block(&self, block: &Block<N>) -> Result<()>;
+            fn transaction_spent_cost_in_microcredits(&self, transaction_id: N::TransactionID, transaction: Transaction<N>) -> Result<u64>;
         }
     }
 
@@ -364,7 +384,7 @@ mod tests {
         let transmission_id = TransmissionID::Solution(solution_id, solution_checksum);
         let result = worker.process_unconfirmed_solution(solution_id, solution).await;
         assert!(result.is_ok());
-        assert!(worker.ready.contains(transmission_id));
+        assert!(worker.ready.read().contains(transmission_id));
     }
 
     #[tokio::test]
@@ -391,12 +411,12 @@ mod tests {
         let transmission_id = TransmissionID::Solution(solution_id, checksum);
         let result = worker.process_unconfirmed_solution(solution_id, solution).await;
         assert!(result.is_err());
-        assert!(!worker.ready.contains(transmission_id));
+        assert!(!worker.ready.read().contains(transmission_id));
     }
 
     #[tokio::test]
     async fn test_process_transaction_ok() {
-        let mut rng = &mut TestRng::default();
+        let rng = &mut TestRng::default();
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let committee_clone = committee.clone();
@@ -412,13 +432,14 @@ mod tests {
 
         // Create the Worker.
         let worker = Worker::new(0, storage, ledger, Default::default(), None).unwrap();
-        let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
-        let transaction = Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
-        let checksum = transaction.to_checksum::<CurrentNetwork>().unwrap();
+        let transaction = sample_execution_transaction_with_fee(false, rng);
+        let transaction_id = transaction.id();
+        let transaction_data = Data::Object(transaction);
+        let checksum = transaction_data.to_checksum::<CurrentNetwork>().unwrap();
         let transmission_id = TransmissionID::Transaction(transaction_id, checksum);
-        let result = worker.process_unconfirmed_transaction(transaction_id, transaction).await;
+        let result = worker.process_unconfirmed_transaction(transaction_id, transaction_data).await;
         assert!(result.is_ok());
-        assert!(worker.ready.contains(transmission_id));
+        assert!(worker.ready.read().contains(transmission_id));
     }
 
     #[tokio::test]
@@ -445,7 +466,7 @@ mod tests {
         let transmission_id = TransmissionID::Transaction(transaction_id, checksum);
         let result = worker.process_unconfirmed_transaction(transaction_id, transaction).await;
         assert!(result.is_err());
-        assert!(!worker.ready.contains(transmission_id));
+        assert!(!worker.ready.read().contains(transmission_id));
     }
 
     #[tokio::test]

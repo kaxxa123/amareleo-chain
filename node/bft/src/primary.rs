@@ -53,8 +53,13 @@ use aleo_std::StorageMode;
 use colored::Colorize;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
+#[cfg(feature = "locktick")]
+use locktick::{
+    parking_lot::{Mutex, RwLock},
+    tokio::Mutex as TMutex,
+};
+#[cfg(not(feature = "locktick"))]
 use parking_lot::{Mutex, RwLock};
-
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use snarkvm::console::account::PrivateKey;
@@ -69,10 +74,9 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{
-    sync::{Mutex as TMutex, OnceCell},
-    task::JoinHandle,
-};
+#[cfg(not(feature = "locktick"))]
+use tokio::sync::Mutex as TMutex;
+use tokio::{sync::OnceCell, task::JoinHandle};
 use tracing::subscriber::DefaultGuard;
 
 /// A helper type for an optional proposed batch.
@@ -160,43 +164,40 @@ impl<N: Network> Primary<N> {
         // Fetch the signed proposals from the file system if it exists.
         match ProposalCache::<N>::exists(&self.storage_mode) {
             // If the proposal cache exists, then process the proposal cache.
-            true => {
-                match ProposalCache::<N>::load(self.account.address(), &self.storage_mode, self) {
-                    Ok(proposal_cache) => {
-                        // Extract the proposal and signed proposals.
-                        let (latest_certificate_round, proposed_batch, signed_proposals, pending_certificates) =
-                            proposal_cache.into();
+            true => match ProposalCache::<N>::load(self.account.address(), &self.storage_mode, self) {
+                Ok(proposal_cache) => {
+                    // Extract the proposal and signed proposals.
+                    let (latest_certificate_round, proposed_batch, signed_proposals, pending_certificates) =
+                        proposal_cache.into();
 
-                        // Write the proposed batch.
-                        *self.proposed_batch.write() = proposed_batch;
-                        // Write the signed proposals.
-                        *self.signed_proposals.write() = signed_proposals;
-                        // Writ the propose lock.
-                        *self.propose_lock.lock().await = latest_certificate_round;
+                    // Write the proposed batch.
+                    *self.proposed_batch.write() = proposed_batch;
+                    // Write the signed proposals.
+                    *self.signed_proposals.write() = signed_proposals;
+                    // Writ the propose lock.
+                    *self.propose_lock.lock().await = latest_certificate_round;
 
-                        // Update the storage with the pending certificates.
-                        for certificate in pending_certificates {
-                            let batch_id = certificate.batch_id();
-                            // We use a dummy IP because the node should not need to request from any peers.
-                            // The storage should have stored all the transmissions. If not, we simply
-                            // skip the certificate.
-                            if let Err(err) =
-                                self.sync_with_certificate_from_peer::<true>(DUMMY_SELF_IP, certificate).await
-                            {
-                                guard_warn!(
-                                    self,
-                                    "Failed to load stored certificate {} from proposal cache - {err}",
-                                    fmt_id(batch_id)
-                                );
-                            }
+                    // Update the storage with the pending certificates.
+                    for certificate in pending_certificates {
+                        let batch_id = certificate.batch_id();
+                        // We use a dummy IP because the node should not need to request from any peers.
+                        // The storage should have stored all the transmissions. If not, we simply
+                        // skip the certificate.
+                        if let Err(err) = self.sync_with_certificate_from_peer::<true>(DUMMY_SELF_IP, certificate).await
+                        {
+                            guard_warn!(
+                                self,
+                                "Failed to load stored certificate {} from proposal cache - {err}",
+                                fmt_id(batch_id)
+                            );
                         }
-                        Ok(())
                     }
-                    Err(err) => {
-                        bail!("Failed to read the signed proposals from the file system - {err}.");
-                    }
+                    Ok(())
                 }
-            }
+                Err(err) => {
+                    bail!("Failed to read the signed proposals from the file system - {err}.");
+                }
+            },
             // If the proposal cache does not exist, then return early.
             false => Ok(()),
         }
@@ -341,7 +342,7 @@ impl<N: Network> Primary<N> {
 }
 
 impl<N: Network> Primary<N> {
-    pub async fn propose_batch(&self) -> Result<()> {
+    pub async fn propose_batch(&self, complete: bool) -> Result<()> {
         let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
         let mut all_acc: Vec<Account<N>> = Vec::new();
         for _ in 0u64..4u64 {
@@ -352,8 +353,8 @@ impl<N: Network> Primary<N> {
 
         // Submit proposal for validator with id 0
         let other_acc: Vec<&Account<N>> = all_acc.iter().skip(1).collect();
-        let round = self.propose_batch_lite(&other_acc).await?;
-        if round == 0u64 {
+        let round = self.propose_batch_lite(&other_acc, complete).await?;
+        if !complete || round == 0u64 {
             return Ok(());
         }
 
@@ -368,7 +369,7 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
-    pub async fn propose_batch_lite(&self, other_acc: &[&Account<N>]) -> Result<u64> {
+    pub async fn propose_batch_lite(&self, other_acc: &[&Account<N>], complete: bool) -> Result<u64> {
         // This function isn't re-entrant.
         let mut lock_guard = self.propose_lock.lock().await;
 
@@ -488,96 +489,142 @@ impl<N: Network> Primary<N> {
             return Ok(0u64);
         }
 
-        // Determined the required number of transmissions per worker.
-        let num_transmissions_per_worker = BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
         // Initialize the map of transmissions.
         let mut transmissions: IndexMap<_, _> = Default::default();
-        // Take the transmissions from the workers.
-        for worker in self.workers.iter() {
-            // Initialize a tracker for included transmissions for the current worker.
-            let mut num_transmissions_included_for_worker = 0;
-            // Keep draining the worker until the desired number of transmissions is reached or the worker is empty.
-            'outer: while num_transmissions_included_for_worker < num_transmissions_per_worker {
-                // Determine the number of remaining transmissions for the worker.
-                let num_remaining_transmissions =
-                    num_transmissions_per_worker.saturating_sub(num_transmissions_included_for_worker);
-                // Drain the worker.
-                let mut worker_transmissions = worker.drain(num_remaining_transmissions).peekable();
-                // If the worker is empty, break early.
-                if worker_transmissions.peek().is_none() {
+        // Track the total execution costs of the batch proposal as it is being constructed.
+        let mut proposal_cost = 0u64;
+        // Note: worker draining and transaction inclusion needs to be thought
+        // through carefully when there is more than one worker. The fairness
+        // provided by one worker (FIFO) is no longer guaranteed with multiple workers.
+        debug_assert_eq!(MAX_WORKERS, 1);
+
+        'outer: for worker in self.workers.iter() {
+            let mut num_worker_transmissions = 0usize;
+
+            while let Some((id, transmission)) = worker.remove_front() {
+                // Check the selected transmissions are below the batch limit.
+                if transmissions.len() >= BatchHeader::<N>::MAX_TRANSMISSIONS_PER_BATCH {
                     break 'outer;
                 }
-                // Iterate through the worker transmissions.
-                'inner: for (id, transmission) in worker_transmissions {
-                    // Check if the ledger already contains the transmission.
-                    if self.ledger.contains_transmission(&id).unwrap_or(true) {
-                        guard_trace!(self, "Proposing - Skipping transmission '{}' - Already in ledger", fmt_id(id));
-                        continue 'inner;
-                    }
-                    // Check if the storage already contain the transmission.
-                    // Note: We do not skip if this is the first transmission in the proposal, to ensure that
-                    // the primary does not propose a batch with no transmissions.
-                    if !transmissions.is_empty() && self.storage.contains_transmission(id) {
-                        guard_trace!(self, "Proposing - Skipping transmission '{}' - Already in storage", fmt_id(id));
-                        continue 'inner;
-                    }
-                    // Check the transmission is still valid.
-                    match (id, transmission.clone()) {
-                        (TransmissionID::Solution(solution_id, checksum), Transmission::Solution(solution)) => {
-                            // Ensure the checksum matches.
-                            match solution.to_checksum::<N>() {
-                                Ok(solution_checksum) if solution_checksum == checksum => (),
-                                _ => {
-                                    guard_trace!(
-                                        self,
-                                        "Proposing - Skipping solution '{}' - Checksum mismatch",
-                                        fmt_id(solution_id)
-                                    );
-                                    continue 'inner;
-                                }
-                            }
-                            // Check if the solution is still valid.
-                            if let Err(e) = self.ledger.check_solution_basic(solution_id, solution).await {
-                                guard_trace!(self, "Proposing - Skipping solution '{}' - {e}", fmt_id(solution_id));
-                                continue 'inner;
-                            }
-                        }
-                        (
-                            TransmissionID::Transaction(transaction_id, checksum),
-                            Transmission::Transaction(transaction),
-                        ) => {
-                            // Ensure the checksum matches.
-                            match transaction.to_checksum::<N>() {
-                                Ok(transaction_checksum) if transaction_checksum == checksum => (),
-                                _ => {
-                                    guard_trace!(
-                                        self,
-                                        "Proposing - Skipping transaction '{}' - Checksum mismatch",
-                                        fmt_id(transaction_id)
-                                    );
-                                    continue 'inner;
-                                }
-                            }
-                            // Check if the transaction is still valid.
-                            if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction).await {
-                                guard_trace!(
-                                    self,
-                                    "Proposing - Skipping transaction '{}' - {e}",
-                                    fmt_id(transaction_id)
-                                );
-                                continue 'inner;
-                            }
-                        }
-                        // Note: We explicitly forbid including ratifications,
-                        // as the protocol currently does not support ratifications.
-                        (TransmissionID::Ratification, Transmission::Ratification) => continue,
-                        // All other combinations are clearly invalid.
-                        _ => continue 'inner,
-                    }
-                    // Insert the transmission into the map.
-                    transmissions.insert(id, transmission);
-                    num_transmissions_included_for_worker += 1;
+
+                // Check the max transmissions per worker is not exceeded.
+                if num_worker_transmissions >= Worker::<N>::MAX_TRANSMISSIONS_PER_WORKER {
+                    continue 'outer;
                 }
+
+                // Check if the ledger already contains the transmission.
+                if self.ledger.contains_transmission(&id).unwrap_or(true) {
+                    guard_trace!(self, "Proposing - Skipping transmission '{}' - Already in ledger", fmt_id(id));
+                    continue;
+                }
+
+                // Check if the storage already contain the transmission.
+                // Note: We do not skip if this is the first transmission in the proposal, to ensure that
+                // the primary does not propose a batch with no transmissions.
+                if !transmissions.is_empty() && self.storage.contains_transmission(id) {
+                    guard_trace!(self, "Proposing - Skipping transmission '{}' - Already in storage", fmt_id(id));
+                    continue;
+                }
+
+                // Check the transmission is still valid.
+                match (id, transmission.clone()) {
+                    (TransmissionID::Solution(solution_id, checksum), Transmission::Solution(solution)) => {
+                        // Ensure the checksum matches. If not, skip the solution.
+                        if !matches!(solution.to_checksum::<N>(), Ok(solution_checksum) if solution_checksum == checksum)
+                        {
+                            guard_trace!(
+                                self,
+                                "Proposing - Skipping solution '{}' - Checksum mismatch",
+                                fmt_id(solution_id)
+                            );
+                            continue;
+                        }
+                        // Check if the solution is still valid.
+                        if let Err(e) = self.ledger.check_solution_basic(solution_id, solution).await {
+                            guard_trace!(self, "Proposing - Skipping solution '{}' - {e}", fmt_id(solution_id));
+                            continue;
+                        }
+                    }
+                    (TransmissionID::Transaction(transaction_id, checksum), Transmission::Transaction(transaction)) => {
+                        // Ensure the checksum matches. If not, skip the transaction.
+                        if !matches!(transaction.to_checksum::<N>(), Ok(transaction_checksum) if transaction_checksum == checksum )
+                        {
+                            guard_trace!(
+                                self,
+                                "Proposing - Skipping transaction '{}' - Checksum mismatch",
+                                fmt_id(transaction_id)
+                            );
+                            continue;
+                        }
+
+                        // Deserialize the transaction. If the transaction exceeds the maximum size, then return an error.
+                        let transaction = spawn_blocking!({
+                            match transaction {
+                                Data::Object(transaction) => Ok(transaction),
+                                Data::Buffer(bytes) => {
+                                    Ok(Transaction::<N>::read_le(&mut bytes.take(N::MAX_TRANSACTION_SIZE as u64))?)
+                                }
+                            }
+                        })?;
+
+                        // Check if the transaction is still valid.
+                        // TODO: check if clone is cheap, otherwise fix.
+                        if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction.clone()).await {
+                            guard_trace!(self, "Proposing - Skipping transaction '{}' - {e}", fmt_id(transaction_id));
+                            continue;
+                        }
+
+                        // Compute the transaction spent cost (in microcredits).
+                        // Note: We purposefully discard this transaction if we are unable to compute the spent cost.
+                        let Ok(cost) = self.ledger.transaction_spent_cost_in_microcredits(transaction_id, transaction)
+                        else {
+                            guard_debug!(
+                                self,
+                                "Proposing - Skipping and discarding transaction '{}' - Unable to compute transaction spent cost",
+                                fmt_id(transaction_id)
+                            );
+                            continue;
+                        };
+
+                        // Compute the next proposal cost.
+                        // Note: We purposefully discard this transaction if the proposal cost overflows.
+                        let Some(next_proposal_cost) = proposal_cost.checked_add(cost) else {
+                            guard_debug!(
+                                self,
+                                "Proposing - Skipping and discarding transaction '{}' - Proposal cost overflowed",
+                                fmt_id(transaction_id)
+                            );
+                            continue;
+                        };
+
+                        // Check if the next proposal cost exceeds the batch proposal spend limit.
+                        if next_proposal_cost > BatchHeader::<N>::BATCH_SPEND_LIMIT {
+                            guard_trace!(
+                                self,
+                                "Proposing - Skipping transaction '{}' - Batch spend limit surpassed ({next_proposal_cost} > {})",
+                                fmt_id(transaction_id),
+                                BatchHeader::<N>::BATCH_SPEND_LIMIT
+                            );
+
+                            // Reinsert the transmission into the worker.
+                            worker.insert_front(id, transmission);
+                            break 'outer;
+                        }
+
+                        // Update the proposal cost.
+                        proposal_cost = next_proposal_cost;
+                    }
+
+                    // Note: We explicitly forbid including ratifications,
+                    // as the protocol currently does not support ratifications.
+                    (TransmissionID::Ratification, Transmission::Ratification) => continue,
+                    // All other combinations are clearly invalid.
+                    _ => continue,
+                }
+
+                // If the transmission is valid, insert it into the proposal's transmission list.
+                transmissions.insert(id, transmission);
+                num_worker_transmissions = num_worker_transmissions.saturating_add(1);
             }
         }
 
@@ -598,7 +645,7 @@ impl<N: Network> Primary<N> {
         // Prepare the previous batch certificate IDs.
         let previous_certificate_ids = previous_certificates.into_iter().map(|c| c.id()).collect();
         // Sign the batch header and construct the proposal.
-        let (batch_header, mut proposal) = spawn_blocking!(BatchHeader::new(
+        let (batch_header, proposal) = spawn_blocking!(BatchHeader::new(
             &private_key,
             round,
             current_timestamp,
@@ -623,9 +670,22 @@ impl<N: Network> Primary<N> {
         // // Set the proposed batch.
         // *self.proposed_batch.write() = Some(proposal);
 
-        //===============================================================================
         // Processing proposal
+        if complete {
+            self.complete_batch_lite(other_acc, round, batch_header, proposal, committee_lookback).await?;
+        }
 
+        Ok(round)
+    }
+
+    pub async fn complete_batch_lite(
+        &self,
+        other_acc: &[&Account<N>],
+        round: u64,
+        batch_header: BatchHeader<N>,
+        mut proposal: Proposal<N>,
+        committee_lookback: Committee<N>,
+    ) -> Result<()> {
         guard_info!(self, "Quorum threshold reached - Preparing to certify our batch for round {round}...");
 
         // Retrieve the batch ID.
@@ -652,7 +712,7 @@ impl<N: Network> Primary<N> {
 
         #[cfg(feature = "metrics")]
         metrics::increment_gauge(metrics::bft::CERTIFIED_BATCHES, 1.0);
-        Ok(round)
+        Ok(())
     }
 
     pub async fn fake_proposal(
@@ -794,7 +854,7 @@ impl<N: Network> Primary<N> {
                 // If there is no proposed batch, attempt to propose a batch.
                 // Note: Do NOT spawn a task around this function call. Proposing a batch is a critical path,
                 // and only one batch needs be proposed at a time.
-                if let Err(e) = self_.propose_batch().await {
+                if let Err(e) = self_.propose_batch(true).await {
                     guard_warn!(self_, "Cannot propose a batch - {e}");
                 }
             }
@@ -933,7 +993,7 @@ impl<N: Network> Primary<N> {
 
             // If the node is ready, propose a batch for the next round.
             if is_ready {
-                self.propose_batch().await?;
+                self.propose_batch(true).await?;
             }
         }
         Ok(())
@@ -983,7 +1043,7 @@ impl<N: Network> Primary<N> {
 
             // // If the node is ready, propose a batch for the next round.
             // if is_ready {
-            //     self.propose_batch().await?;
+            //     self.propose_batch(true).await?;
             // }
         }
         Ok(())
@@ -1258,7 +1318,10 @@ mod tests {
     use amareleo_node_bft_storage_service::BFTMemoryService;
     use snarkvm::{
         console::types::Field,
-        ledger::committee::{Committee, MIN_VALIDATOR_STAKE},
+        ledger::{
+            committee::{Committee, MIN_VALIDATOR_STAKE},
+            ledger_test_helpers::sample_execution_transaction_with_fee,
+        },
         prelude::{Address, Signature},
     };
 
@@ -1268,31 +1331,36 @@ mod tests {
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
-    // Returns a primary and a list of accounts in the configured committee.
-    async fn primary_without_handlers(
-        rng: &mut TestRng,
-    ) -> (Primary<CurrentNetwork>, Vec<(SocketAddr, Account<CurrentNetwork>)>) {
+    fn sample_committee(rng: &mut TestRng) -> (Vec<(SocketAddr, Account<CurrentNetwork>)>, Committee<CurrentNetwork>) {
         // Create a committee containing the primary's account.
-        let (accounts, committee) = {
-            const COMMITTEE_SIZE: usize = 4;
-            let mut accounts = Vec::with_capacity(COMMITTEE_SIZE);
-            let mut members = IndexMap::new();
+        const COMMITTEE_SIZE: usize = 4;
+        let mut rng_validator = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
+        let mut accounts = Vec::with_capacity(COMMITTEE_SIZE);
+        let mut members = IndexMap::new();
 
-            for i in 0..COMMITTEE_SIZE {
-                let socket_addr = format!("127.0.0.1:{}", 5000 + i).parse().unwrap();
-                let account = Account::new(rng).unwrap();
-                members.insert(account.address(), (MIN_VALIDATOR_STAKE, true, rng.gen_range(0..100)));
-                accounts.push((socket_addr, account));
-            }
+        for i in 0..COMMITTEE_SIZE {
+            let socket_addr = format!("127.0.0.1:{}", 5000 + i).parse().unwrap();
+            let account = Account::new(&mut rng_validator).unwrap();
 
-            (accounts, Committee::<CurrentNetwork>::new(1, members).unwrap())
-        };
+            members.insert(account.address(), (MIN_VALIDATOR_STAKE, true, rng.gen_range(0..100)));
+            accounts.push((socket_addr, account));
+        }
 
-        let account = accounts.first().unwrap().1.clone();
-        let ledger = Arc::new(MockLedgerService::new(committee));
+        (accounts, Committee::<CurrentNetwork>::new(1, members).unwrap())
+    }
+
+    // Returns a primary and a list of accounts in the configured committee.
+    fn primary_with_committee(
+        account_index: usize,
+        accounts: &[(SocketAddr, Account<CurrentNetwork>)],
+        committee: Committee<CurrentNetwork>,
+        height: u32,
+    ) -> Primary<CurrentNetwork> {
+        let ledger = Arc::new(MockLedgerService::new_at_height(committee, height));
         let storage = Storage::new(ledger.clone(), Arc::new(BFTMemoryService::new()), 10, None);
 
         // Initialize the primary.
+        let account = accounts[account_index].1.clone();
         let mut primary = Primary::new(account, storage, false, StorageMode::Development(0), ledger, None).unwrap();
 
         // Construct a worker instance.
@@ -1304,6 +1372,20 @@ mod tests {
             None,
         )
         .unwrap()]);
+
+        primary
+    }
+
+    fn primary_without_handlers(
+        rng: &mut TestRng,
+    ) -> (Primary<CurrentNetwork>, Vec<(SocketAddr, Account<CurrentNetwork>)>) {
+        let (accounts, committee) = sample_committee(rng);
+        let primary = primary_with_committee(
+            0, // index of primary's account
+            &accounts,
+            committee,
+            CurrentNetwork::CONSENSUS_HEIGHT(ConsensusVersion::V1).unwrap(),
+        );
 
         (primary, accounts)
     }
@@ -1322,20 +1404,14 @@ mod tests {
         (solution_id, solution)
     }
 
-    // Creates a mock transaction.
+    // Samples a test transaction.
     fn sample_unconfirmed_transaction(
         rng: &mut TestRng,
     ) -> (<CurrentNetwork as Network>::TransactionID, Data<Transaction<CurrentNetwork>>) {
-        // Sample a random fake transaction ID.
-        let id = Field::<CurrentNetwork>::rand(rng).into();
-        // Vary the size of the transactions.
-        let size = rng.gen_range(1024..10 * 1024);
-        // Sample random fake transaction bytes.
-        let mut vec = vec![0u8; size];
-        rng.fill_bytes(&mut vec);
-        let transaction = Data::Buffer(Bytes::from(vec));
-        // Return the ID and transaction.
-        (id, transaction)
+        let transaction = sample_execution_transaction_with_fee(false, rng);
+        let id = transaction.id();
+
+        (id, Data::Object(transaction))
     }
 
     // Creates a batch proposal with one solution and one transaction.
@@ -1345,25 +1421,30 @@ mod tests {
         round: u64,
         previous_certificate_ids: IndexSet<Field<CurrentNetwork>>,
         timestamp: i64,
+        num_transactions: u64,
         rng: &mut TestRng,
     ) -> Proposal<CurrentNetwork> {
-        let (solution_id, solution) = sample_unconfirmed_solution(rng);
-        let (transaction_id, transaction) = sample_unconfirmed_transaction(rng);
-        let solution_checksum = solution.to_checksum::<CurrentNetwork>().unwrap();
-        let transaction_checksum = transaction.to_checksum::<CurrentNetwork>().unwrap();
+        let mut transmission_ids = IndexSet::new();
+        let mut transmissions = IndexMap::new();
 
+        // Prepare the solution and insert into the sets.
+        let (solution_id, solution) = sample_unconfirmed_solution(rng);
+        let solution_checksum = solution.to_checksum::<CurrentNetwork>().unwrap();
         let solution_transmission_id = (solution_id, solution_checksum).into();
-        let transaction_transmission_id = (&transaction_id, &transaction_checksum).into();
+        transmission_ids.insert(solution_transmission_id);
+        transmissions.insert(solution_transmission_id, Transmission::Solution(solution));
+
+        // Prepare the transactions and insert into the sets.
+        for _ in 0..num_transactions {
+            let (transaction_id, transaction) = sample_unconfirmed_transaction(rng);
+            let transaction_checksum = transaction.to_checksum::<CurrentNetwork>().unwrap();
+            let transaction_transmission_id = (&transaction_id, &transaction_checksum).into();
+            transmission_ids.insert(transaction_transmission_id);
+            transmissions.insert(transaction_transmission_id, Transmission::Transaction(transaction));
+        }
 
         // Retrieve the private key.
         let private_key = author.private_key();
-        // Prepare the transmission IDs.
-        let transmission_ids = [solution_transmission_id, transaction_transmission_id].into();
-        let transmissions = [
-            (solution_transmission_id, Transmission::Solution(solution)),
-            (transaction_transmission_id, Transmission::Transaction(transaction)),
-        ]
-        .into();
         // Sign the batch header.
         let batch_header = BatchHeader::new(
             private_key,
@@ -1475,7 +1556,7 @@ mod tests {
     #[tokio::test]
     async fn test_propose_batch() {
         let mut rng = TestRng::default();
-        let (primary, _) = primary_without_handlers(&mut rng).await;
+        let (primary, _) = primary_without_handlers(&mut rng);
 
         // Check there is no batch currently proposed.
         assert!(primary.proposed_batch.read().is_none());
@@ -1489,7 +1570,7 @@ mod tests {
         primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
 
         // Try to propose a batch again. This time, it should succeed.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
 
         // AlexZ: proposed_batch is no longer written to when processing new batches...
         // assert!(primary.proposed_batch.read().is_some());
@@ -1498,13 +1579,13 @@ mod tests {
     #[tokio::test]
     async fn test_propose_batch_with_no_transmissions() {
         let mut rng = TestRng::default();
-        let (primary, _) = primary_without_handlers(&mut rng).await;
+        let (primary, _) = primary_without_handlers(&mut rng);
 
         // Check there is no batch currently proposed.
         assert!(primary.proposed_batch.read().is_none());
 
         // Try to propose a batch with no transmissions.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
 
         // AlexZ: proposed_batch is no longer written to when processing new batches...
         // assert!(primary.proposed_batch.read().is_some());
@@ -1514,7 +1595,7 @@ mod tests {
     async fn test_propose_batch_in_round() {
         let round = 3;
         let mut rng = TestRng::default();
-        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+        let (primary, accounts) = primary_without_handlers(&mut rng);
 
         // Fill primary storage.
         store_certificate_chain(&primary, &accounts, round, &mut rng);
@@ -1531,17 +1612,55 @@ mod tests {
         primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
 
         // Propose a batch again. This time, it should succeed.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
 
         // AlexZ: proposed_batch is no longer written to when processing new batches...
         // assert!(primary.proposed_batch.read().is_some());
     }
 
     #[tokio::test]
+    async fn test_propose_batch_over_spend_limit() {
+        let mut rng = TestRng::default();
+        // Create two primaries to test spend limit activation on V4.
+        let (accounts, committee) = sample_committee(&mut rng);
+        let primary = primary_with_committee(
+            0,
+            &accounts,
+            committee.clone(),
+            CurrentNetwork::CONSENSUS_HEIGHT(ConsensusVersion::V3).unwrap(),
+        );
+
+        // Check there is no batch currently proposed.
+        assert!(primary.proposed_batch.read().is_none());
+        // Check the workers are empty.
+        primary.workers.iter().for_each(|worker| assert!(worker.transmissions().is_empty()));
+
+        // Generate a solution and a transaction.
+        let (solution_id, solution) = sample_unconfirmed_solution(&mut rng);
+        primary.workers[0].process_unconfirmed_solution(solution_id, solution).await.unwrap();
+
+        for _i in 0..5 {
+            let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+            // Store it on one of the workers.
+            primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
+        }
+
+        // Try to propose a batch again. This time, it should succeed.
+        assert!(primary.propose_batch(false).await.is_ok());
+
+        // AlexZ: proposed_batch is no longer written to when processing new batches...
+        // Expect 2/5 transactions to be included in the proposal in addition to the solution.
+        // assert_eq!(primary.proposed_batch.read().as_ref().unwrap().transmissions().len(), 3);
+
+        // Check the transmissions were correctly drained from the workers.
+        assert_eq!(primary.workers.iter().map(|worker| worker.transmissions().len()).sum::<usize>(), 3);
+    }
+
+    #[tokio::test]
     async fn test_propose_batch_with_storage_round_behind_proposal_lock() {
         let round = 3;
         let mut rng = TestRng::default();
-        let (primary, _) = primary_without_handlers(&mut rng).await;
+        let (primary, _) = primary_without_handlers(&mut rng);
 
         // Check there is no batch currently proposed.
         assert!(primary.proposed_batch.read().is_none());
@@ -1559,14 +1678,14 @@ mod tests {
         *primary.propose_lock.lock().await = round + 1;
 
         // Propose a batch and enforce that it fails.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
         assert!(primary.proposed_batch.read().is_none());
 
         // Set the proposal lock back to the old round.
         *primary.propose_lock.lock().await = old_proposal_lock_round;
 
         // Try to propose a batch again. This time, it should succeed.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
 
         // AlexZ: proposed_batch is no longer written to when processing new batches...
         // assert!(primary.proposed_batch.read().is_some());
@@ -1576,7 +1695,7 @@ mod tests {
     async fn test_propose_batch_with_storage_round_behind_proposal() {
         let round = 5;
         let mut rng = TestRng::default();
-        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+        let (primary, accounts) = primary_without_handlers(&mut rng);
 
         // Generate previous certificates.
         let previous_certificates = store_certificate_chain(&primary, &accounts, round, &mut rng);
@@ -1589,6 +1708,7 @@ mod tests {
             round + 1,
             previous_certificates,
             timestamp,
+            1,
             &mut rng,
         );
 
@@ -1596,7 +1716,7 @@ mod tests {
         *primary.proposed_batch.write() = Some(proposal);
 
         // Try to propose a batch will terminate early because the storage is behind the proposal.
-        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.propose_batch(false).await.is_ok());
         assert!(primary.proposed_batch.read().is_some());
         assert!(primary.proposed_batch.read().as_ref().unwrap().round() > primary.current_round());
     }

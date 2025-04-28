@@ -154,7 +154,9 @@ mod tests {
         // Initialize the account.
         let account = Account::<CurrentNetwork>::new(&mut rng).unwrap();
         // Initialize a new VM.
-        let vm = VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?)?;
+        let vm = VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(
+            StorageMode::new_test(None),
+        )?)?;
         // Initialize the genesis block.
         let genesis = vm.genesis_beacon(account.private_key(), &mut rng)?;
 

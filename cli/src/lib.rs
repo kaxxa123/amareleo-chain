@@ -19,5 +19,13 @@
 #[macro_use]
 extern crate thiserror;
 
+#[cfg(feature = "locktick")]
+#[macro_use]
+extern crate tracing;
+
+#[cfg(feature = "locktick")]
+#[macro_use]
+extern crate amareleo_chain_tracing;
+
 pub mod commands;
 pub mod helpers;
