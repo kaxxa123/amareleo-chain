@@ -1621,13 +1621,14 @@ mod tests {
     #[tokio::test]
     async fn test_propose_batch_over_spend_limit() {
         let mut rng = TestRng::default();
-        // Create two primaries to test spend limit activation on V4.
+
+        // Create a primary to test spend limit backwards compatibility with V4.
         let (accounts, committee) = sample_committee(&mut rng);
         let primary = primary_with_committee(
             0,
             &accounts,
             committee.clone(),
-            CurrentNetwork::CONSENSUS_HEIGHT(ConsensusVersion::V3).unwrap(),
+            CurrentNetwork::CONSENSUS_HEIGHT(ConsensusVersion::V4).unwrap(),
         );
 
         // Check there is no batch currently proposed.
