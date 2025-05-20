@@ -1,4 +1,4 @@
-// Copyright 2024 Aleo Network Foundation
+// Copyright (c) 2019-2025 Provable Inc.
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,18 +29,33 @@ use snarkvm::{
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashSet;
 
+/// A pending proposal by a validator.
+///
+/// When a validator creates and broadcasts a proposal, it collects endorsing signatures from other validators.
+/// When the validator has enough endorsements, it turns the proposal into a certificate.
+/// This struct holds the information about the pending proposal, in the proposing validator's state,
+/// between the creation of the proposal and its turning into a certificate.
+///
+/// Invariant: `batch_header.transmission_ids()` contains the same elements as `transmissions.keys()`.
+/// [`Proposal::new`] and [`Proposal::read_le`] establish the invariant, by checking the condition;
+/// none of the other functions modifies the batch header or the transmissions.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Proposal<N: Network> {
     /// The proposed batch header.
     batch_header: BatchHeader<N>,
     /// The proposed transmissions.
     transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
-    /// The set of signatures.
+    /// The set of endorsing signatures accumulated so far from other validators
+    /// (excludes the signature of the proposal author, which is in the `batch_header` component).
     signatures: IndexSet<Signature<N>>,
 }
 
 impl<N: Network> Proposal<N> {
     /// Initializes a new instance of the proposal.
+    ///
+    /// The `committee` input is the active (i.e. lookback) committee for the batch round.
+    /// A crucial protocol safety check made in this constructor is that the proposal author (the current validator),
+    /// is a member of that committee, because only members of the committee can propose batches.
     pub fn new(
         committee: Committee<N>,
         batch_header: BatchHeader<N>,
@@ -72,12 +87,12 @@ impl<N: Network> Proposal<N> {
         self.batch_header.batch_id()
     }
 
-    /// Returns the round.
+    /// Returns the round of the batch header.
     pub const fn round(&self) -> u64 {
         self.batch_header.round()
     }
 
-    /// Returns the timestamp.
+    /// Returns the timestamp of the batch header.
     pub const fn timestamp(&self) -> i64 {
         self.batch_header.timestamp()
     }
@@ -92,12 +107,12 @@ impl<N: Network> Proposal<N> {
         self.transmissions
     }
 
-    /// Returns the signers.
+    /// Returns all the signers, including author and endorsers.
     pub fn signers(&self) -> HashSet<Address<N>> {
         self.signatures.iter().chain(Some(self.batch_header.signature())).map(Signature::to_address).collect()
     }
 
-    /// Returns the nonsigners.
+    /// Returns the non-signers, i.e. the committee members that have not signed the proposal.
     pub fn nonsigners(&self, committee: &Committee<N>) -> HashSet<Address<N>> {
         // Retrieve the current signers.
         let signers = self.signers();
@@ -114,7 +129,8 @@ impl<N: Network> Proposal<N> {
         nonsigners
     }
 
-    /// Returns `true` if the quorum threshold has been reached for the proposed batch.
+    /// Returns `true` if the signers of the batch (author and endorsers)
+    /// have reached the quorum threshold for the committee.
     pub fn is_quorum_threshold_reached(&self, committee: &Committee<N>) -> bool {
         // Check if the batch has reached the quorum threshold.
         committee.is_quorum_threshold_reached(&self.signers())
@@ -130,7 +146,9 @@ impl<N: Network> Proposal<N> {
         self.transmissions.get(&transmission_id.into())
     }
 
-    /// Adds a signature to the proposal, if the signature is valid.
+    /// Adds an endorsing signature to the proposal, if the signature is valid
+    /// and the signer is a committee member that has not already signed the proposal
+    /// (this implicitly checks that the signature is not from the author).
     pub fn add_signature(
         &mut self,
         signer: Address<N>,
@@ -193,7 +211,7 @@ impl<N: Network> ToBytes for Proposal<N> {
 impl<N: Network> FromBytes for Proposal<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         // Read the batch header.
-        let batch_header = FromBytes::read_le(&mut reader)?;
+        let batch_header: BatchHeader<N> = FromBytes::read_le(&mut reader)?;
         // Read the number of transmissions.
         let num_transmissions = u32::read_le(&mut reader)?;
         // Ensure the number of transmissions is within bounds (this is an early safety check).
@@ -219,6 +237,16 @@ impl<N: Network> FromBytes for Proposal<N> {
             signatures.insert(FromBytes::read_le(&mut reader)?);
         }
 
+        // Ensure the transmission IDs match in the batch header and transmissions.
+        if batch_header.transmission_ids().len() != transmissions.len() {
+            return Err(error("The transmission IDs do not match in the batch header and transmissions"));
+        }
+        for (a, b) in batch_header.transmission_ids().iter().zip_eq(transmissions.keys()) {
+            if a != b {
+                return Err(error("The transmission IDs do not match in the batch header and transmissions"));
+            }
+        }
+
         Ok(Self { batch_header, transmissions, signatures })
     }
 }
@@ -237,7 +265,9 @@ pub(crate) mod tests {
         let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
         let (_, transmissions) = sample_transmissions(&certificate, rng);
 
-        let transmissions = transmissions.into_iter().map(|(id, (t, _))| (id, t)).collect::<IndexMap<_, _>>();
+        let transmissions =
+            certificate.transmission_ids().iter().map(|id| (*id, transmissions.get(id).unwrap().0.clone())).collect();
+
         let batch_header = certificate.batch_header().clone();
         let signatures = certificate.signatures().copied().collect();
 

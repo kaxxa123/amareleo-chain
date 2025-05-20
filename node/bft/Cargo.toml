@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-bft"
-version = "2.3.0"
+version = "2.4.1"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A memory pool for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -59,7 +59,7 @@ optional = true
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "../metrics"
-version = "=2.3.0"
+version = "=2.4.1"
 optional = true
 
 [dependencies.parking_lot]
@@ -77,25 +77,25 @@ default-features = false
 
 [dependencies.amareleo-chain-tracing]
 path = "../../tracing"
-version = "=2.3.0"
+version = "=2.4.1"
 
 [dependencies.amareleo-chain-account]
 path = "../../account"
-version = "=2.3.0"
+version = "=2.4.1"
 
 [dependencies.amareleo-node-bft-ledger-service]
 path = "./ledger-service"
-version = "=2.3.0"
+version = "=2.4.1"
 features = ["ledger", "prover"]
 
 [dependencies.amareleo-node-bft-storage-service]
 path = "./storage-service"
-version = "=2.3.0"
+version = "=2.4.1"
 features = ["memory"]
 
 [dependencies.amareleo-node-sync]
 path = "../sync"
-version = "=2.3.0"
+version = "=2.4.1"
 
 [dependencies.snarkvm]
 workspace = true

@@ -1,4 +1,4 @@
-// Copyright 2024 Aleo Network Foundation
+// Copyright (c) 2019-2025 Provable Inc.
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -240,6 +240,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                     &format!("/{network}/transaction/confirmed/:id"),
                     get(Self::get_confirmed_transaction),
                 )
+                .route(&format!("/{network}/transaction/unconfirmed/:id"), get(Self::get_unconfirmed_transaction))
                 .route(
                     &format!("/{network}/transaction/broadcast"),
                     post(Self::transaction_broadcast),
@@ -344,7 +345,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                 .layer(middleware::from_fn_with_state(self.clone(), Self::log_middleware))
                 // Enable CORS.
                 .layer(cors)
-                // Cap body size at 512KiB.
+                // Cap the request body size at 512KiB.
                 .layer(DefaultBodyLimit::max(512 * 1024))
                 .layer(GovernorLayer {
                     // We can leak this because it is created only once and it persists.

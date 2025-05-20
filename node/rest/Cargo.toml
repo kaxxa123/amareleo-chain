@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-rest"
-version = "2.3.0"
+version = "2.4.1"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A REST API server for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -63,17 +63,17 @@ features = ["preserve_order"]
 
 [dependencies.amareleo-chain-tracing]
 path = "../../tracing"
-version = "=2.3.0"
+version = "=2.4.1"
 
 [dependencies.amareleo-node-consensus]
 path = "../consensus"
-version = "=2.3.0"
+version = "=2.4.1"
 
 [dependencies.snarkvm-synthesizer]
 #path = "../../../snarkVM/synthesizer"
 #git = "https://github.com/ProvableHQ/snarkVM.git"
-#rev = "e319a75"
-version = "=1.6.0"
+#rev = "e60c5b0"
+version = "=3.7.1"
 default-features = false
 optional = true
 
