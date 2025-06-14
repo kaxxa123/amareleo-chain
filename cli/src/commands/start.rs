@@ -39,8 +39,8 @@ use amareleo_chain_api::{AmareleoApi, get_node_account};
 /// Starts the node.
 #[derive(Clone, Debug, Parser)]
 pub struct Start {
-    /// Specify the network ID of this node
-    #[clap(default_value = "1", long = "network")]
+    /// Specify the network ID of this node (0 = mainnet, 1 = testnet, 2 = canary)
+    #[clap(default_value_t=MainnetV0::ID, long = "network", value_parser = clap::value_parser!(u16).range((MainnetV0::ID as i64)..=(CanaryV0::ID as i64)))]
     pub network: u16,
 
     /// Specify the IP address and port for the REST server [default: 127.0.0.1:3030]

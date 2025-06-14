@@ -20,7 +20,6 @@ locktick = [
     "snarkvm/locktick",
 ]
 metrics = ["dep:metrics", "amareleo-node-bft-ledger-service/metrics"]
-test_targets = ["snarkvm/test_targets"]
 
 [dependencies.aleo-std]
 workspace = true
@@ -115,10 +114,10 @@ version = "0.3.0"
 default-features = false
 
 [dev-dependencies.axum]
-version = "0.7"
+version = "0.8"
 
 [dev-dependencies.axum-extra]
-version = "0.9"
+version = "0.10"
 default-features = false
 features = ["erased-json"]
 
@@ -169,7 +168,7 @@ features = ["test-helpers"]
 version = "0.3.1"
 
 [dev-dependencies.tower-http]
-version = "0.5"
+version = "0.6"
 features = ["fs", "trace"]
 
 [dev-dependencies.tracing-subscriber]

@@ -28,7 +28,6 @@ metrics = [
     "amareleo-node-consensus/metrics",
 ]
 history = ["amareleo-node-rest/history"]
-test_targets = ["snarkvm/test_targets"]
 
 [dependencies.aleo-std]
 workspace = true

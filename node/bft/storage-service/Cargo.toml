@@ -16,7 +16,6 @@ locktick = ["dep:locktick", "snarkvm/locktick"]
 memory = ["parking_lot", "tracing"]
 persistent = []
 test = ["memory"]
-test_targets = ["snarkvm/test_targets"]
 
 [dependencies.aleo-std]
 workspace = true
