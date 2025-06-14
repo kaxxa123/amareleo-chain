@@ -206,7 +206,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                     get(Self::get_node_address),
                 )
                 .route(
-                    &format!("/{network}/program/:id/mapping/:name"),
+                    &format!("/{network}/program/{{id}}/mapping/{{name}}"),
                     get(Self::get_mapping_values),
                 )
                 .route_layer(middleware::from_fn(auth_middleware))
@@ -224,23 +224,23 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                     get(Self::get_block_latest),
                 )
                 .route(
-                    &format!("/{network}/block/:height_or_hash"),
+                    &format!("/{network}/block/{{height_or_hash}}"),
                     get(Self::get_block),
                 )
                 // The path param here is actually only the height, but the name must match the route
                 // above, otherwise there'll be a conflict at runtime.
-                .route(&format!("/{network}/block/:height_or_hash/header"), get(Self::get_block_header))
-                .route(&format!("/{network}/block/:height_or_hash/transactions"), get(Self::get_block_transactions))
+                .route(&format!("/{network}/block/{{height_or_hash}}/header"), get(Self::get_block_header))
+                .route(&format!("/{network}/block/{{height_or_hash}}/transactions"), get(Self::get_block_transactions))
                 // GET and POST ../transaction/..
                 .route(
-                    &format!("/{network}/transaction/:id"),
+                    &format!("/{network}/transaction/{{id}}"),
                     get(Self::get_transaction),
                 )
                 .route(
-                    &format!("/{network}/transaction/confirmed/:id"),
+                    &format!("/{network}/transaction/confirmed/{{id}}"),
                     get(Self::get_confirmed_transaction),
                 )
-                .route(&format!("/{network}/transaction/unconfirmed/:id"), get(Self::get_unconfirmed_transaction))
+                .route(&format!("/{network}/transaction/unconfirmed/{{id}}"), get(Self::get_unconfirmed_transaction))
                 .route(
                     &format!("/{network}/transaction/broadcast"),
                     post(Self::transaction_broadcast),
@@ -252,23 +252,23 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                 )
                 // GET ../find/..
                 .route(
-                    &format!("/{network}/find/blockHash/:tx_id"),
+                    &format!("/{network}/find/blockHash/{{tx_id}}"),
                     get(Self::find_block_hash),
                 )
                 .route(
-                    &format!("/{network}/find/blockHeight/:state_root"),
+                    &format!("/{network}/find/blockHeight/{{state_root}}"),
                     get(Self::find_block_height_from_state_root),
                 )
                 .route(
-                    &format!("/{network}/find/transactionID/deployment/:program_id"),
+                    &format!("/{network}/find/transactionID/deployment/{{program_id}}"),
                     get(Self::find_transaction_id_from_program_id),
                 )
                 .route(
-                    &format!("/{network}/find/transactionID/:transition_id"),
+                    &format!("/{network}/find/transactionID/{{transition_id}}"),
                     get(Self::find_transaction_id_from_transition_id),
                 )
                 .route(
-                    &format!("/{network}/find/transitionID/:input_or_output_id"),
+                    &format!("/{network}/find/transitionID/{{input_or_output_id}}"),
                     get(Self::find_transition_id),
                 )
                 // GET ../peers/..
@@ -282,18 +282,18 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                     get(Self::get_peers_all_metrics),
                 )
                 // GET ../program/..
-                .route(&format!("/{network}/program/:id"), get(Self::get_program))
+                .route(&format!("/{network}/program/{{id}}"), get(Self::get_program))
                 .route(
-                    &format!("/{network}/program/:id/mappings"),
+                    &format!("/{network}/program/{{id}}/mappings"),
                     get(Self::get_mapping_names),
                 )
                 .route(
-                    &format!("/{network}/program/:id/mapping/:name/:key"),
+                    &format!("/{network}/program/{{id}}/mapping/{{name}}/{{key}}"),
                     get(Self::get_mapping_value),
                 )
                 // GET misc endpoints.
                 .route(&format!("/{network}/blocks"), get(Self::get_blocks))
-                .route(&format!("/{network}/height/:hash"), get(Self::get_height))
+                .route(&format!("/{network}/height/{{hash}}"), get(Self::get_height))
                 .route(
                     &format!("/{network}/memoryPool/transmissions"),
                     get(Self::get_memory_pool_transmissions),
@@ -307,7 +307,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                     get(Self::get_memory_pool_transactions),
                 )
                 .route(
-                    &format!("/{network}/statePath/:commitment"),
+                    &format!("/{network}/statePath/{{commitment}}"),
                     get(Self::get_state_path_for_commitment),
                 )
                 .route(
@@ -315,7 +315,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                     get(Self::get_state_root_latest),
                 )
                 .route(
-                    &format!("/{network}/stateRoot/:height"),
+                    &format!("/{network}/stateRoot/{{height}}"),
                     get(Self::get_state_root),
                 )
                 .route(
@@ -323,18 +323,18 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                     get(Self::get_committee_latest),
                 )
                 .route(
-                    &format!("/{network}/committee/:height"),
+                    &format!("/{network}/committee/{{height}}"),
                     get(Self::get_committee),
                 )
                 .route(
-                    &format!("/{network}/delegators/:validator"),
+                    &format!("/{network}/delegators/{{validator}}"),
                     get(Self::get_delegators_for_validator),
                 );
 
             // If the `history` feature is enabled, enable the additional endpoint.
             #[cfg(feature = "history")]
             let routes =
-                routes.route(&format!("/{network}/block/:blockHeight/history/:mapping"), get(Self::get_history));
+                routes.route(&format!("/{network}/block/{{blockHeight}}/history/{{mapping}}"), get(Self::get_history));
 
             routes
                 // Pass in `Rest` to make things convenient.
@@ -349,7 +349,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                 .layer(DefaultBodyLimit::max(512 * 1024))
                 .layer(GovernorLayer {
                     // We can leak this because it is created only once and it persists.
-                    config: Box::leak(governor_config),
+                    config: governor_config.into(),
                 })
         };
 

@@ -19,7 +19,6 @@ metrics = ["dep:metrics", "snarkvm/metrics"]
 mock = ["parking_lot", "tracing"]
 prover = []
 test = ["mock"]
-test_targets = ["snarkvm/test_targets"]
 
 [dependencies.anyhow]
 version = "1.0"

@@ -19,7 +19,7 @@ locktick = [
     "snarkvm/locktick",
 ]
 metrics = ["dep:metrics", "amareleo-chain-api/metrics", "amareleo-node/metrics"]
-test_targets = ["snarkvm/test_targets"]
+test_network = ["snarkvm/test_targets", "snarkvm/test_consensus_heights"]
 
 [dependencies.anstyle]
 version = "1"
