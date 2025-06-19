@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-rest"
-version = "2.4.1"
+version = "2.5.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A REST API server for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -19,16 +19,15 @@ locktick = [
     "amareleo-node-consensus/locktick",
     "snarkvm-synthesizer/locktick",
 ]
-test_targets = ["snarkvm/test_targets"]
 
 [dependencies.anyhow]
 version = "1.0.79"
 
 [dependencies.axum]
-version = "0.7"
+version = "0.8"
 
 [dependencies.axum-extra]
-version = "0.9.0"
+version = "0.10"
 features = ["erased-json", "typed-header"]
 
 [dependencies.http]
@@ -63,17 +62,17 @@ features = ["preserve_order"]
 
 [dependencies.amareleo-chain-tracing]
 path = "../../tracing"
-version = "=2.4.1"
+version = "=2.5.0"
 
 [dependencies.amareleo-node-consensus]
 path = "../consensus"
-version = "=2.4.1"
+version = "=2.5.0"
 
 [dependencies.snarkvm-synthesizer]
 #path = "../../../snarkVM/synthesizer"
 #git = "https://github.com/ProvableHQ/snarkVM.git"
-#rev = "e60c5b0"
-version = "=3.7.1"
+#rev = "0d744e9"
+version = "=3.8.0"
 default-features = false
 optional = true
 
@@ -94,10 +93,10 @@ version = "0.3"
 version = "1"
 
 [dependencies.tower_governor]
-version = "0.3"
+version = "0.7"
 
 [dependencies.tower-http]
-version = "0.5"
+version = "0.6"
 features = ["cors", "trace"]
 
 [dependencies.tracing]

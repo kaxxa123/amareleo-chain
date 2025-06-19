@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain-account"
-version = "2.4.1"
+version = "2.5.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "Account for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -11,7 +11,6 @@ license = "Apache-2.0"
 edition = "2021"
 
 [features]
-test_targets = ["snarkvm/test_targets"]
 
 [dependencies.colored]
 version = "2"

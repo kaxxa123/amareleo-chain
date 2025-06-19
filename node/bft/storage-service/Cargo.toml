@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-bft-storage-service"
-version = "2.4.1"
+version = "2.5.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A storage service for the memory pool in a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -16,7 +16,6 @@ locktick = ["dep:locktick", "snarkvm/locktick"]
 memory = ["parking_lot", "tracing"]
 persistent = []
 test = ["memory"]
-test_targets = ["snarkvm/test_targets"]
 
 [dependencies.aleo-std]
 workspace = true
@@ -45,7 +44,7 @@ workspace = true
 
 [dependencies.amareleo-chain-tracing]
 path = "../../../tracing"
-version = "=2.4.1"
+version = "=2.5.0"
 
 [dependencies.tracing]
 version = "0.1"

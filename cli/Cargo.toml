@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain-cli"
-version = "2.4.1"
+version = "2.5.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A CLI for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -19,7 +19,7 @@ locktick = [
     "snarkvm/locktick",
 ]
 metrics = ["dep:metrics", "amareleo-chain-api/metrics", "amareleo-node/metrics"]
-test_targets = ["snarkvm/test_targets"]
+test_network = ["snarkvm/test_targets", "snarkvm/test_consensus_heights"]
 
 [dependencies.anstyle]
 version = "1"
@@ -45,7 +45,7 @@ optional = true
 [dependencies.metrics]
 package = "amareleo-node-metrics"
 path = "../node/metrics"
-version = "=2.4.1"
+version = "=2.5.0"
 optional = true
 
 [dependencies.num_cpus]
@@ -74,19 +74,19 @@ features = ["env-filter"]
 
 [dependencies.amareleo-node]
 path = "../node"
-version = "=2.4.1"
+version = "=2.5.0"
 
 [dependencies.amareleo-node-rest]
 path = "../node/rest"
-version = "=2.4.1"
+version = "=2.5.0"
 
 [dependencies.amareleo-chain-tracing]
 path = "../tracing"
-version = "=2.4.1"
+version = "=2.5.0"
 
 [dependencies.amareleo-chain-api]
 path = "../api"
-version = "=2.4.1"
+version = "=2.5.0"
 
 [dependencies.snarkvm]
 workspace = true

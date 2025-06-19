@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-metrics"
-version = "2.4.1"
+version = "2.5.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A node for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -15,7 +15,6 @@ default = ["rayon", "snarkvm/metrics"]
 locktick = ["dep:locktick", "snarkvm/locktick"]
 metrics = ["snarkvm/metrics"]
 serial = ["snarkvm/metrics"]
-test_targets = ["snarkvm/test_targets"]
 
 [dependencies.locktick]
 version = "0.3"
