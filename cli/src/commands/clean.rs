@@ -20,7 +20,7 @@ use amareleo_node::bft::helpers::{
     default_ledger_dir,
     proposal_cache_path,
 };
-use snarkvm::console::network::{CanaryV0, MainnetV0, Network};
+use snarkvm::console::network::{CanaryV0, MainnetV0, Network, TestnetV0};
 
 use anyhow::{Result, bail};
 use clap::Parser;
@@ -31,7 +31,7 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 pub struct Clean {
     /// Specify the network to remove from storage (0 = mainnet, 1 = testnet, 2 = canary)
-    #[clap(default_value_t=MainnetV0::ID, long = "network", value_parser = clap::value_parser!(u16).range((MainnetV0::ID as i64)..=(CanaryV0::ID as i64)))]
+    #[clap(default_value_t=TestnetV0::ID, long = "network", value_parser = clap::value_parser!(u16).range((MainnetV0::ID as i64)..=(CanaryV0::ID as i64)))]
     pub network: u16,
     /// Specify the path to the ledger storage directory [default: current directory]
     #[clap(long = "path")]
