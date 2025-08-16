@@ -62,6 +62,9 @@ use tower_http::{
 };
 use tracing::subscriber::DefaultGuard;
 
+/// The default port used for the REST API
+pub const DEFAULT_REST_PORT: u16 = 3030;
+
 /// A REST API server for the ledger.
 #[derive(Clone)]
 pub struct Rest<N: Network, C: ConsensusStorage<N>> {
@@ -210,6 +213,10 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                     get(Self::get_mapping_values),
                 )
                 .route_layer(middleware::from_fn(auth_middleware))
+
+                // Get ../consensus_version
+                .route(&format!("/{network}/consensus_version"), get(Self::get_consensus_version))
+
                 // GET ../block/..
                 .route(
                     &format!("/{network}/block/height/latest"),
@@ -259,9 +266,11 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                     &format!("/{network}/find/blockHeight/{{state_root}}"),
                     get(Self::find_block_height_from_state_root),
                 )
-                .route(
-                    &format!("/{network}/find/transactionID/deployment/{{program_id}}"),
-                    get(Self::find_transaction_id_from_program_id),
+                .route(&format!("/{network}/find/transactionID/deployment/{{program_id}}"), 
+                get(Self::find_latest_transaction_id_from_program_id)
+                )
+                .route(&format!("/{network}/find/transactionID/deployment/{{program_id}}/{{edition}}"), 
+                get(Self::find_transaction_id_from_program_id_and_edition)
                 )
                 .route(
                     &format!("/{network}/find/transactionID/{{transition_id}}"),
@@ -283,6 +292,12 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                 )
                 // GET ../program/..
                 .route(&format!("/{network}/program/{{id}}"), get(Self::get_program))
+                .route(&format!("/{network}/program/{{id}}/latest_edition"), 
+                get(Self::get_latest_program_edition)
+                )
+                .route(&format!("/{network}/program/{{id}}/{{edition}}"), 
+                get(Self::get_program_for_edition)
+                )
                 .route(
                     &format!("/{network}/program/{{id}}/mappings"),
                     get(Self::get_mapping_names),
@@ -291,6 +306,13 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                     &format!("/{network}/program/{{id}}/mapping/{{name}}/{{key}}"),
                     get(Self::get_mapping_value),
                 )
+                // GET ../sync/..
+                // Note: keeping ../sync_status for compatibility
+                .route(&format!("/{network}/sync_status"), get(Self::get_sync_status))
+                .route(&format!("/{network}/sync/status"), get(Self::get_sync_status))
+                .route(&format!("/{network}/sync/peers"), get(Self::get_sync_peers))
+                .route(&format!("/{network}/sync/requests"), get(Self::get_sync_requests_summary))
+                .route(&format!("/{network}/sync/requests/list"), get(Self::get_sync_requests_list))
                 // GET misc endpoints.
                 .route(&format!("/{network}/blocks"), get(Self::get_blocks))
                 .route(&format!("/{network}/height/{{hash}}"), get(Self::get_height))

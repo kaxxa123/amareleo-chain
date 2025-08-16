@@ -16,13 +16,15 @@
 use super::*;
 use snarkvm::{
     ledger::puzzle::Solution,
-    prelude::{Address, Identifier, LimitedWriter, Plaintext, ToBytes, block::Transaction},
+    prelude::{Address, Identifier, LimitedWriter, Plaintext, Program, ToBytes, block::Transaction},
 };
 
 use indexmap::IndexMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use serde_with::skip_serializing_none;
+use std::collections::{BTreeMap, HashMap};
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -40,10 +42,77 @@ pub(crate) struct Metadata {
     all: Option<bool>,
 }
 
+/// The return value for a `sync_status` query.
+#[skip_serializing_none]
+#[derive(Copy, Clone, Serialize)]
+struct SyncStatus<'a> {
+    /// Is this node fully synced with the network?
+    is_synced: bool,
+    /// The block height of this node.
+    ledger_height: u32,
+    /// Which way are we sync'ing (either "cdn" or "p2p")
+    sync_mode: &'a str,
+    /// The block height of the CDN (if connected to a CDN).
+    cdn_height: Option<u32>,
+    /// The greatest known block height of a peer.
+    /// None, if no peers are connected yet.
+    p2p_height: Option<u32>,
+    /// The number of outstanding p2p sync requests.
+    outstanding_block_requests: usize,
+}
+
+/// Summary of completed all in-flight requests.
+#[derive(Clone, serde::Serialize)]
+pub struct BlockRequestsSummary {
+    outstanding: String,
+    completed: String,
+}
+
 impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
+    // Get /<network>/consensus_version
+    pub(crate) async fn get_consensus_version(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(N::CONSENSUS_VERSION(rest.ledger.latest_height())? as u16))
+    }
+
     // GET /<network>/block/height/latest
     pub(crate) async fn get_block_height_latest(State(rest): State<Self>) -> ErasedJson {
         ErasedJson::pretty(rest.ledger.latest_height())
+    }
+
+    // GET /<network>/sync/status
+    pub(crate) async fn get_sync_status(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        // Get the CDN height (if we are syncing from a CDN)
+        let (cdn_sync, cdn_height) = (false, None);
+
+        // Generate a string representing the current sync mode.
+        let sync_mode = if cdn_sync { "cdn" } else { "p2p" };
+
+        Ok(ErasedJson::pretty(SyncStatus {
+            sync_mode,
+            cdn_height,
+            is_synced: true,
+            ledger_height: rest.ledger.latest_height(),
+            p2p_height: None,
+            outstanding_block_requests: 0,
+        }))
+    }
+
+    // GET /<network>/sync/peers
+    pub(crate) async fn get_sync_peers(State(_rest): State<Self>) -> Result<ErasedJson, RestError> {
+        let peers: HashMap<String, u32> = HashMap::new();
+        Ok(ErasedJson::pretty(peers))
+    }
+
+    // GET /<network>/sync/requests
+    pub(crate) async fn get_sync_requests_summary(State(_rest): State<Self>) -> Result<ErasedJson, RestError> {
+        let summary = BlockRequestsSummary { completed: String::from("[]"), outstanding: String::from("[]") };
+        Ok(ErasedJson::pretty(summary))
+    }
+
+    // GET /<network>/sync/requests/list
+    pub(crate) async fn get_sync_requests_list(State(_rest): State<Self>) -> Result<ErasedJson, RestError> {
+        let requests: BTreeMap<u32, u32> = BTreeMap::new();
+        Ok(ErasedJson::pretty(requests))
     }
 
     // GET /<network>/block/hash/latest
@@ -190,12 +259,59 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         }
     }
 
-    // GET /<network>/program/{programID}
+    // GET /<network>/program/{programID}?metadata={true}
     pub(crate) async fn get_program(
         State(rest): State<Self>,
         Path(id): Path<ProgramID<N>>,
+        metadata: Query<Metadata>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.get_program(id)?))
+        // Get the program from the ledger.
+        let program = rest.ledger.get_program(id)?;
+        // Check if metadata is requested and return the program with metadata if so.
+        if metadata.metadata.unwrap_or(false) {
+            // Get the edition of the program.
+            let edition = rest.ledger.get_latest_edition_for_program(&id)?;
+            return rest.return_program_with_metadata(program, edition);
+        }
+        // Return the program without metadata.
+        Ok(ErasedJson::pretty(program))
+    }
+
+    // GET /<network>/program/{programID}/{edition}
+    // GET /<network>/program/{programID}/{edition}?metadata={true}
+    pub(crate) async fn get_program_for_edition(
+        State(rest): State<Self>,
+        Path((id, edition)): Path<(ProgramID<N>, u16)>,
+        metadata: Query<Metadata>,
+    ) -> Result<ErasedJson, RestError> {
+        // Get the program from the ledger.
+        let program = rest.ledger.get_program_for_edition(id, edition)?;
+        // Check if metadata is requested and return the program with metadata if so.
+        if metadata.metadata.unwrap_or(false) {
+            return rest.return_program_with_metadata(program, edition);
+        }
+        Ok(ErasedJson::pretty(program))
+    }
+
+    // A helper function to return the program and its metadata.
+    // This function is used in the `get_program` and `get_program_for_edition` functions.
+    fn return_program_with_metadata(&self, program: Program<N>, edition: u16) -> Result<ErasedJson, RestError> {
+        let id = program.id();
+        // Get the transaction ID associated with the program and edition.
+        let tx_id = self.ledger.find_transaction_id_from_program_id_and_edition(id, edition)?;
+        Ok(ErasedJson::pretty(json!({
+            "program": program,
+            "edition": edition,
+            "transaction_id": tx_id,
+        })))
+    }
+
+    // GET /<network>/program/{programID}/latest_edition
+    pub(crate) async fn get_latest_program_edition(
+        State(rest): State<Self>,
+        Path(id): Path<ProgramID<N>>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.get_latest_edition_for_program(&id)?))
     }
 
     // GET /<network>/program/{programID}/mappings
@@ -347,11 +463,19 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     }
 
     // GET /<network>/find/transactionID/deployment/{programID}
-    pub(crate) async fn find_transaction_id_from_program_id(
+    pub(crate) async fn find_latest_transaction_id_from_program_id(
         State(rest): State<Self>,
         Path(program_id): Path<ProgramID<N>>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.find_transaction_id_from_program_id(&program_id)?))
+        Ok(ErasedJson::pretty(rest.ledger.find_latest_transaction_id_from_program_id(&program_id)?))
+    }
+
+    // GET /<network>/find/transactionID/deployment/{programID}/{edition}
+    pub(crate) async fn find_transaction_id_from_program_id_and_edition(
+        State(rest): State<Self>,
+        Path((program_id, edition)): Path<(ProgramID<N>, u16)>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.find_transaction_id_from_program_id_and_edition(&program_id, edition)?))
     }
 
     // GET /<network>/find/transactionID/{transitionID}
@@ -411,6 +535,16 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
                 let proof_target = rest.ledger.latest_proof_target();
                 // Ensure that the solution is valid for the given epoch.
                 let puzzle = rest.ledger.puzzle().clone();
+                // Check if the prover has reached their solution limit.
+                // While snarkVM will ultimately abort any excess solutions for safety, performing this check
+                // here prevents the to-be aborted solutions from propagating through the network.
+                let prover_address = solution.address();
+                if rest.ledger.is_solution_limit_reached(&prover_address, 0) {
+                    return Err(RestError(format!(
+                        "Invalid solution '{}' - Prover '{prover_address}' has reached their solution limit for the current epoch",
+                        fmt_id(solution.id())
+                    )));
+                }
                 // Verify the solution in a blocking task.
                 match tokio::task::spawn_blocking(move || puzzle.check_solution(&solution, epoch_hash, proof_target))
                     .await

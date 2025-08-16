@@ -73,7 +73,7 @@ impl<N: Network> Sync<N> {
 
         // Update the `IS_SYNCED` metric.
         #[cfg(feature = "metrics")]
-        metrics::gauge(metrics::bft::IS_SYNCED, true);
+        amareleo_node_metrics::gauge(amareleo_node_metrics::bft::IS_SYNCED, true);
 
         Ok(())
     }

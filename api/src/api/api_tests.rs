@@ -12,8 +12,11 @@
 
 #[cfg(test)]
 mod tests {
+    use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
     use crate::{AmareleoApiState, api_node::AmareleoApi};
     use amareleo_chain_tracing::TracingHandler;
+    use amareleo_node_rest::DEFAULT_REST_PORT;
     use serial_test::serial;
     use snarkvm::prelude::{MainnetV0, Network};
 
@@ -37,7 +40,7 @@ mod tests {
         let node1 = AmareleoApi::new();
         assert!(node1.cfg_network(MainnetV0::ID).is_ok());
         assert!(node1.cfg_ledger(false, Some(temp_path.clone()), true).is_ok());
-        assert!(node1.cfg_rest("127.0.0.1:3030".parse().unwrap(), 10).is_ok());
+        assert!(node1.cfg_rest(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, DEFAULT_REST_PORT)), 10).is_ok());
         assert!(node1.cfg_file_log(None, 4).is_ok());
         assert!(node1.cfg_custom_log(TracingHandler::new()).is_ok());
         assert!(node1.cfg_no_log().is_ok());

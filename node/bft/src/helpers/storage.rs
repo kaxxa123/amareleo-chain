@@ -213,7 +213,7 @@ impl<N: Network> Storage<N> {
         self.update_current_round(next_round);
 
         #[cfg(feature = "metrics")]
-        metrics::gauge(metrics::bft::LAST_STORED_ROUND, next_round as f64);
+        amareleo_node_metrics::gauge(amareleo_node_metrics::bft::LAST_STORED_ROUND, next_round as f64);
 
         // Retrieve the storage round.
         let storage_round = self.current_round();

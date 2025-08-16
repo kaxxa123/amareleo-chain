@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain"
-version = "2.5.0"
+version = "3.0.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -34,6 +34,123 @@ members = [
   "node/sync"
   ]
 
+[workspace.dependencies.aleo-std]
+version = "1.0.1"
+default-features = false
+
+[workspace.dependencies.snarkvm] # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
+#path = "../snarkVM"
+#git = "https://github.com/ProvableHQ/snarkVM.git"
+#rev = "fe255cf"
+version = "=4.0.0"
+default-features = false
+#features = [ "circuit", "console", "rocks" ]
+
+[workspace.dependencies.anyhow]
+version = "1.0"
+
+[workspace.dependencies.clap]
+version = "4.4"
+default-features = false
+features = [ "std" ]
+
+[workspace.dependencies.crossterm]
+version = "0.29"
+
+[workspace.dependencies.futures]
+version = "0.3"
+
+[workspace.dependencies.proptest]
+version = "=1.6.0" # Remove this once we upgrade to rand 0.9
+
+[workspace.dependencies.base64]
+version = "0.22"
+
+[workspace.dependencies.tokio]
+version = "1.28"
+
+[workspace.dependencies.tokio-util]
+version = "0.7"
+
+[workspace.dependencies.itertools]
+version = "0.14"
+
+[workspace.dependencies.indexmap]
+version = "2"
+default-features = false
+
+[workspace.dependencies.serde]
+version = "1"
+default-features = false
+
+[workspace.dependencies.parking_lot]
+version = "0.12"
+
+[workspace.dependencies.tracing]
+version = "0.1"
+default-features = false
+
+[workspace.dependencies.tracing-test]
+version = "0.2"
+
+[workspace.dependencies.tracing-subscriber]
+version = "0.3"
+
+[workspace.dependencies.test-strategy]
+version = "0.4"
+
+[workspace.dependencies.amareleo-chain-resources]
+path = "./resources"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-chain-account]
+path = "./account"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-chain-tracing]
+path = "./tracing"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-chain-cli]
+path = "./cli"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-chain-api]
+path = "./api"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-node-metrics]
+path = "./node/metrics"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-node]
+path = "./node"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-node-bft]
+path = "./node/bft"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-node-bft-storage-service]
+path = "node/bft/storage-service"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-node-bft-ledger-service]
+path = "node/bft/ledger-service"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-node-consensus]
+path = "node/consensus"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-node-sync]
+path = "node/sync"
+version = "=3.0.0"
+
+[workspace.dependencies.amareleo-node-rest]
+path = "./node/rest"
+version = "=3.0.0"
+
 [lib]
 path = "src/lib.rs"
 test = false
@@ -60,83 +177,57 @@ locktick = [
 ]
 test_network = [ "amareleo-chain-cli/test_network" ]
 
-[dependencies]
-
-[workspace.dependencies.aleo-std]
-version = "1.0.1"
-default-features = false
-
-[workspace.dependencies.snarkvm] # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
-#path = "../snarkVM"
-#git = "https://github.com/ProvableHQ/snarkVM.git"
-#rev = "0d744e9"
-version = "=3.8.0"
-features = [ "circuit", "console", "rocks" ]
-
 [dependencies.anyhow]
-version = "1.0.79"
+workspace = true
 
 [dependencies.clap]
-version = "4.4"
+workspace = true
 features = [ "derive" ]
 
 [dependencies.locktick]
 version = "0.3"
 optional = true
 
-[dependencies.amareleo-chain-account]
-path = "./account"
-version = "=2.5.0"
-
 [dependencies.amareleo-chain-cli]
-path = "./cli"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-chain-tracing]
-path = "./tracing"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-chain-api]
-path = "./api"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-node]
-path = "./node"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-node-bft]
-path = "./node/bft"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-node-consensus]
-path = "./node/consensus"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-node-metrics]
-path = "./node/metrics"
-version = "=2.5.0"
+workspace = true
 optional = true
 
 [dependencies.amareleo-node-rest]
-path = "./node/rest"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-node-sync]
-path = "./node/sync"
-version = "=2.5.0"
+workspace = true
 
 [target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
 tikv-jemallocator = "0.5"
 
 [dependencies.tracing]
-version = "0.1"
+workspace = true
 optional = true
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"
 
 [build-dependencies.built]
-version = "0.7"
+version = "0.8"
 features = [ "git2" ]
 
 [build-dependencies.toml]
@@ -172,3 +263,14 @@ lto = "thin"
 incremental = true
 debug = true
 debug-assertions = true
+
+[package.metadata.cargo-machete]
+ignored = [
+  "amareleo-chain-account",
+  "amareleo-node", # Needed for metrics feature
+  "amareleo-node-bft", # Needed for locktick features
+  "amareleo-node-consensus", # Needed for locktick features
+  "amareleo-node-rest", # Needed for locktick features
+  "amareleo-node-sync", # Needed for locktick features
+  "amareleo-node-metrics", # Needed for locktick feature
+]

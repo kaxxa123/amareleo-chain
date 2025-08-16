@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain-cli"
-version = "2.5.0"
+version = "3.0.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A CLI for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -18,34 +18,47 @@ locktick = [
     "amareleo-node-rest/locktick",
     "snarkvm/locktick",
 ]
-metrics = ["dep:metrics", "amareleo-chain-api/metrics", "amareleo-node/metrics"]
+metrics = [
+    "dep:amareleo-node-metrics",
+    "amareleo-chain-api/metrics",
+    "amareleo-node/metrics",
+]
 test_network = ["snarkvm/test_targets", "snarkvm/test_consensus_heights"]
 
 [dependencies.anstyle]
 version = "1"
 
+[dependencies.anyhow]
+workspace = true
+
 [dependencies.glob]
 version = "0.3"
 
-[dependencies.anyhow]
-version = "1.0.79"
-
 [dependencies.clap]
-version = "4.4"
-features = ["derive", "color", "unstable-styles"]
+workspace = true
+features = [
+    "derive",
+    "color",
+    "unstable-styles",
+    "help",
+    "cargo",
+    "usage",
+    "suggestions",
+]
 
 [dependencies.colored]
-version = "2"
+version = "3"
+
+[dependencies.crossterm]
+workspace = true
 
 [dependencies.locktick]
 version = "0.3"
 features = ["parking_lot"]
 optional = true
 
-[dependencies.metrics]
-package = "amareleo-node-metrics"
-path = "../node/metrics"
-version = "=2.5.0"
+[dependencies.amareleo-node-metrics]
+workspace = true
 optional = true
 
 [dependencies.num_cpus]
@@ -55,48 +68,44 @@ version = "1"
 version = "1"
 
 [dependencies.self_update]
-version = "0.41"
+version = "0.42"
 features = ["archive-zip", "compression-zip-deflate"]
 
-[dependencies.crossterm]
-version = "0.27"
+[dependencies.amareleo-node]
+workspace = true
+
+[dependencies.amareleo-node-rest]
+workspace = true
+
+[dependencies.amareleo-chain-tracing]
+workspace = true
+
+[dependencies.amareleo-chain-api]
+workspace = true
+
+[dependencies.snarkvm]
+workspace = true
+features = ["parameters", "circuit", "package"]
 
 [dependencies.time]
 version = "0.3"
 features = ["formatting"]
 
-[dependencies.tracing]
-version = "0.1"
-
-[dependencies.tracing-subscriber]
-version = "0.3"
-features = ["env-filter"]
-
-[dependencies.amareleo-node]
-path = "../node"
-version = "=2.5.0"
-
-[dependencies.amareleo-node-rest]
-path = "../node/rest"
-version = "=2.5.0"
-
-[dependencies.amareleo-chain-tracing]
-path = "../tracing"
-version = "=2.5.0"
-
-[dependencies.amareleo-chain-api]
-path = "../api"
-version = "=2.5.0"
-
-[dependencies.snarkvm]
-workspace = true
-
 [dependencies.thiserror]
 version = "2.0.11"
 
 [dependencies.tokio]
-version = "1.28"
+workspace = true
 features = ["rt", "rt-multi-thread"]
 
+[dependencies.tracing]
+workspace = true
+
+[dependencies.tracing-subscriber]
+workspace = true
+features = ["env-filter"]
+
 [target."cfg(target_family = \"unix\")".dependencies.nix]
-version = "0.26"
+version = "0.30"
+default-features = false
+features = ["resource"]

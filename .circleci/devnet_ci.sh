@@ -75,9 +75,9 @@ check_heights() {
     fi
 }
 
-# Wait for 60 seconds to let the network start up
-echo "Waiting 60 seconds for network to start up..."
-sleep 60
+# Wait for 30 seconds to let the network start up
+echo "Waiting 30 seconds for network to start up..."
+sleep 30
 
 # Check heights periodically with a timeout
 total_wait=0
@@ -94,8 +94,8 @@ while [ $total_wait -lt 900 ]; do  # 15 minutes max
     fi
     
     # Continue waiting
-    sleep 60
-    total_wait=$((total_wait + 60))
+    sleep 30
+    total_wait=$((total_wait + 30))
     echo "Waited $total_wait seconds so far..."
 done
 

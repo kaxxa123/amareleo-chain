@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-bft-storage-service"
-version = "2.5.0"
+version = "3.0.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A storage service for the memory pool in a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -21,10 +21,10 @@ test = ["memory"]
 workspace = true
 
 [dependencies.anyhow]
-version = "1.0.79"
+workspace = true
 
 [dependencies.indexmap]
-version = "2.1"
+workspace = true
 features = ["serde", "rayon"]
 
 [dependencies.locktick]
@@ -41,13 +41,13 @@ optional = true
 
 [dependencies.snarkvm]
 workspace = true
+features = ["ledger", "console", "rocks"]
 
 [dependencies.amareleo-chain-tracing]
-path = "../../../tracing"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.tracing]
-version = "0.1"
+workspace = true
 optional = true
 
 [dev-dependencies.snarkvm]

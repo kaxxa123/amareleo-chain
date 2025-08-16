@@ -317,7 +317,7 @@ impl<N: Network> Consensus<N> {
         let checksum = Data::<Solution<N>>::Buffer(solution.to_bytes_le()?.into()).to_checksum::<N>()?;
         #[cfg(feature = "metrics")]
         {
-            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
+            amareleo_node_metrics::increment_gauge(amareleo_node_metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
             let timestamp = amareleo_node_bft::helpers::now();
             self.transmissions_queue_timestamps
                 .lock()
@@ -396,7 +396,7 @@ impl<N: Network> Consensus<N> {
         let checksum = Data::<Transaction<N>>::Buffer(transaction.to_bytes_le()?.into()).to_checksum::<N>()?;
         #[cfg(feature = "metrics")]
         {
-            metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
+            amareleo_node_metrics::increment_gauge(amareleo_node_metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
             let timestamp = amareleo_node_bft::helpers::now();
             self.transmissions_queue_timestamps
                 .lock()
@@ -583,14 +583,23 @@ impl<N: Network> Consensus<N> {
             let coinbase_target = next_block.header().coinbase_target();
             let cumulative_proof_target = next_block.header().cumulative_proof_target();
 
-            metrics::add_transmission_latency_metric(&self.transmissions_queue_timestamps, &next_block);
+            amareleo_node_metrics::add_transmission_latency_metric(&self.transmissions_queue_timestamps, &next_block);
 
-            metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
-            metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
-            metrics::histogram(metrics::consensus::BLOCK_LATENCY, block_latency as f64);
-            metrics::gauge(metrics::blocks::PROOF_TARGET, proof_target as f64);
-            metrics::gauge(metrics::blocks::COINBASE_TARGET, coinbase_target as f64);
-            metrics::gauge(metrics::blocks::CUMULATIVE_PROOF_TARGET, cumulative_proof_target as f64);
+            amareleo_node_metrics::gauge(
+                amareleo_node_metrics::consensus::COMMITTED_CERTIFICATES,
+                num_committed_certificates as f64,
+            );
+            amareleo_node_metrics::histogram(
+                amareleo_node_metrics::consensus::CERTIFICATE_COMMIT_LATENCY,
+                elapsed.as_secs_f64(),
+            );
+            amareleo_node_metrics::histogram(amareleo_node_metrics::consensus::BLOCK_LATENCY, block_latency as f64);
+            amareleo_node_metrics::gauge(amareleo_node_metrics::blocks::PROOF_TARGET, proof_target as f64);
+            amareleo_node_metrics::gauge(amareleo_node_metrics::blocks::COINBASE_TARGET, coinbase_target as f64);
+            amareleo_node_metrics::gauge(
+                amareleo_node_metrics::blocks::CUMULATIVE_PROOF_TARGET,
+                cumulative_proof_target as f64,
+            );
         }
         Ok(())
     }

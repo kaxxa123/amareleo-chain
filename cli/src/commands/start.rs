@@ -19,7 +19,7 @@ use colored::Colorize;
 
 use core::future::Future;
 use std::{
-    net::SocketAddr,
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     path::PathBuf,
     result::Result::Ok,
     sync::{Arc, atomic::AtomicBool},
@@ -35,43 +35,51 @@ use snarkvm::console::network::{CanaryV0, MainnetV0, Network, TestnetV0};
 
 use crate::helpers::initialize_custom_tracing;
 use amareleo_chain_api::{AmareleoApi, get_node_account};
+use amareleo_node_rest::DEFAULT_REST_PORT;
 
 /// Starts the node.
 #[derive(Clone, Debug, Parser)]
+#[command(
+    // Use kebab-case for all arguments (e.g., use the `private-key` flag for the `private_key` field).
+    // This is already the default, but we specify it in case clap's default changes in the future.
+    rename_all = "kebab-case",
+)]
 pub struct Start {
-    /// Specify the network ID of this node (0 = mainnet, 1 = testnet, 2 = canary)
-    #[clap(default_value_t=TestnetV0::ID, long = "network", value_parser = clap::value_parser!(u16).range((MainnetV0::ID as i64)..=(CanaryV0::ID as i64)))]
+    /// Specify the network ID of this node
+    /// [options: 0 = mainnet, 1 = testnet, 2 = canary]
+    #[clap(long, default_value_t=TestnetV0::ID, value_parser = clap::value_parser!(u16).range((MainnetV0::ID as i64)..=(CanaryV0::ID as i64)))]
     pub network: u16,
 
     /// Specify the IP address and port for the REST server [default: 127.0.0.1:3030]
-    #[clap(long = "rest")]
+    #[clap(long)]
     pub rest: Option<SocketAddr>,
     /// Specify the REST server requests per second (RPS) rate limit per IP
-    #[clap(default_value = "10", long = "rest-rps")]
+    #[clap(long, default_value = "10")]
     pub rest_rps: u32,
 
     /// Specify the verbosity level [options: 0, 1, 2, 3, 4]
-    #[clap(default_value = "1", long = "verbosity")]
+    #[clap(long, default_value_t = 1)]
     pub verbosity: u8,
+
     /// Specify the path to the log file
-    #[clap(long = "logfile")]
+    #[clap(long)]
     pub logfile: Option<PathBuf>,
 
-    /// Enables the metrics exporter
+    /// Enable the metrics exporter
     #[cfg(feature = "metrics")]
-    #[clap(default_value = "false", long = "metrics")]
+    #[clap(long, default_value = "false")]
     pub metrics: bool,
     /// Specify the IP address and port for the metrics exporter [default: 127.0.0.1:9000]
-    #[clap(long = "metrics-ip")]
     #[cfg(feature = "metrics")]
+    #[clap(long)]
     pub metrics_ip: Option<SocketAddr>,
 
     /// Specify the path to the ledger storage directory [default: current directory]
-    #[clap(long = "storage")]
+    #[clap(long)]
     pub storage: Option<PathBuf>,
 
-    /// Enables preserving the chain state across runs
-    #[clap(default_value = "false", long = "keep-state")]
+    /// Enable preserving the chain state across runs
+    #[clap(long, default_value = "false")]
     pub keep_state: bool,
 }
 
@@ -115,7 +123,7 @@ impl Start {
         println!("{}", Self::welcome_message());
 
         // Parse the REST IP.
-        let rest_ip_port = self.rest.as_ref().copied().unwrap_or_else(|| "0.0.0.0:3030".parse().unwrap());
+        let rest_ip_port = self.rest.as_ref().copied().unwrap_or_else(|| SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, DEFAULT_REST_PORT)));
 
         // Get the node account.
         let account = get_node_account::<N>()?;
@@ -124,14 +132,14 @@ impl Start {
         println!("🧭 Starting node on {}.\n",N::NAME.bold());
         println!("🌐 Starting the REST server at {}.\n", rest_ip_port.to_string().bold());
 
-        if let Ok(jwt_token) = amareleo_node_rest::Claims::new(account.address()).to_jwt_string() {
+        if let Ok(jwt_token) = amareleo_node_rest::Claims::new(account.address(), None, None).to_jwt_string() {
             println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
         }
 
         // Initialize the metrics.
         #[cfg(feature = "metrics")]
         if self.metrics {
-            metrics::initialize_metrics(self.metrics_ip);
+            amareleo_node_metrics::initialize_metrics(self.metrics_ip);
         }
 
         let node_api= AmareleoApi::new();

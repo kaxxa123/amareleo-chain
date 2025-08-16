@@ -28,17 +28,21 @@ use clap::{Parser, builder::Styles};
 
 const HEADER_COLOR: Option<Color> = Some(Color::Ansi(AnsiColor::Yellow));
 const LITERAL_COLOR: Option<Color> = Some(Color::Ansi(AnsiColor::Green));
+const ERROR_COLOR: Option<Color> = Some(Color::Ansi(AnsiColor::Red));
+const INVALID_COLOR: Option<Color> = Some(Color::Ansi(AnsiColor::Magenta));
+
 const STYLES: Styles = Styles::plain()
     .header(Style::new().bold().fg_color(HEADER_COLOR))
     .usage(Style::new().bold().fg_color(HEADER_COLOR))
+    .error(Style::new().bold().fg_color(ERROR_COLOR))
+    .invalid(Style::new().fg_color(INVALID_COLOR))
+    .valid(Style::new().bold().fg_color(LITERAL_COLOR))
     .literal(Style::new().bold().fg_color(LITERAL_COLOR));
 
+// The top-level command-line argument.
 #[derive(Debug, Parser)]
 #[clap(styles = STYLES, version)]
 pub struct CLI {
-    /// Specify the verbosity [options: 0, 1, 2, 3]
-    #[clap(default_value = "2", short, long)]
-    pub verbosity: u8,
     /// Specify a subcommand.
     #[clap(subcommand)]
     pub command: Command,

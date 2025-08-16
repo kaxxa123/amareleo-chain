@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-chain-api"
-version = "2.5.0"
+version = "3.0.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "API for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -55,24 +55,22 @@ version = "0.3"
 features = ["env-filter"]
 
 [dependencies.amareleo-chain-account]
-path = "../account"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-chain-tracing]
-path = "../tracing"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-node]
-path = "../node"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-node-bft]
-path = "../node/bft"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-chain-resources]
-path = "../resources"
-version = "=2.5.0"
+workspace = true
+
+[dependencies.amareleo-node-rest]
+workspace = true
 
 [dependencies.snarkvm]
 workspace = true

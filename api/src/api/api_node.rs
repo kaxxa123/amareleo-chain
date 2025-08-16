@@ -20,7 +20,11 @@ use crate::{
     is_valid_network_id,
 };
 
-use std::{net::SocketAddr, path::PathBuf, sync::OnceLock};
+use std::{
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    path::PathBuf,
+    sync::OnceLock,
+};
 
 use anyhow::{Result, bail};
 #[cfg(feature = "locktick")]
@@ -31,6 +35,7 @@ use snarkvm::console::network::{Network, TestnetV0};
 
 use amareleo_chain_tracing::TracingHandler;
 use amareleo_node_bft::helpers::amareleo_storage_mode;
+use amareleo_node_rest::DEFAULT_REST_PORT;
 
 // ===================================================================
 // AmareleoApi is a simple thread-safe singleton.
@@ -77,7 +82,7 @@ impl AmareleoApi {
                 state: AmareleoApiState::Init,
                 prev_state: AmareleoApiState::Init,
                 network_id: TestnetV0::ID,
-                rest_ip: "0.0.0.0:3030".parse().unwrap(),
+                rest_ip: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, DEFAULT_REST_PORT)),
                 rest_rps: 10u32,
                 keep_state: false,
                 ledger_base_path: None,

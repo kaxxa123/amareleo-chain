@@ -127,6 +127,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 mod tests {
     use super::*;
     use amareleo_node_bft::DEVELOPMENT_MODE_RNG_SEED;
+    use amareleo_node_rest::DEFAULT_REST_PORT;
 
     use snarkvm::prelude::{
         MainnetV0,
@@ -137,7 +138,7 @@ mod tests {
     use anyhow::bail;
     use rand::SeedableRng;
     use rand_chacha::ChaChaRng;
-    use std::str::FromStr;
+    use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
     type CurrentNetwork = MainnetV0;
 
@@ -146,7 +147,7 @@ mod tests {
     #[tokio::test]
     async fn test_profiler() -> Result<()> {
         // Specify the node attributes.
-        let rest = SocketAddr::from_str("0.0.0.0:3030").unwrap();
+        let rest = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, DEFAULT_REST_PORT));
         let storage_mode = StorageMode::Development(0);
 
         // Initialize an (insecure) fixed RNG.

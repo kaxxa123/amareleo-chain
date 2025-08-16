@@ -392,7 +392,7 @@ impl<N: Network> Primary<N> {
         }
 
         #[cfg(feature = "metrics")]
-        metrics::gauge(metrics::bft::PROPOSAL_ROUND, round as f64);
+        amareleo_node_metrics::gauge(amareleo_node_metrics::bft::PROPOSAL_ROUND, round as f64);
 
         // Ensure that the primary does not create a new proposal too quickly.
         if let Err(e) = self.check_proposal_timestamp(previous_round, self.account.address(), now()) {
@@ -711,7 +711,7 @@ impl<N: Network> Primary<N> {
         }
 
         #[cfg(feature = "metrics")]
-        metrics::increment_gauge(metrics::bft::CERTIFIED_BATCHES, 1.0);
+        amareleo_node_metrics::increment_gauge(amareleo_node_metrics::bft::CERTIFIED_BATCHES, 1.0);
         Ok(())
     }
 

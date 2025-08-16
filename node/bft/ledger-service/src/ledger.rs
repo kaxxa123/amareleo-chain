@@ -307,6 +307,17 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             bail!("Invalid solution - expected {solution_id}, found {}", solution.id());
         }
 
+        // Check if the prover has reached their solution limit.
+        // While snarkVM will ultimately abort any excess solutions for safety, performing this check
+        // here prevents the to-be aborted solutions from propagating through the network.
+        let prover_address = solution.address();
+        if self.ledger.is_solution_limit_reached(&prover_address, 0) {
+            bail!(
+                "Invalid Solution '{}' - Prover '{prover_address}' has reached their solution limit for the current epoch",
+                fmt_id(solution.id())
+            );
+        }
+
         // Compute the current epoch hash.
         let epoch_hash = self.ledger.latest_epoch_hash()?;
         // Retrieve the current proof target.
@@ -378,11 +389,11 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             let num_sol = block.solutions().len();
             let num_tx = block.transactions().len();
 
-            metrics::gauge(metrics::bft::HEIGHT, block.height() as f64);
-            metrics::gauge(metrics::bft::LAST_COMMITTED_ROUND, block.round() as f64);
-            metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
-            metrics::increment_gauge(metrics::blocks::TRANSACTIONS, num_tx as f64);
-            metrics::update_block_metrics(block);
+            amareleo_node_metrics::gauge(amareleo_node_metrics::bft::HEIGHT, block.height() as f64);
+            amareleo_node_metrics::gauge(amareleo_node_metrics::bft::LAST_COMMITTED_ROUND, block.round() as f64);
+            amareleo_node_metrics::increment_gauge(amareleo_node_metrics::blocks::SOLUTIONS, num_sol as f64);
+            amareleo_node_metrics::increment_gauge(amareleo_node_metrics::blocks::TRANSACTIONS, num_tx as f64);
+            amareleo_node_metrics::update_block_metrics(block);
         }
 
         guard_info!(self, "\n\nAdvanced to block {} at round {} - {}\n", block.height(), block.round(), block.hash());

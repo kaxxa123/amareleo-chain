@@ -1,6 +1,6 @@
 [package]
 name = "amareleo-node-consensus"
-version = "2.5.0"
+version = "3.0.0"
 authors = ["The Amareleo Team <amareleo@windeveloper.com>"]
 description = "A node consensus for a lite Aleo development node"
 homepage = "https://amareleo.com"
@@ -19,7 +19,7 @@ locktick = [
     "amareleo-node-bft-storage-service/locktick",
     "snarkvm/locktick",
 ]
-metrics = ["dep:metrics"]
+metrics = ["dep:amareleo-node-metrics"]
 
 [dependencies.aleo-std]
 workspace = true
@@ -42,36 +42,29 @@ optional = true
 [dependencies.lru]
 version = "0.12.1"
 
-[dependencies.metrics]
-package = "amareleo-node-metrics"
-path = "../metrics"
-version = "=2.5.0"
+[dependencies.amareleo-node-metrics]
+workspace = true
 optional = true
 
 [dependencies.parking_lot]
 version = "0.12"
 
 [dependencies.amareleo-chain-account]
-path = "../../account"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-chain-tracing]
-path = "../../tracing"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-node-bft]
-path = "../bft"
-version = "=2.5.0"
+workspace = true
 
 [dependencies.amareleo-node-bft-ledger-service]
-path = "../bft/ledger-service"
-version = "=2.5.0"
+workspace = true
 default-features = false
 features = ["ledger", "ledger-write"]
 
 [dependencies.amareleo-node-bft-storage-service]
-path = "../bft/storage-service"
-version = "=2.5.0"
+workspace = true
 default-features = false
 features = ["persistent"]
 
