@@ -11,6 +11,7 @@
 * [2. Build Guide](#2-build-guide)
     * [2.1 Requirements](#21-Requirements)
     * [2.2 Installation](#22-installation)
+    * [2.3 macOS Installation](#23-macos-installation)
 * [3. Run](#3-run)
     * [3.1 Amareleo-Chain CLI](#31-amareleo-chain-cli)
 
@@ -64,6 +65,38 @@ Otherwise, ensure your machine has `Rust v1.83+` installed. Instructions to [ins
 git clone https://github.com/kaxxa123/amareleo-chain.git
 cd amareleo-chain
 ./build_ubuntu.sh
+```
+
+### 2.3 macOS Installation
+
+**Step 1 — Install Rust 1.81 or newer**
+
+**Step 2 — Clone this repo**
+
+```bash
+git clone https://github.com/kaxxa123/amareleo-chain.git
+cd amareleo-chain
+```
+
+**Step 3 — Perform a Cargo build**
+
+```bash
+cargo build --release
+```
+
+**Step 4 - Run it**
+
+```bash
+./target/release/amareleo-chain help
+```
+
+**Step 5 (optiona) - Install it**
+To run `amareleo-chain` from anywhere, you can install the binary to ~/.cargo/bin, which should already be in your PATH:
+```bash
+cargo install --path . --locked
+
+# now, from any path
+amarelo-chain start
 ```
 
 ## 3. Run
