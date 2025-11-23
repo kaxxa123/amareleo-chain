@@ -37,7 +37,7 @@ Key benefits:
 ## 2. Build Guide
 
 Amareleo-Chain may be installed from source or from [crates.io](https://crates.io/) using cargo. 
-On a fresh machine, installing from source is recommanded as this will also help getting all dependencies installed.
+On a fresh machine, installing from source is recommended as this will also help getting all dependencies installed.
 
 ### 2.1 Requirements
 
@@ -90,13 +90,13 @@ cargo build --release
 ./target/release/amareleo-chain help
 ```
 
-**Step 5 (optiona) - Install it**
+**Step 5 (optional) - Install it**
 To run `amareleo-chain` from anywhere, you can install the binary to ~/.cargo/bin, which should already be in your PATH:
 ```bash
 cargo install --path . --locked
 
 # now, from any path
-amarelo-chain start
+amareleo-chain start
 ```
 
 ## 3. Run
@@ -121,7 +121,7 @@ For `snarkos` users, running `amareleo-chain start` will look very much like run
 
 * The `amareleo-chain` default network is `testnet` (`--network 1`) rather than `mainnet` (`--network 0`).
 
-* `amareleo-chain` supports two modes of operations controlled by the `--keep-state` argument. Running `amareleo-chain start`, the node will start from genesis and will not preserve the chain state accross runs. Running `amareleo-chain start --keep-state` causes it to preserve the chain-state.
+* `amareleo-chain` supports two modes of operations controlled by the `--keep-state` argument. Running `amareleo-chain start`, the node will start from genesis and will not preserve the chain state across runs. Running `amareleo-chain start --keep-state` causes it to preserve the chain-state.
 
 * `amareleo-chain` uses different disk storage locations depending on its mode of operation:
 
